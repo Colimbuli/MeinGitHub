@@ -57,6 +57,15 @@ const inlineWahl = markup.match(/\{[^}]*\}/g) || [];
 pruefe('keine geschweiften Klammern im Markup', inlineWahl.length === 0, inlineWahl.join(' '));
 pruefe('Klammer-Hinweis für den Spieler bleibt sichtbar', markup.includes('&#91;eckigen Klammern&#93;'));
 
+// Perchance liest den Klammerinhalt als JS-Ausdruck — auch im <script>-Block.
+// ['a','b'] und [i] sind gültiges JavaScript und stören nicht; zwei nackte
+// Wörter wie [eckigen Klammern] sind ein Syntaxfehler und legen den
+// Generator lahm. In Zeichenketten deshalb \x5B und \x5D schreiben.
+const nackteWorte = (html.match(/\[[^\]\n]*\]/g) || []).filter(k =>
+  /^\[\s*[A-Za-zÄÖÜäöüß_][A-Za-zÄÖÜäöüß0-9_]*(\s+[A-Za-zÄÖÜäöüß_][A-Za-zÄÖÜäöüß0-9_]*)+\s*\]$/.test(k));
+pruefe('keine nackten Wortfolgen in eckigen Klammern (ganze Datei)', nackteWorte.length === 0, nackteWorte.join(' '));
+pruefe('Version im Startbildschirm ablesbar', /V\d+\.\d+/.test(markup));
+
 console.log('\n— jsonAus —');
 pruefe('sauberes JSON', ctx.jsonAus('{"a":1}').a === 1);
 pruefe('JSON in Codeblock', ctx.jsonAus('```json\n{"a":2}\n```').a === 2);

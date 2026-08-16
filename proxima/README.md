@@ -47,16 +47,28 @@ Eine weitere Quelle hinzufügen heißt: einen Eintrag in `BILDQUELLEN` ergänzen
 
 ## Fallstrick beim Bearbeiten
 
-Perchance wertet den **HTML-Bereich als Vorlage** aus, bevor der Browser ihn sieht. Ein
-eingeklammertes Wort gilt dort als Listenverweis — `[eckigen Klammern]` in einem Platzhalter
-lässt den ganzen Generator mit *„There's a problem with the syntax of this expression"*
-abbrechen, und in der Folge fehlt dem KI-Plugin sein Iframe
+Perchance wertet den **kompletten HTML-Bereich als Vorlage** aus, bevor der Browser ihn sieht —
+Markup, HTML-Kommentare **und den `<script>`-Block**. Was in eckigen Klammern steht, wird als
+Ausdruck gelesen.
+
+Entscheidend ist, ob der Klammerinhalt als JavaScript durchgeht:
+
+| im Quelltext | Ergebnis |
+|---|---|
+| `S.stimmung[i]`, `z['NPC_NAME']`, `['a','b']`, `[]` | gültiger Ausdruck — unproblematisch |
+| `[eckigen Klammern]`, `[tritt ein]` | zwei nackte Bezeichner → **Syntaxfehler**, der Generator startet nicht |
+
+Der Fehler lautet *„There's a problem with the syntax of this expression"* und zieht Folgefehler
+nach sich: ohne aufgebaute Generator-Struktur findet das KI-Plugin sein Iframe nicht mehr
 (*„Cannot read properties of null (reading 'contentWindow')"*).
 
-Das gilt für Attribute, Text **und HTML-Kommentare**. Frei davon sind nur `<script>` und
-`<style>` — Array-Zugriffe wie `S.stimmung[i]` im Skript sind also unproblematisch.
+Deshalb:
 
-Im Markup deshalb `&#91;` und `&#93;` schreiben. `node test/logik.test.js` prüft das mit.
+* im **Markup** `&#91;` und `&#93;` schreiben — sieht im Browser aus wie eckige Klammern,
+* in **JavaScript-Zeichenketten** `'\x5B…\x5D'` — ergibt zur Laufzeit dieselben Zeichen,
+* in **Kommentaren** gar keine Klammern um Wortfolgen.
+
+`node test/logik.test.js` prüft beides und schlägt fehl, bevor es in Perchance auffällt.
 
 ## Befehle im Spiel
 

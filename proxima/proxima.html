@@ -149,7 +149,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.1</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -572,12 +572,12 @@ function einWort(s){ return String(s||'').toLowerCase().trim().split(/[\s,.;:]/)
 var W = {
   protagonist:{name:'',herkunft:'',beruf:'',eigenart:'',aussehen:'',kleidung:''},
   stadt:'', rahmenhandlung:'', rahmenhandlungOriginal:'',
-  ort:null,          // {name,geschichte,bildPrompt}
-  npcs:[]            // [{name,rolle,aussehen,kleidung,person,grundstimmung,eroeffnung}]
+  ort:null,          // mit name, geschichte, bildPrompt
+  npcs:[]            // Figuren mit name, rolle, aussehen, kleidung, person, grundstimmung, eroeffnung
 };
 var S = {
   imSpiel:false, wartet:false,
-  verlauf:[],                       // [{rolle:'ich'|'npc', idx, text, name}]
+  verlauf:[],                       // Eintraege: rolle 'ich' oder 'npc', idx, text, name
   stimmung:[], kleidung:[], regieAnweisung:[],
   handlung:'', fakten:[],           // Kurzzeit-Zusammenfassung + Langzeitgedaechtnis
   seed:0,                           // fest, damit Figuren wiedererkennbar bleiben
@@ -862,7 +862,7 @@ async function naechsterZug(erzwinge,autoModus){
     (autoModus?'AUTO-MODUS: Der Held schweigt gerade. Die Figuren treiben die Szene EIGENSTAENDIG voran, reden miteinander und handeln.\n':'')+
     (autoModus&&!mehrere?'Es ist nur EINE Figur anwesend: sie handelt allein weiter – denkt laut, beschaeftigt sich, kommentiert die Umgebung, geht ihrer Taetigkeit nach und treibt die Szene voran, auch ohne Gegenueber.\n':'')+
     'REGISTER: Der Ton ist warm, freundlich und offen. Alle Figuren begegnen einander UND dem Helden mit Respekt und Sympathie. Frivole, freche, anzuegliche und teils obszoene Sprueche sind erlaubt und erwuenscht, solange sie SPIELERISCH und gutmuetig bleiben. KEINE Beleidigungen, keine Herablassung, keine Feindseligkeit untereinander — necken ja, verletzen oder respektlos sein nein.\n'+
-    '- Text des Helden in eckigen Klammern [ ] sind seine HANDLUNGEN. Figuren antworten mit EIGENEN Handlungen (in eckigen Klammern) und Rede.\n'+
+    '- Text des Helden in eckigen Klammern sind seine HANDLUNGEN. Figuren antworten mit EIGENEN Handlungen (in eckigen Klammern) und Rede.\n'+
     '- Reagiere KONKRET auf das zuletzt Gesagte. Wiederhole keine Formulierungen aus frueheren Zeilen.\n'+
     '- Widersprich nichts, was unter WAS BISHER FESTSTEHT aufgefuehrt ist.\n'+
     '- Stimmungen duerfen sich durch das Gespraech aendern, zum Guten wie zum Schlechten.\n\n'+
@@ -1090,7 +1090,7 @@ function zeigeHilfe(){
   z.className='zeile hilfe';
   var html='<div class="txt"><b>BEFEHLE</b><br>';
   BEFEHLE.forEach(function(b){ html+='<b>'+escapeHtml(b.hilfe[0])+'</b> — '+escapeHtml(b.hilfe[1])+'<br>'; });
-  html+='<br>Alles ohne Schrägstrich sprichst du selbst. Text in [eckigen Klammern] ist eine Handlung.</div>';
+  html+='<br>Alles ohne Schrägstrich sprichst du selbst. Text in \x5Beckigen Klammern\x5D ist eine Handlung.</div>';
   z.innerHTML=html;
   g.appendChild(z);scrolle();
 }
@@ -1255,7 +1255,7 @@ async function erscheineNPC(hint){
       kleidung:     f('kleidung','KLEIDUNG','simple clothing'),
       person:       f('person','PERSON','zurueckhaltend'),
       grundstimmung:einWort(f('stimmung','STIMMUNG','neugierig')),
-      eroeffnung:   f('eroeffnung','EROEFFNUNG','[tritt ein] Störe ich?')
+      eroeffnung:   f('eroeffnung','EROEFFNUNG','\x5Btritt ein\x5D Störe ich?')
     };
     var idx=W.npcs.length;
     W.npcs.push(npc);
@@ -1386,7 +1386,7 @@ function aktualisiereUI(){
   var f=el('freitext');
   if(f)f.placeholder=S.autoAktiv
     ? 'Regie (gilt dauerhaft)   ·   /sag: selbst sprechen   ·   /hilfe'
-    : 'Sprich oder handle in [eckigen Klammern]   ·   /hilfe';
+    : 'Sprich oder handle in \x5Beckigen Klammern\x5D   ·   /hilfe';
   baueChronikNav();
 }
 function zeigeStimmung(){
