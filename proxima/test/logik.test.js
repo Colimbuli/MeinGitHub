@@ -46,6 +46,17 @@ function pruefe(name, bedingung, extra) {
   else { bad++; console.log('  FAIL ' + name + (extra ? '  → ' + extra : '')); }
 }
 
+console.log('\n— Perchance-Syntax im Markup —');
+// Perchance wertet den HTML-Bereich als Vorlage aus: ein eingeklammertes Wort
+// gilt dort als Listenverweis und lässt den Generator mit Syntaxfehler abbrechen.
+// Das betrifft Attribute, Text UND Kommentare — nur <script> und <style> sind frei.
+const markup = html.replace(/<script>[\s\S]*?<\/script>/g, '').replace(/<style>[\s\S]*?<\/style>/g, '');
+const listenVerweise = markup.match(/\[[A-Za-zÄÖÜäöüß_][^\]]*\]/g) || [];
+pruefe('keine eckigen Klammern im Markup (nur &#91; &#93;)', listenVerweise.length === 0, listenVerweise.join(' '));
+const inlineWahl = markup.match(/\{[^}]*\}/g) || [];
+pruefe('keine geschweiften Klammern im Markup', inlineWahl.length === 0, inlineWahl.join(' '));
+pruefe('Klammer-Hinweis für den Spieler bleibt sichtbar', markup.includes('&#91;eckigen Klammern&#93;'));
+
 console.log('\n— jsonAus —');
 pruefe('sauberes JSON', ctx.jsonAus('{"a":1}').a === 1);
 pruefe('JSON in Codeblock', ctx.jsonAus('```json\n{"a":2}\n```').a === 2);

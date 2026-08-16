@@ -206,7 +206,10 @@ select.feld option{background:var(--panel);}
     <div id="gespraech" aria-live="polite" onclick="tippenFertig()"></div>
     <div id="interakt">
       <div id="freitext-wrap">
-        <input id="freitext" type="text" placeholder="Sprich oder handle in [eckigen Klammern]   ·   /hilfe" onkeydown="if(event.key==='Enter')sendeFreitext()">
+        <!-- &#91; und &#93; statt echter eckiger Klammern: Perchance liest im
+             HTML-Bereich ein eingeklammertes Wort als Listenverweis und bricht
+             sonst mit einem Syntaxfehler ab. Gilt auch fuer Kommentare wie diesen. -->
+        <input id="freitext" type="text" placeholder="Sprich oder handle in &#91;eckigen Klammern&#93;   ·   /hilfe" onkeydown="if(event.key==='Enter')sendeFreitext()">
         <button id="sendBtn" onclick="sendeFreitext()">SAGEN</button>
       </div>
     </div>

@@ -45,6 +45,19 @@ Zwei Dinge, die man wissen sollte:
 Eine weitere Quelle hinzufügen heißt: einen Eintrag in `BILDQUELLEN` ergänzen. Jede Quelle bekommt
 `{prompt, negativ, seed, breite, hoehe}` und gibt eine Bildadresse zurück — mehr ist der Vertrag nicht.
 
+## Fallstrick beim Bearbeiten
+
+Perchance wertet den **HTML-Bereich als Vorlage** aus, bevor der Browser ihn sieht. Ein
+eingeklammertes Wort gilt dort als Listenverweis — `[eckigen Klammern]` in einem Platzhalter
+lässt den ganzen Generator mit *„There's a problem with the syntax of this expression"*
+abbrechen, und in der Folge fehlt dem KI-Plugin sein Iframe
+(*„Cannot read properties of null (reading 'contentWindow')"*).
+
+Das gilt für Attribute, Text **und HTML-Kommentare**. Frei davon sind nur `<script>` und
+`<style>` — Array-Zugriffe wie `S.stimmung[i]` im Skript sind also unproblematisch.
+
+Im Markup deshalb `&#91;` und `&#93;` schreiben. `node test/logik.test.js` prüft das mit.
+
 ## Befehle im Spiel
 
 | Befehl | Wirkung |
