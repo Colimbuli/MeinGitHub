@@ -160,7 +160,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.13</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.14</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -349,7 +349,10 @@ var STILE = {
   aquarell:    'watercolor painting, soft washes, delicate brushwork, muted colors, textured paper',
   oel:         'classical oil painting, rich texture, dramatic chiaroscuro lighting, painterly brushstrokes',
   realistisch: 'candid 35mm film photograph, Fujifilm Provia, natural light, fine film grain, documentary realism',
-  pixel:       'detailed pixel art, 16-bit retro game style, limited palette, crisp pixels'
+  pixel:       'detailed pixel art, 16-bit retro game style, limited palette, crisp pixels',
+  // Illustrious- und Pony-Ableger reagieren auf Tag-Ketten deutlich besser als
+  // auf Prosa; die Qualitaets-Tags am Anfang sind dort ueblich.
+  illustrious: 'masterpiece, best quality, amazing quality, very aesthetic, absurdres, highly detailed, anime style'
 };
 var STIL_NEGATIV = {
   realistisch: 'illustration, painting, drawing, 3d render, cgi, airbrushed skin, retouched, plastic skin, over-sharpened, hdr'
@@ -387,7 +390,10 @@ var CFG={
   pollModell:'',
   hordeKey:'0000000000', hordeModell:'', hordeSchritte:25,
   apiUrl:'https://api.openai.com/v1', apiKey:'', apiModell:'gpt-image-1',
-  urlVorlage:'https://example.org/bild?p={prompt}&seed={seed}&w={breite}&h={hoehe}'
+  urlVorlage:'https://example.org/bild?p={prompt}&seed={seed}&w={breite}&h={hoehe}',
+  gradioHost:'https://ibarakidouji-wai-nsfw-illustrious-sdxl.hf.space',
+  gradioApi:'/infer', gradioFnIndex:'', gradioToken:'',
+  gradioVorlage:'["{prompt}", "{negativ}", {seed}, false, {breite}, {hoehe}, 7, 28]'
 };
 function ladeCfg(){
   try{
@@ -553,6 +559,46 @@ var BILDQUELLEN={
       throw new Error('API-Antwort ohne Bild.');
     }
   },
+  gradio:{
+    label:'Hugging-Face-Space (Gradio)',
+    info:'Spricht einen Gradio-Space über seine HTTP-Schnittstelle an. Die genaue Reihenfolge der Parameter steht auf der Space-Seite unten unter „Use via API" — von dort in die Vorlage übertragen. ZeroGPU-Spaces brauchen meist ein Token und haben ein Kontingent.',
+    felder:[
+      {k:'gradioHost',l:'Space-Adresse (…hf.space, ohne Schrägstrich am Ende)',typ:'text'},
+      {k:'gradioApi',l:'API-Name laut „Use via API" (z.B. /infer)',typ:'text'},
+      {k:'gradioFnIndex',l:'fn_index (leer = automatisch aus /config)',typ:'text'},
+      {k:'gradioToken',l:'Hugging-Face-Token (nur bei ZeroGPU oder privat)',typ:'passwort'},
+      {k:'gradioVorlage',l:'Parameter-Vorlage — Platzhalter: "{prompt}" "{negativ}" {seed} {breite} {hoehe}',typ:'text'}
+    ],
+    zeichne:async function(a){
+      var host=String(CFG.gradioHost||'').replace(/\/+$/,'');
+      if(!host)throw new Error('Keine Space-Adresse hinterlegt.');
+      var api=String(CFG.gradioApi||'/infer');
+      if(api.charAt(0)!=='/')api='/'+api;
+      var daten=gradioDaten(CFG.gradioVorlage,a);
+      var kopf={'Content-Type':'application/json'};
+      if(CFG.gradioToken)kopf['Authorization']='Bearer '+CFG.gradioToken;
+
+      // Warteschlange: anstellen, dann den Ergebnisstrom derselben Sitzung lesen.
+      var fn=await gradioFnIndex(host,api,kopf);
+      var sitzung=sitzungsNummer();
+      var r=await fetch(host+'/gradio_api/queue/join',{
+        method:'POST',headers:kopf,
+        body:JSON.stringify({data:daten,fn_index:fn,session_hash:sitzung,trigger_id:null})
+      });
+      if(!r.ok)throw new Error('Anstellen abgelehnt (HTTP '+r.status+'): '+(await r.text()).substring(0,200)+
+        ' [fn_index '+fn+', '+daten.length+' Parameter]');
+
+      var e=await fetch(host+'/gradio_api/queue/data?session_hash='+encodeURIComponent(sitzung),
+                        {headers:CFG.gradioToken?{'Authorization':'Bearer '+CFG.gradioToken}:{}});
+      if(!e.ok)throw new Error('Ergebnisstrom nicht abrufbar (HTTP '+e.status+').');
+      var strom=await e.text();
+      var ausgabe=gradioQueueErgebnis(strom);
+      if(ausgabe===null)ausgabe=sseDaten(strom);   // Rueckfallebene fuer andere Fassungen
+      var bild=bildAusGradio(ausgabe,host);
+      if(!bild)throw new Error('Kein Bild in der Antwort. Anfang des Stroms: '+strom.substring(0,220));
+      return await ladeBildUrl(bild,180000);
+    }
+  },
   url:{
     label:'Eigene URL-Vorlage',
     maxPrompt:1200,
@@ -570,6 +616,114 @@ var BILDQUELLEN={
     }
   }
 };
+// Gradio-Spaces erwarten ihre Eingaben als Liste in fester Reihenfolge, die je
+// Space anders ist. Deshalb eine Vorlage, in die die Werte eingesetzt werden.
+function gradioDaten(vorlage,a){
+  var t=String(vorlage||'[]')
+    .replace(/"\{prompt\}"/g,JSON.stringify(String(a.prompt||'')))
+    .replace(/"\{negativ\}"/g,JSON.stringify(String(a.negativ||'')))
+    .replace(/\{seed\}/g,String(seedFuerDienst(a.seed)))
+    .replace(/\{breite\}/g,String(auf64(a.breite)))
+    .replace(/\{hoehe\}/g,String(auf64(a.hoehe)));
+  var d=JSON.parse(t);
+  if(!Array.isArray(d))throw new Error('Die Parameter-Vorlage muss eine Liste sein, z.B. ["{prompt}", 0].');
+  return d;
+}
+// Die Antwort ist je nach Gradio-Fassung verschieden verpackt: mal eine
+// data:-Adresse, mal {url:…}, mal {path:'/tmp/…'}. Erste brauchbare gewinnt.
+function bildAusGradio(daten,host){
+  var treffer=null;
+  (function suche(x){
+    if(treffer||x==null)return;
+    if(typeof x==='string'){
+      if(/^data:image/i.test(x))treffer=x;
+      else if(/^https?:\/\//i.test(x))treffer=x;
+      else if(x.charAt(0)==='/')treffer=host+'/gradio_api/file='+x;
+      return;
+    }
+    if(Array.isArray(x)){ for(var i=0;i<x.length&&!treffer;i++)suche(x[i]); return; }
+    if(typeof x==='object'){
+      if(typeof x.url==='string'&&x.url){ treffer=x.url; return; }
+      if(typeof x.path==='string'&&x.path){ treffer=host+'/gradio_api/file='+x.path; return; }
+      if(typeof x.name==='string'&&x.name){ treffer=host+'/file='+x.name; return; }
+      var k=Object.keys(x);
+      for(var j=0;j<k.length&&!treffer;j++)suche(x[k[j]]);
+    }
+  })(daten);
+  return treffer;
+}
+// Der Queue-Strom schickt je Zeile ein Objekt: estimation, process_starts,
+// zuletzt process_completed mit den Ausgabedaten.
+function gradioQueueErgebnis(text){
+  var ergebnis=null, fehler=null;
+  String(text||'').split('\n').forEach(function(z){
+    z=z.trim();
+    if(z.indexOf('data:')!==0)return;
+    var o=null;
+    try{ o=JSON.parse(z.substring(5).trim()); }catch(e){ return; }
+    if(!o||typeof o!=='object')return;
+    if(o.msg==='process_completed'){
+      if(o.success===false)fehler=(o.output&&(o.output.error||o.output.detail))||'Der Space meldete einen Fehler.';
+      else ergebnis=(o.output&&o.output.data)||o.output||null;
+    }else if(o.msg==='unexpected_error'||o.msg==='queue_full'){
+      fehler=o.message||o.msg;
+    }
+  });
+  if(fehler)throw new Error(String(fehler).substring(0,220));
+  return ergebnis;
+}
+function sitzungsNummer(){
+  return Math.random().toString(36).substring(2)+Date.now().toString(36);
+}
+// fn_index aus /config holen: dort steht zu jedem api_name die passende id.
+async function gradioFnIndex(host,api,kopf){
+  if(CFG.gradioFnIndex!==''&&CFG.gradioFnIndex!=null&&!isNaN(parseInt(CFG.gradioFnIndex,10)))
+    return parseInt(CFG.gradioFnIndex,10);
+  var r=await fetch(host+'/config',{headers:kopf});
+  if(!r.ok)throw new Error('/config nicht abrufbar (HTTP '+r.status+') - fn_index bitte von Hand eintragen.');
+  var c=await r.json();
+  var gesucht=String(api||'').replace(/^\//,'');
+  var treffer=null;
+  (c&&c.dependencies||[]).forEach(function(d,i){
+    var name=String(d.api_name||'').replace(/^\//,'');
+    if(name&&name===gesucht&&treffer===null)treffer=(d.id!=null?d.id:i);
+  });
+  if(treffer===null)throw new Error('Kein Endpunkt namens "'+api+'" in /config. Vorhanden: '+
+    (c&&c.dependencies||[]).map(function(d){return d.api_name;}).filter(Boolean).join(', '));
+  return treffer;
+}
+// Aus der Parameterliste von /gradio_api/info eine Vorlage bauen.
+function gradioVorlageAus(params){
+  return '['+(params||[]).map(function(pa){
+    var n=String(pa.parameter_name||pa.label||'').toLowerCase();
+    if(/negativ/.test(n))return '"{negativ}"';        // vor prompt pruefen!
+    if(/prompt/.test(n))return '"{prompt}"';
+    // Ein "randomize_seed" muss aus bleiben, sonst wuerfelt der Space selbst
+    // und die Figuren sehen von Bild zu Bild anders aus.
+    if(/random/.test(n)&&/seed/.test(n))return 'false';
+    if(/seed/.test(n))return '{seed}';
+    if(/width|breite/.test(n))return '{breite}';
+    if(/height/.test(n))return '{hoehe}';
+    if(pa.parameter_has_default&&pa.parameter_default!==undefined)return JSON.stringify(pa.parameter_default);
+    var t=String((pa.type&&pa.type.type)||(pa.python_type&&pa.python_type.type)||'').toLowerCase();
+    if(/bool/.test(t))return 'false';
+    if(/number|int|float/.test(t))return '0';
+    return '""';
+  }).join(', ')+']';
+}
+function sseDaten(text){
+  // Antwortstrom: Zeilen "event: complete" und "data: [...]" — letzte gültige nehmen.
+  var letzte=null;
+  String(text||'').split('\n').forEach(function(z){
+    z=z.trim();
+    if(z.indexOf('data:')!==0)return;
+    var roh=z.substring(5).trim();
+    if(!roh||roh==='null')return;
+    try{ letzte=JSON.parse(roh); }catch(e){}
+  });
+  return letzte;
+}
+
 function quelle(){ return BILDQUELLEN[CFG.quelle]||BILDQUELLEN.perchance; }
 function auf64(n){ n=Math.round((Number(n)||1024)/64)*64; return Math.max(256,Math.min(2048,n)); }
 // Bild-Backends rechnen mit 32-Bit-Seeds. Aeltere Spielstaende halten
@@ -1798,7 +1952,8 @@ function speichereFiguren(){
 // ── SZENEN-MENÜ ───────────────────────────────
 // Dieselbe Stilauswahl wie auf dem Startbildschirm, nur im laufenden Spiel.
 var STIL_NAMEN={manga:'Manga / Anime',comic:'Westlicher Comic',aquarell:'Aquarell',
-                oel:'Ölgemälde',realistisch:'Fotorealistisch',pixel:'Pixel-Art'};
+                oel:'Ölgemälde',realistisch:'Fotorealistisch',pixel:'Pixel-Art',
+                illustrious:'Illustrious / Anime-Tags'};
 function oeffneSzeneMenu(){
   if(!S.imSpiel)return;
   el('szeneFeld').value=S.szeneGlobal||'';
@@ -1882,6 +2037,11 @@ function zeichneQuellenFelder(){
   if((q.felder||[]).some(function(f){return f.typ==='passwort';})){
     html+='<div class="warnung">Schlüssel werden unverschlüsselt im Browser (localStorage) abgelegt und bei jedem Bild an den Dienst geschickt. Nur eigene Schlüssel mit Ausgabenlimit verwenden.</div>';
   }
+  if(k==='gradio'){
+    html+='<div class="reihe" style="margin-top:6px"><button class="feld" style="cursor:pointer" onclick="gradioErkunden()">'+
+          '&#9670; API ERKUNDEN &amp; VORLAGE BAUEN</button></div>'+
+          '<div class="hinweis" id="gradioInfo"></div>';
+  }
   if(q.modelle){
     html+='<label class="feldlabel" for="modellWahl">VERFÜGBARE MODELLE — Liste kommt vom Dienst</label>'+
       '<div class="reihe"><select id="modellWahl" class="feld" onchange="modellGewaehlt()">'+
@@ -1927,6 +2087,65 @@ function modellGewaehlt(){
   var q=BILDQUELLEN[el('cfgQuelle').value];
   var sel=el('modellWahl'), feld=q&&el('q_'+q.modellSchluessel);
   if(sel&&feld)feld.value=sel.value;
+}
+
+// Endpunkte und Parameter beim Space erfragen und die Vorlage daraus bauen.
+// Erspart das Abtippen aus "Use via API" und deckt Tippfehler sofort auf.
+async function gradioErkunden(){
+  leseEinstellungen();
+  var pr=el('quellePruef'), info=el('gradioInfo');
+  var host=String(CFG.gradioHost||'').replace(/\/+$/,'');
+  if(!host){ pr.className='pruefzeile fehler'; pr.textContent='Erst die Space-Adresse eintragen.'; return; }
+  var kopf={};
+  if(CFG.gradioToken)kopf['Authorization']='Bearer '+CFG.gradioToken;
+  pr.className='pruefzeile'; pr.textContent='Frage den Space ab...';
+  try{
+    var r=await fetch(host+'/gradio_api/info',{headers:kopf});
+    if(!r.ok)throw new Error('HTTP '+r.status+' auf /gradio_api/info');
+    var j=await r.json();
+    var punkte=(j&&j.named_endpoints)||{};
+    var namen=Object.keys(punkte);
+    if(!namen.length)throw new Error('Der Space nennt keine benannten Endpunkte.');
+
+    // Gewuenschten Endpunkt nehmen, sonst den ersten mit Bildausgabe.
+    var wunsch=String(CFG.gradioApi||'');
+    if(wunsch.charAt(0)!=='/')wunsch='/'+wunsch;
+    var name=(punkte[wunsch]?wunsch:null);
+    if(!name){
+      name=namen.filter(function(n){
+        return (punkte[n].returns||[]).some(function(rt){return /image/i.test(String(rt.component||rt.label||''));});
+      })[0]||namen[0];
+    }
+    var ep=punkte[name];
+    var params=ep.parameters||[];
+
+    var feldApi=el('q_gradioApi'), feldVor=el('q_gradioVorlage'), feldFn=el('q_gradioFnIndex');
+    if(feldApi)feldApi.value=name;
+    if(feldVor)feldVor.value=gradioVorlageAus(params);
+
+    // fn_index gleich mitnehmen, dann muss es zur Laufzeit nicht geholt werden.
+    var fnText='';
+    try{
+      var c=await (await fetch(host+'/config',{headers:kopf})).json();
+      var gesucht=name.replace(/^\//,''), gefunden=null;
+      (c&&c.dependencies||[]).forEach(function(d,i){
+        if(String(d.api_name||'').replace(/^\//,'')===gesucht&&gefunden===null)gefunden=(d.id!=null?d.id:i);
+      });
+      if(gefunden!==null&&feldFn){ feldFn.value=String(gefunden); fnText=', fn_index '+gefunden; }
+    }catch(e2){}
+
+    info.textContent='Endpunkte: '+namen.join(', ')+'  |  gewählt: '+name+fnText+
+      '  |  Parameter: '+params.map(function(pa,i){
+        return (i+1)+'. '+(pa.parameter_name||pa.label||'?')+
+               ' ('+String((pa.type&&pa.type.type)||(pa.python_type&&pa.python_type.type)||'?')+')';
+      }).join(' · ');
+    pr.className='pruefzeile ok';
+    pr.textContent='\u2713 Vorlage gebaut. Bitte prüfen, dann ÜBERNEHMEN und QUELLE TESTEN.';
+    leseEinstellungen();
+  }catch(e){
+    pr.className='pruefzeile fehler';
+    pr.textContent='\u2715 '+((e&&e.message)||e)+' — Angaben notfalls von Hand aus "Use via API" übernehmen.';
+  }
 }
 
 function leseEinstellungen(){

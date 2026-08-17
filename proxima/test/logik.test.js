@@ -339,7 +339,8 @@ pruefe('normaler Text ist kein Befehl', treffer('Guten Abend!') === null);
 pruefe('Text mit Schrägstrich im Satz', treffer('Ich gehe zum Markt/Hafen') === null);
 
 console.log('\n— Bildquellen-Registry —');
-pruefe('fünf Quellen registriert', Object.keys(ctx.BILDQUELLEN).length === 5, Object.keys(ctx.BILDQUELLEN).join(','));
+['perchance', 'pollinations', 'horde', 'api', 'gradio', 'url'].forEach(k =>
+  pruefe(`Quelle "${k}" registriert`, !!ctx.BILDQUELLEN[k]));
 pruefe('jede hat label/info/zeichne', Object.values(ctx.BILDQUELLEN).every(q => q.label && q.info && typeof q.zeichne === 'function'));
 pruefe('auf64 rundet', ctx.auf64(1000) === 1024 && ctx.auf64(100) === 256 && ctx.auf64(9000) === 2048);
 ctx.CFG.urlVorlage = 'https://x.test/i?p={prompt}&n={negativ}&s={seed}&w={breite}&h={hoehe}';
@@ -347,6 +348,73 @@ let gebaut = null;
 ctx.ladeBildUrl = u => { gebaut = u; return Promise.resolve(u); };
 ctx.BILDQUELLEN.url.zeichne({ prompt: 'a cat & dog', negativ: 'blurry', seed: 42, breite: 512, hoehe: 512 });
 pruefe('URL-Vorlage füllt Platzhalter', gebaut === 'https://x.test/i?p=a%20cat%20%26%20dog&n=blurry&s=42&w=512&h=512', gebaut);
+
+console.log('\n— Gradio-Space —');
+// Die Parameterliste eines Space ist von Space zu Space verschieden, deshalb
+// eine Vorlage. Platzhalter in Anführungszeichen werden zu Zeichenketten,
+// die anderen zu Zahlen.
+const daten = ctx.gradioDaten('["{prompt}", "{negativ}", {seed}, false, {breite}, {hoehe}, 7, 28]',
+  { prompt: 'ein "Test" mit Anführungszeichen', negativ: 'blurry', seed: 42, breite: 1024, hoehe: 1024 });
+pruefe('Vorlage ergibt eine Liste', Array.isArray(daten) && daten.length === 8, JSON.stringify(daten));
+pruefe('Anführungszeichen im Prompt zerlegen die Liste nicht', daten[0] === 'ein "Test" mit Anführungszeichen', daten[0]);
+pruefe('Zahlen bleiben Zahlen', daten[2] === 42 && daten[4] === 1024 && typeof daten[3] === 'boolean');
+let vFehler = '';
+try { ctx.gradioDaten('{"a":1}', { prompt: 'x', seed: 1, breite: 512, hoehe: 512 }); } catch (e) { vFehler = e.message; }
+pruefe('Vorlage ohne Liste wird abgelehnt', /Liste/.test(vFehler), vFehler);
+
+const H = 'https://beispiel.hf.space';
+pruefe('Bild als data-Adresse', ctx.bildAusGradio(['data:image/png;base64,xx'], H) === 'data:image/png;base64,xx');
+pruefe('Bild als Objekt mit url', ctx.bildAusGradio([{ url: 'https://x.test/a.png', path: '/tmp/a.png' }], H) === 'https://x.test/a.png');
+pruefe('Bild als Objekt mit path', ctx.bildAusGradio([{ path: '/tmp/a.png' }], H) === H + '/gradio_api/file=/tmp/a.png');
+pruefe('Bild tief verschachtelt', ctx.bildAusGradio({ a: { b: [null, { c: [{ path: '/tmp/z.webp' }] }] } }, H) === H + '/gradio_api/file=/tmp/z.webp');
+pruefe('nichts Brauchbares ergibt null', ctx.bildAusGradio([null, 3, { seed: 7 }], H) === null);
+
+pruefe('Antwortstrom: letzte Datenzeile gewinnt',
+  JSON.stringify(ctx.sseDaten('event: generating\ndata: null\n\nevent: complete\ndata: [{"path":"/tmp/f.png"}]\n')) === '[{"path":"/tmp/f.png"}]',
+  JSON.stringify(ctx.sseDaten('event: complete\ndata: [{"path":"/tmp/f.png"}]')));
+pruefe('Antwortstrom ohne Daten ergibt null', ctx.sseDaten('event: heartbeat\n\n') === null);
+
+console.log('\n— Gradio: Warteschlange und Vorlagenbau —');
+// Der Space nutzt queue/join + queue/data. Der Strom endet mit
+// process_completed; darin stecken die Ausgabedaten.
+const strom = [
+  'data: {"msg":"estimation","rank":3}',
+  'data: {"msg":"process_starts"}',
+  'data: {"msg":"process_completed","success":true,"output":{"data":[{"path":"/tmp/gradio/abc.png","url":"https://x.hf.space/gradio_api/file=/tmp/gradio/abc.png"},1234]}}',
+  'data: {"msg":"close_stream"}'
+].join('\n');
+const aus = ctx.gradioQueueErgebnis(strom);
+pruefe('Ausgabedaten aus process_completed', Array.isArray(aus) && aus[0].path === '/tmp/gradio/abc.png', JSON.stringify(aus));
+pruefe('Bild daraus gefunden', ctx.bildAusGradio(aus, 'https://x.hf.space') === 'https://x.hf.space/gradio_api/file=/tmp/gradio/abc.png');
+pruefe('Zwischenmeldungen stören nicht', ctx.gradioQueueErgebnis('data: {"msg":"estimation"}\n') === null);
+
+let qFehler = '';
+try { ctx.gradioQueueErgebnis('data: {"msg":"process_completed","success":false,"output":{"error":"GPU quota exceeded"}}'); }
+catch (e) { qFehler = e.message; }
+pruefe('Fehlschlag wird zur Meldung', /GPU quota/.test(qFehler), qFehler);
+qFehler = '';
+try { ctx.gradioQueueErgebnis('data: {"msg":"queue_full","message":"Warteschlange voll"}'); } catch (e) { qFehler = e.message; }
+pruefe('volle Warteschlange wird gemeldet', /voll/.test(qFehler), qFehler);
+
+// Vorlagenbau aus der Parameterliste von /gradio_api/info
+const vorlage = ctx.gradioVorlageAus([
+  { parameter_name: 'prompt', python_type: { type: 'str' } },
+  { parameter_name: 'negative_prompt', python_type: { type: 'str' } },
+  { parameter_name: 'seed', python_type: { type: 'float' } },
+  { parameter_name: 'randomize_seed', python_type: { type: 'bool' }, parameter_has_default: true, parameter_default: true },
+  { parameter_name: 'width', python_type: { type: 'float' } },
+  { parameter_name: 'height', python_type: { type: 'float' } },
+  { parameter_name: 'guidance_scale', python_type: { type: 'float' }, parameter_has_default: true, parameter_default: 7 },
+  { parameter_name: 'num_inference_steps', python_type: { type: 'float' }, parameter_has_default: true, parameter_default: 28 }
+]);
+pruefe('Vorlage aus Parameterliste',
+  vorlage === '["{prompt}", "{negativ}", {seed}, false, {breite}, {hoehe}, 7, 28]', vorlage);
+pruefe('negative_prompt wird nicht als prompt erkannt', vorlage.indexOf('"{negativ}"') > vorlage.indexOf('"{prompt}"'));
+// Wichtig: randomize_seed muss aus bleiben, sonst würfelt der Space selbst
+// und die Figuren verlieren ihre Wiedererkennbarkeit.
+pruefe('randomize_seed wird abgeschaltet, trotz Vorgabewert true', /\{seed\}, false,/.test(vorlage), vorlage);
+const gefuellt = ctx.gradioDaten(vorlage, { prompt: 'a', negativ: 'b', seed: 7, breite: 1024, hoehe: 768 });
+pruefe('gebaute Vorlage lässt sich füllen', gefuellt.length === 8 && gefuellt[2] === 7 && gefuellt[5] === 768, JSON.stringify(gefuellt));
 
 console.log('\n— Seeds für externe Dienste —');
 pruefe('zwölfstelliger Seed wird auf 32 Bit gefaltet', ctx.seedFuerDienst(777777777777) <= 2147483647);

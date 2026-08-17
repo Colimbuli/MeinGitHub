@@ -31,6 +31,7 @@ Die Auswahl gilt generatorweit und überlebt Spielstände.
 | **Pollinations** | nein | Offener Dienst, Bild kommt als URL. Anderes Modell als Perchance — dieselbe Beschreibung ergibt sichtbar andere Bilder. Negativprompt wird mitgeschickt, aber nicht von jedem Modell dort beachtet. |
 | **AI Horde** | nein (`0000000000`) | Gratis über freiwillige Rechner; anonym langsam, mit eigenem Schlüssel von [aihorde.net](https://aihorde.net) deutlich schneller. Bei hoher Auslastung sperrt sie alles über 907×907 und über 50 Schritte — die Bildgröße wird automatisch darunter gehalten (1024×1024 wird zu 896×896). |
 | **OpenAI-kompatible API** | ja | Alles, was `POST {basis}/images/generations` versteht. |
+| **Hugging-Face-Space (Gradio)** | meist ja | Spricht einen Space ueber seine Warteschlange an. Endpunkt und Parameter holt **API ERKUNDEN** beim Space ab. ZeroGPU-Spaces brauchen ein Token und haben ein Kontingent. |
 | **Eigene URL-Vorlage** | je nachdem | Platzhalter `{prompt}` `{negativ}` `{seed}` `{breite}` `{hoehe}`. |
 
 Zwei Dinge, die man wissen sollte:
@@ -69,6 +70,27 @@ wie viele Aufträge warten — sortiert ist nach Rechnerzahl, oben stehen also d
 Die Liste ist nur eine Hilfe: Das Textfeld darunter bleibt maßgeblich, ein Modellname lässt sich
 also weiterhin von Hand eintragen. Ist der Dienst gerade nicht erreichbar, sagt die Statuszeile das
 und ändert sonst nichts.
+
+### Einen Gradio-Space anbinden
+
+1. Bildquelle **Hugging-Face-Space (Gradio)** waehlen.
+2. **Space-Adresse** eintragen: `https://<besitzer>-<spacename>.hf.space`, alles klein, Sonderzeichen
+   werden zu Bindestrichen.
+3. Bei ZeroGPU-Spaces ein **Token** von huggingface.co/settings/tokens hinterlegen.
+4. **API ERKUNDEN** druecken. Der Generator holt `/gradio_api/info` und `/config`, waehlt den
+   Endpunkt mit Bildausgabe, traegt `fn_index` ein und baut die **Parameter-Vorlage**.
+5. Vorlage kurz pruefen, **UEBERNEHMEN**, dann **QUELLE TESTEN**.
+
+Die Vorlage ist die Parameterliste des Space in seiner Reihenfolge, mit Platzhaltern:
+`"{prompt}"` `"{negativ}"` `{seed}` `{breite}` `{hoehe}`. Alles andere sind feste Werte, die aus den
+Vorgaben des Space uebernommen werden. Ein `randomize_seed` wird bewusst auf `false` gesetzt --
+sonst wuerfelt der Space seinen eigenen Seed und die Figuren sehen von Bild zu Bild anders aus.
+
+Laesst sich die API nicht abfragen, stehen dieselben Angaben auf der Space-Seite unter
+*Use via API* und koennen von Hand eingetragen werden.
+
+Anime-Modelle vom Typ Illustrious oder Pony reagieren auf **Tag-Ketten** deutlich besser als auf
+Prosa. Dafuer gibt es im Menue 🎬 den Stil *Illustrious / Anime-Tags*.
 
 ### Wenn eine Quelle nichts liefert
 
