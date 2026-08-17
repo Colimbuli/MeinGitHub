@@ -47,28 +47,28 @@ Eine weitere Quelle hinzufügen heißt: einen Eintrag in `BILDQUELLEN` ergänzen
 
 ## Fallstrick beim Bearbeiten
 
-Perchance wertet den **kompletten HTML-Bereich als Vorlage** aus, bevor der Browser ihn sieht —
-Markup, HTML-Kommentare **und den `<script>`-Block**. Was in eckigen Klammern steht, wird als
-Ausdruck gelesen.
+Perchance tastet den HTML-Bereich **einmal beim Laden** ab und liest jeden Klammerinhalt als
+Ausdruck. Entscheidend ist deshalb der *Zeitpunkt*, nicht der Ort:
 
-Entscheidend ist, ob der Klammerinhalt als JavaScript durchgeht:
-
-| im Quelltext | Ergebnis |
+| | |
 |---|---|
-| `S.stimmung[i]`, `z['NPC_NAME']`, `['a','b']`, `[]` | gültiger Ausdruck — unproblematisch |
-| `[eckigen Klammern]`, `[tritt ein]` | zwei nackte Bezeichner → **Syntaxfehler**, der Generator startet nicht |
+| **Beim Laden vorhanden** — Markup, Attribute, Kommentare | wird geprüft → hier keine eckigen Klammern um Wörter |
+| **Erst zur Laufzeit erzeugt** — per JavaScript ins DOM geschrieben | wird nicht mehr geprüft → unbedenklich |
 
-Der Fehler lautet *„There's a problem with the syntax of this expression"* und zieht Folgefehler
-nach sich: ohne aufgebaute Generator-Struktur findet das KI-Plugin sein Iframe nicht mehr
-(*„Cannot read properties of null (reading 'contentWindow')"*).
+Darum laufen die Dialogzeilen mit ihren `[Handlungen]` und der ausführliche Platzhalter des
+Eingabefelds problemlos: die entstehen erst nach dem Laden. Ein Platzhalter-Attribut im
+Start-Markup dagegen legt den Generator lahm.
 
-Deshalb:
+**HTML-Entities helfen nicht.** `&#91;` wird vom Browser beim Parsen zu `[` aufgelöst — und erst
+danach schaut Perchance hin. Im Start-Markup hilft nur, die Klammern wegzulassen.
 
-* im **Markup** `&#91;` und `&#93;` schreiben — sieht im Browser aus wie eckige Klammern,
-* in **JavaScript-Zeichenketten** `'\x5B…\x5D'` — ergibt zur Laufzeit dieselben Zeichen,
-* in **Kommentaren** gar keine Klammern um Wortfolgen.
+Ob der Inhalt gültiges JavaScript ist, entscheidet über den Fehler: `['a','b']` und `[i]` gehen
+durch, zwei nackte Wörter wie `[eckigen Klammern]` ergeben *„Unexpected identifier"*. Der Abbruch
+zieht Folgefehler nach sich — ohne aufgebaute Generator-Struktur findet das KI-Plugin sein Iframe
+nicht mehr (*„Cannot read properties of null (reading 'contentWindow')"*).
 
-`node test/logik.test.js` prüft beides und schlägt fehl, bevor es in Perchance auffällt.
+`node test/logik.test.js` prüft das Start-Markup **nach** dem Auflösen der Entities und schlägt
+fehl, bevor es in Perchance auffällt.
 
 ## Befehle im Spiel
 

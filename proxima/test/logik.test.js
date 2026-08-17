@@ -51,11 +51,17 @@ console.log('\n— Perchance-Syntax im Markup —');
 // gilt dort als Listenverweis und lässt den Generator mit Syntaxfehler abbrechen.
 // Das betrifft Attribute, Text UND Kommentare — nur <script> und <style> sind frei.
 const markup = html.replace(/<script>[\s\S]*?<\/script>/g, '').replace(/<style>[\s\S]*?<\/style>/g, '');
-const listenVerweise = markup.match(/\[[A-Za-zÄÖÜäöüß_][^\]]*\]/g) || [];
-pruefe('keine eckigen Klammern im Markup (nur &#91; &#93;)', listenVerweise.length === 0, listenVerweise.join(' '));
-const inlineWahl = markup.match(/\{[^}]*\}/g) || [];
-pruefe('keine geschweiften Klammern im Markup', inlineWahl.length === 0, inlineWahl.join(' '));
-pruefe('Klammer-Hinweis für den Spieler bleibt sichtbar', markup.includes('&#91;eckigen Klammern&#93;'));
+// Entities wie der Browser auflösen: &#91; wird zu [, BEVOR Perchance abtastet.
+// Ein Escape im Quelltext hilft hier also nicht — nur der Verzicht auf Klammern.
+const dekodiert = markup
+  .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+  .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)))
+  .replace(/&lsqb;|&lbrack;/g, '[').replace(/&rsqb;|&rbrack;/g, ']');
+const listenVerweise = dekodiert.match(/\[[A-Za-zÄÖÜäöüß_][^\]]*\]/g) || [];
+pruefe('keine eckigen Klammern im Start-Markup, auch nicht als Entity', listenVerweise.length === 0, listenVerweise.join(' '));
+const inlineWahl = dekodiert.match(/\{[^}]*\}/g) || [];
+pruefe('keine geschweiften Klammern im Start-Markup', inlineWahl.length === 0, inlineWahl.join(' '));
+pruefe('Hinweis auf eckige Klammern bleibt als Wortlaut erhalten', markup.includes('in eckigen Klammern'));
 
 // Perchance liest den Klammerinhalt als JS-Ausdruck — auch im <script>-Block.
 // ['a','b'] und [i] sind gültiges JavaScript und stören nicht; zwei nackte
