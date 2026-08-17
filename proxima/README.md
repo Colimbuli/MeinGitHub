@@ -59,6 +59,10 @@ Erste Handgriffe: **Modellfeld leeren** (ein nicht mehr existierender Modellname
 Ursache), Bildgröße auf 512×512 stellen, in den Einstellungen **QUELLE TESTEN** drücken — der
 schickt einen kurzen Testprompt und schließt damit die Prompt-Länge als Ursache aus.
 
+Bei **HTTP 500** fasst der Generator einmal selbst nach: kurze Pause, benachbarter Seed, zweiter
+Versuch. Seeds werden für alle externen Dienste auf 32 Bit gefaltet — Bild-Backends rechnen mit
+`uint32`, und die zwölfstelligen Seeds älterer Spielstände quittieren manche mit genau diesem 500.
+
 Bleibt es bei `Failed to fetch` für *jede* externe Quelle, während Perchance selbst zeichnet, dann
 lässt die Perchance-Umgebung keine fremden Bild-Aufrufe zu; dann hilft nur die eingebaute Quelle.
 
@@ -138,6 +142,8 @@ fehl, bevor es in Perchance auffällt.
   auch `**NAME:**`, Aufzählungszeichen und umgebrochene Fließtexte.
 * **Langzeitgedächtnis**: Neben der fortgeschriebenen Handlung sammelt der Generator harte Fakten
   (max. 24) und legt sie jedem Zug bei, damit sich die Figuren nicht widersprechen.
+* **Einklappbare Kopfleiste**: Der Schalter unter der Titelzeile fährt Werkzeuge, Figurenanzeige
+  und Titel nach oben aus dem Bild — das Szenenbild bleibt unverdeckt. Der Zustand wird gemerkt.
 * **Bis zu vier Figuren** gleichzeitig statt zwei.
 * **Undo und /nochmal** für misslungene Antworten.
 * **Vier Spielstand-Plätze** (einer automatisch) mit Export/Import als Textblock, Versionsfeld und

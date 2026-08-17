@@ -67,7 +67,11 @@ html,body{width:100%;height:var(--hoehe);background:var(--bg);font-family:'EB Ga
 /* Kopfbereich als echte Reihenfolge statt uebereinandergelegter Ebenen:
    Werkzeuge und NPC-Anzeige teilen sich die erste Zeile, der Titel steht
    darunter. Sonst laeuft der Titel auf schmalen Displays hinter die Knoepfe. */
-#kopf{position:absolute;top:0;left:0;right:0;z-index:6;pointer-events:none;padding:6px 8px 0;}
+#kopf{position:absolute;top:0;left:0;right:0;z-index:6;pointer-events:none;padding:6px 8px 0;display:flex;flex-direction:column;}
+#kopfInhalt{max-height:70vh;overflow:hidden;transition:max-height 0.3s ease,opacity 0.22s ease;}
+#kopf.zu #kopfInhalt{max-height:0;opacity:0;}
+#kopfschalter{align-self:center;margin-top:3px;pointer-events:all;background:rgba(42,28,14,0.86);border:1px solid var(--border);color:var(--gold2);font-family:'Cinzel',serif;font-size:0.72rem;line-height:1;padding:3px 18px;cursor:pointer;border-radius:0 0 4px 4px;opacity:0.8;transition:all 0.15s;}
+#kopfschalter:hover{background:rgba(212,160,51,0.14);border-color:var(--gold);opacity:1;}
 #kopfreihe{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
 #raumtitel{font-family:'Cinzel',serif;font-size:clamp(0.75rem,1.9vw,1.05rem);font-weight:700;letter-spacing:0.18em;color:var(--gold2);text-shadow:0 0 14px rgba(212,160,51,0.6),0 2px 6px rgba(0,0,0,0.9);text-align:center;padding:8px 4px 0;pointer-events:none;}
 #werkzeuge{flex:0 0 auto;pointer-events:all;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;max-width:62%;}
@@ -154,7 +158,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.3</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.4</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -194,6 +198,7 @@ select.feld option{background:var(--panel);}
 <div id="spiel">
   <div id="oben">
    <div id="kopf">
+    <div id="kopfInhalt">
     <div id="kopfreihe">
     <div id="npcstatus"></div>
     <div id="werkzeuge">
@@ -209,6 +214,8 @@ select.feld option{background:var(--panel);}
     </div>
     </div>
     <div id="raumtitel"></div>
+    </div>
+    <button id="kopfschalter" onclick="kopfUmschalten()" aria-expanded="true" title="Kopfleiste einklappen">⌃</button>
    </div>
   </div>
   <div id="unten">
@@ -365,6 +372,7 @@ var CFG={
   quelle:'perchance',
   breite:1024, hoehe:1024,
   negativ:'low quality, worst quality, blurry, deformed, bad anatomy, extra limbs, extra fingers, text, watermark, signature',
+  kopfOffen:true,  // Kopfleiste aus- oder eingeklappt
   tempo:16,        // ms pro Zeichen im Schreibmaschinen-Effekt (0 = sofort)
   bildTakt:2,      // alle N Zuege ein neues Bild (0 = nur auf Zuruf)
   pollModell:'',
@@ -403,13 +411,24 @@ var BILDQUELLEN={
   },
   pollinations:{
     label:'Pollinations (frei, ohne Schlüssel)',
-    info:'Offener Dienst, die Beschreibung steckt in der Adresse — deshalb wird der Prompt gekürzt. Kein Negativprompt. Modellfeld leer lassen, wenn Bilder ausbleiben: ein nicht (mehr) vorhandener Modellname lässt den Dienst scheitern.',
+    info:'Offener Dienst, die Beschreibung steckt in der Adresse — deshalb wird der Prompt gekürzt. Kein Negativprompt. Bei HTTP 500 hilft meist: Modellfeld leeren, Bildgröße auf 512×512, oder im Bildmenü einen neuen Seed würfeln.',
     felder:[{k:'pollModell',l:'Modell (leer = Standard des Dienstes)',typ:'text'}],
     zeichne:async function(a){
-      var u='https://image.pollinations.ai/prompt/'+encodeURIComponent(kuerzePrompt(a.prompt,700))+
-            '?width='+a.breite+'&height='+a.hoehe+'&seed='+a.seed+'&nologo=true'+
-            (CFG.pollModell?'&model='+encodeURIComponent(CFG.pollModell):'');
-      return await ladeBildUrl(u,120000);
+      var bau=function(seed){
+        return 'https://image.pollinations.ai/prompt/'+encodeURIComponent(kuerzePrompt(a.prompt,700))+
+               '?width='+a.breite+'&height='+a.hoehe+'&seed='+seed+
+               (CFG.pollModell?'&model='+encodeURIComponent(CFG.pollModell):'');
+      };
+      var seed=seedFuerDienst(a.seed);
+      try{
+        return await ladeBildUrl(bau(seed),120000);
+      }catch(e){
+        // 500er sind bei diesem Dienst oft vorübergehend oder seed-abhängig:
+        // genau einmal mit benachbartem Seed nachfassen, dann aufgeben.
+        if(!/HTTP 5\d\d/.test(String(e&&e.message)))throw e;
+        await warte(2500);
+        return await ladeBildUrl(bau((seed+1)%2147483647||1),120000);
+      }
     }
   },
   horde:{
@@ -424,7 +443,7 @@ var BILDQUELLEN={
       var kopf={'Content-Type':'application/json','apikey':(CFG.hordeKey||'0000000000'),'Client-Agent':'PROXIMA:7:perchance'};
       var koerper={
         prompt:a.prompt+(a.negativ?' ### '+a.negativ:''),
-        params:{n:1,width:auf64(a.breite),height:auf64(a.hoehe),seed:String(a.seed),steps:Number(CFG.hordeSchritte)||25,sampler_name:'k_euler_a'},
+        params:{n:1,width:auf64(a.breite),height:auf64(a.hoehe),seed:String(seedFuerDienst(a.seed)),steps:Number(CFG.hordeSchritte)||25,sampler_name:'k_euler_a'},
         nsfw:true, censor_nsfw:false
       };
       if(CFG.hordeModell)koerper.models=[CFG.hordeModell];
@@ -482,7 +501,7 @@ var BILDQUELLEN={
       var u=String(CFG.urlVorlage)
         .replace(/\{prompt\}/g,encodeURIComponent(a.prompt))
         .replace(/\{negativ\}/g,encodeURIComponent(a.negativ||''))
-        .replace(/\{seed\}/g,String(a.seed))
+        .replace(/\{seed\}/g,String(seedFuerDienst(a.seed)))
         .replace(/\{breite\}/g,String(a.breite))
         .replace(/\{hoehe\}/g,String(a.hoehe));
       return await ladeBildUrl(u,120000);
@@ -491,6 +510,9 @@ var BILDQUELLEN={
 };
 function quelle(){ return BILDQUELLEN[CFG.quelle]||BILDQUELLEN.perchance; }
 function auf64(n){ n=Math.round((Number(n)||1024)/64)*64; return Math.max(256,Math.min(2048,n)); }
+// Bild-Backends rechnen mit 32-Bit-Seeds. Aeltere Spielstaende halten
+// zwoelfstellige Werte — die quittieren manche Dienste mit HTTP 500.
+function seedFuerDienst(s){ return (Math.abs(parseInt(s,10)||0)%2147483647)||1; }
 // Lange Prompts sprengen URL-basierte Dienste (die Beschreibung steckt im Pfad).
 // Am letzten Komma vor der Grenze kappen, damit kein Wort zerrissen wird.
 function kuerzePrompt(p,max){
@@ -780,7 +802,7 @@ function setzeNpcs(liste){
   S.kleidung=liste.map(function(n){return n.kleidung;});
   S.regieAnweisung=liste.map(function(){return '';});
 }
-function neuerSeed(){ return Math.floor(100000000000+Math.random()*900000000000); }
+function neuerSeed(){ return Math.floor(1+Math.random()*999999998); }   // 32-Bit-sicher
 
 // ── SPIEL STARTEN ─────────────────────────────
 async function leiteNpcAusStoryAb(story){
@@ -1415,6 +1437,7 @@ function setWartet(b){
 // ── UI-AKTUALISIERUNG ─────────────────────────
 function aktualisiereUI(){
   zeigeStimmung();
+  zeichneKopfSchalter();
   var npcbtn=el('npcbtn');
   if(npcbtn)npcbtn.style.display=(S.imSpiel&&W.npcs.length<MAX_NPCS)?'block':'none';
   var undobtn=el('undobtn');
@@ -1429,6 +1452,21 @@ function aktualisiereUI(){
     ? 'Regie (gilt dauerhaft)   ·   /sag: selbst sprechen   ·   /hilfe'
     : 'Sprich oder handle in \x5Beckigen Klammern\x5D   ·   /hilfe';
   baueChronikNav();
+}
+// Kopfleiste ein-/ausklappen. Der Schalter bleibt sichtbar, damit sie
+// zurueckgeholt werden kann; der Zustand ueberlebt den Neustart.
+function kopfUmschalten(){
+  CFG.kopfOffen=!CFG.kopfOffen;
+  speichereCfg();
+  zeichneKopfSchalter();
+}
+function zeichneKopfSchalter(){
+  var k=el('kopf'), b=el('kopfschalter');
+  if(!k||!b)return;
+  k.classList.toggle('zu',!CFG.kopfOffen);
+  b.textContent=CFG.kopfOffen?'⌃':'⌄';
+  b.title=CFG.kopfOffen?'Kopfleiste einklappen':'Kopfleiste ausklappen';
+  b.setAttribute('aria-expanded',CFG.kopfOffen?'true':'false');
 }
 function zeigeStimmung(){
   var e=el('npcstatus'); if(!e)return;
@@ -1832,6 +1870,7 @@ function uebernehmeAltstand(){
 // ── START ─────────────────────────────────────
 (function(){
   ladeCfg();
+  zeichneKopfSchalter();
   fuelleQuelleKurz();
   uebernehmeAltstand();
   pruefeLadeButton();

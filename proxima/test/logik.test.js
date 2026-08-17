@@ -153,6 +153,23 @@ ctx.ladeBildUrl = u => { gebaut = u; return Promise.resolve(u); };
 ctx.BILDQUELLEN.url.zeichne({ prompt: 'a cat & dog', negativ: 'blurry', seed: 42, breite: 512, hoehe: 512 });
 pruefe('URL-Vorlage füllt Platzhalter', gebaut === 'https://x.test/i?p=a%20cat%20%26%20dog&n=blurry&s=42&w=512&h=512', gebaut);
 
+console.log('\n— Seeds für externe Dienste —');
+pruefe('zwölfstelliger Seed wird auf 32 Bit gefaltet', ctx.seedFuerDienst(777777777777) <= 2147483647);
+pruefe('gefalteter Seed bleibt stabil', ctx.seedFuerDienst(777777777777) === ctx.seedFuerDienst(777777777777));
+pruefe('Null wird nie durchgereicht', ctx.seedFuerDienst(0) >= 1 && ctx.seedFuerDienst('') >= 1);
+pruefe('kleiner Seed bleibt unverändert', ctx.seedFuerDienst(4242) === 4242);
+let seedsOk = true;
+for (let i = 0; i < 500; i++) { const n = ctx.neuerSeed(); if (!(n >= 1 && n <= 2147483647)) seedsOk = false; }
+pruefe('neue Seeds liegen im 32-Bit-Bereich', seedsOk);
+
+console.log('\n— Kopfleiste ein-/ausklappen —');
+const vorZustand = ctx.CFG.kopfOffen;
+ctx.kopfUmschalten();
+pruefe('Umschalten kehrt den Zustand um', ctx.CFG.kopfOffen === !vorZustand);
+ctx.kopfUmschalten();
+pruefe('zweimal Umschalten stellt ihn wieder her', ctx.CFG.kopfOffen === vorZustand);
+pruefe('Zustand landet in der Konfiguration', JSON.parse(store['proxima_cfg_v1']).kopfOffen === vorZustand);
+
 console.log('\n— Speicherstand —');
 ctx.W.ort = { name: 'Taverne', geschichte: '…', bildPrompt: '…' };
 ctx.S.rueckgaengig = ['grosser schnappschuss'];
