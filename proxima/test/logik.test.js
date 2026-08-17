@@ -332,6 +332,22 @@ let seedsOk = true;
 for (let i = 0; i < 500; i++) { const n = ctx.neuerSeed(); if (!(n >= 1 && n <= 2147483647)) seedsOk = false; }
 pruefe('neue Seeds liegen im 32-Bit-Bereich', seedsOk);
 
+console.log('\n— Maße für die AI Horde —');
+// Die Horde lehnt bei hoher Auslastung alles über 907×907 ab (HTTP 403).
+const GRENZE = 907 * 907;
+[[1024, 1024], [1024, 768], [768, 1024], [2048, 2048], [512, 512], [256, 256]].forEach(([b, h]) => {
+  const m = ctx.hordeMasse(b, h);
+  const passt = m.breite * m.hoehe <= GRENZE;
+  const raster = m.breite % 64 === 0 && m.hoehe % 64 === 0;
+  pruefe(`${b}×${h} → ${m.breite}×${m.hoehe} liegt unter der Grenze und im 64er-Raster`, passt && raster,
+    `${m.breite * m.hoehe} Pixel`);
+});
+const klein = ctx.hordeMasse(512, 512);
+pruefe('kleine Maße bleiben unangetastet', klein.breite === 512 && klein.hoehe === 512);
+const quer = ctx.hordeMasse(1024, 768);
+pruefe('Seitenverhältnis bleibt ungefähr erhalten', Math.abs((quer.breite / quer.hoehe) - (1024 / 768)) < 0.12,
+  `${(quer.breite / quer.hoehe).toFixed(2)} statt ${(1024 / 768).toFixed(2)}`);
+
 console.log('\n— Kopfleiste ein-/ausklappen —');
 const vorZustand = ctx.CFG.kopfOffen;
 ctx.kopfUmschalten();

@@ -160,7 +160,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.11</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.12</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -457,7 +457,7 @@ var BILDQUELLEN={
   },
   horde:{
     label:'AI Horde (frei, freiwillige Rechner)',
-    info:'Gratis und anonym mit dem Schlüssel 0000000000 — dann aber langsam (Warteschlange). Ein eigener Schlüssel von aihorde.net ist deutlich schneller.',
+    info:'Gratis und anonym mit dem Schlüssel 0000000000 — dann aber langsam (Warteschlange). Ein eigener Schlüssel von aihorde.net ist deutlich schneller. Bei hoher Auslastung sperrt die Horde alles über 907×907 und über 50 Schritte; die Bildgröße wird deshalb automatisch darunter gehalten.',
     felder:[
       {k:'hordeKey',l:'API-Schlüssel (0000000000 = anonym)',typ:'passwort'},
       {k:'hordeModell',l:'Modell (leer = beliebig)',typ:'text'},
@@ -465,14 +465,21 @@ var BILDQUELLEN={
     ],
     zeichne:async function(a){
       var kopf={'Content-Type':'application/json','apikey':(CFG.hordeKey||'0000000000'),'Client-Agent':'PROXIMA:7:perchance'};
+      var m=hordeMasse(a.breite,a.hoehe);
       var koerper={
         prompt:a.prompt+(a.negativ?' ### '+a.negativ:''),
-        params:{n:1,width:auf64(a.breite),height:auf64(a.hoehe),seed:String(seedFuerDienst(a.seed)),steps:Number(CFG.hordeSchritte)||25,sampler_name:'k_euler_a'},
+        params:{n:1,width:m.breite,height:m.hoehe,seed:String(seedFuerDienst(a.seed)),
+                steps:Math.max(1,Math.min(50,Number(CFG.hordeSchritte)||25)),sampler_name:'k_euler_a'},
         nsfw:true, censor_nsfw:false
       };
       if(CFG.hordeModell)koerper.models=[CFG.hordeModell];
       var r=await fetch('https://stablehorde.net/api/v2/generate/async',{method:'POST',headers:kopf,body:JSON.stringify(koerper)});
-      if(!r.ok)throw new Error('AI Horde lehnte den Auftrag ab ('+r.status+'): '+(await r.text()).substring(0,140));
+      if(!r.ok){
+        var roh=await r.text(), text=roh;
+        try{ var jj=JSON.parse(roh); if(jj&&jj.message)text=jj.message; }catch(e0){}
+        throw new Error('AI Horde lehnte den Auftrag ab ('+r.status+'): '+String(text).substring(0,220)+
+          ' [angefragt: '+m.breite+'x'+m.hoehe+', '+koerper.params.steps+' Schritte]');
+      }
       var j=await r.json();
       if(!j.id)throw new Error('AI Horde lieferte keine Auftragsnummer.');
       for(var i=0;i<90;i++){
@@ -538,6 +545,18 @@ function auf64(n){ n=Math.round((Number(n)||1024)/64)*64; return Math.max(256,Ma
 // Bild-Backends rechnen mit 32-Bit-Seeds. Aeltere Spielstaende halten
 // zwoelfstellige Werte — die quittieren manche Dienste mit HTTP 500.
 function seedFuerDienst(s){ return (Math.abs(parseInt(s,10)||0)%2147483647)||1; }
+// Die AI Horde sperrt bei hoher Auslastung alles ueber 907x907 und ueber 50
+// Schritte. Seitenverhaeltnis beibehalten, auf Vielfache von 64 runden.
+function hordeMasse(breite,hoehe){
+  var b=auf64(breite), h=auf64(hoehe), grenze=907*907;
+  if(b*h>grenze){
+    var f=Math.sqrt(grenze/(b*h));
+    b=auf64(Math.floor(b*f/64)*64);
+    h=auf64(Math.floor(h*f/64)*64);
+    while(b*h>grenze&&(b>256||h>256)){ if(b>=h)b=Math.max(256,b-64); else h=Math.max(256,h-64); }
+  }
+  return {breite:b,hoehe:h};
+}
 // Am letzten Komma vor der Grenze kappen, damit kein Wort zerrissen wird.
 function kuerzeText(p,max){
   p=String(p||'');

@@ -29,7 +29,7 @@ Die Auswahl gilt generatorweit und überlebt Spielstände.
 |---|---|---|
 | **Perchance** | nein | Das eingebaute Plugin. Nichts verlässt Perchance. Standard. |
 | **Pollinations** | nein | Offener Dienst, Bild kommt als URL. Anderes Modell als Perchance — dieselbe Beschreibung ergibt sichtbar andere Bilder. Negativprompt wird mitgeschickt, aber nicht von jedem Modell dort beachtet. |
-| **AI Horde** | nein (`0000000000`) | Gratis über freiwillige Rechner; anonym langsam, mit eigenem Schlüssel von [aihorde.net](https://aihorde.net) deutlich schneller. |
+| **AI Horde** | nein (`0000000000`) | Gratis über freiwillige Rechner; anonym langsam, mit eigenem Schlüssel von [aihorde.net](https://aihorde.net) deutlich schneller. Bei hoher Auslastung sperrt sie alles über 907×907 und über 50 Schritte — die Bildgröße wird automatisch darunter gehalten (1024×1024 wird zu 896×896). |
 | **OpenAI-kompatible API** | ja | Alles, was `POST {basis}/images/generations` versteht. |
 | **Eigene URL-Vorlage** | je nachdem | Platzhalter `{prompt}` `{negativ}` `{seed}` `{breite}` `{hoehe}`. |
 
@@ -72,6 +72,7 @@ blockiert. Die Fehlerzeile im Dialog zeigt deshalb, woran es liegt:
 | `Failed to fetch` / `NetworkError` | Gar nicht erst hingekommen: Adresse falsch, Dienst tot, oder Perchance lässt den Aufruf nicht zu. |
 | `Antwort war kein Bild, sondern text/html` | Der Dienst schickt eine Fehlerseite statt eines Bildes. |
 | `HTTP 429` | **Drosselung** — zu viele Anfragen in kurzer Zeit. Kein Fehler der Anfrage. |
+| `HTTP 403` bei AI Horde | Auftrag zu groß oder zu aufwendig für das vorhandene Kudos-Guthaben. Die Meldung nennt die geltende Grenze und die tatsächlich angefragten Maße. |
 | `Zeitüberschreitung` | Dienst überlastet — bei AI Horde anonym normal. |
 
 Erste Handgriffe: **Modellfeld leeren** (ein nicht mehr existierender Modellname ist die häufigste
