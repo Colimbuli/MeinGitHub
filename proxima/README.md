@@ -113,6 +113,21 @@ nicht mehr (*„Cannot read properties of null (reading 'contentWindow')"*).
 `node test/logik.test.js` prüft das Start-Markup **nach** dem Auflösen der Entities und schlägt
 fehl, bevor es in Perchance auffällt.
 
+## Wenn das Text-Plugin klemmt
+
+Meldet Perchance *„Cannot read properties of null (reading 'contentWindow')"* **ohne** vorherigen
+Syntaxfehler, dann kommt das aus Perchances eigenem Text-Plugin: es spricht über ein verstecktes
+Iframe, und das war beim Aufruf noch nicht da. Beobachtet vor allem, wenn der Generator aus einem
+Elternfenster initialisiert wird (`?__initWithDataFromParentWindow=1`) und gleich die erste
+Anfrage rausgeht.
+
+Der Generator fängt das ab: Anfragen, die daran scheitern, werden bis zu dreimal mit wachsender
+Pause wiederholt. Erst danach erscheint eine verständliche Meldung im Dialog statt eines
+unbehandelten Fehlers. Bleibt es dabei, hilft die Seite neu zu laden — direkt über
+`perchance.org/<generator>`, nicht aus der Editor-Vorschau heraus.
+
+Behebbar ist die Ursache von hier aus nicht: das Iframe gehört dem Plugin, nicht diesem Code.
+
 ## Befehle im Spiel
 
 | Befehl | Wirkung |

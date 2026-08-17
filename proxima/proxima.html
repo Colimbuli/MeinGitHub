@@ -160,7 +160,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.7</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.8</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -566,7 +566,29 @@ function extrahiereText(x){
   if(typeof x==='string')return x;
   return x.fullText||x.text||x.output||'';
 }
-function frageKI(prompt,timeoutMs){
+// Das Text-Plugin von Perchance spricht ueber ein eigenes Iframe. Wird es zu
+// frueh gerufen — etwa direkt nach dem Laden aus einem Elternfenster —, meldet
+// es "Cannot read properties of null (reading 'contentWindow')". Das ist kein
+// Fehler der Anfrage, sondern schlicht zu frueh: kurz warten und erneut fragen.
+function kiNochNichtBereit(e){
+  var m=String((e&&e.message)||e||'');
+  return /contentWindow|streamTextFromIframe|of null|not defined/i.test(m);
+}
+async function frageKI(prompt,timeoutMs){
+  var letzter=null;
+  for(var versuch=0;versuch<3;versuch++){
+    try{
+      return await frageKIEinmal(prompt,timeoutMs);
+    }catch(e){
+      letzter=e;
+      if(!kiNochNichtBereit(e))throw e;
+      await warte(1200*(versuch+1));
+    }
+  }
+  throw new Error('Das Text-Plugin von Perchance war auch nach drei Anläufen nicht bereit ('+
+    ((letzter&&letzter.message)||'unbekannt')+'). Seite neu laden hilft meist.');
+}
+function frageKIEinmal(prompt,timeoutMs){
   var limit=timeoutMs||90000;
   return new Promise(function(resolve,reject){
     var fertig=false;
@@ -1522,6 +1544,20 @@ function schliesseModal(){
 document.addEventListener('keydown',function(ev){
   if(ev.key==='Escape')schliesseModal();
 });
+// Scheitert etwas ausserhalb unserer Aufrufkette — etwa im Text-Plugin selbst —,
+// landet die Meldung sonst nur in Perchances Fehlerkasten. Lieber im Spiel zeigen.
+if(typeof window!=='undefined'&&window.addEventListener){
+  window.addEventListener('unhandledrejection',function(ev){
+    var g=(ev&&ev.reason)||{};
+    var text=String(g.message||g);
+    if(kiNochNichtBereit(g)){
+      errZeile('⚠ Das Text-Plugin war kurz nicht bereit. Wenn nichts weitergeht: Seite neu laden.');
+    }else{
+      errZeile('⚠ '+text);
+    }
+    if(ev.preventDefault)ev.preventDefault();
+  });
+}
 document.querySelectorAll('.modal').forEach(function(m){
   m.addEventListener('click',function(ev){ if(ev.target===m)schliesseModal(); });
 });

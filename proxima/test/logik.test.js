@@ -31,7 +31,7 @@ const ctx = {
     querySelectorAll: () => [],
     addEventListener() {}
   },
-  window: { open() {} },
+  window: { open() {}, addEventListener() {} },
   Image: function () { this.src = ''; },
   fetch: () => Promise.reject(new Error('kein Netz im Test')),
   Date, Math, JSON, Object, Array, String, Number, RegExp, Promise, isNaN, parseInt, parseFloat, encodeURIComponent
@@ -210,6 +210,38 @@ const laufen = async () => {
   ctx.S.eigenerPrompt = ''; ctx.S.eigenerNegativ = '';
   await ctx.zeichneBild({});
   pruefe('nach dem Zurücksetzen greift wieder die Szene', gesendet.at(-1).prompt.includes('anime manga style'));
+
+  console.log('\n— Text-Plugin noch nicht bereit —');
+  // Perchance meldet "Cannot read properties of null (reading 'contentWindow')",
+  // wenn ai() gerufen wird, bevor das Plugin sein Iframe hat. Das ist kein
+  // Fehler der Anfrage: kurz warten und erneut fragen.
+  pruefe('contentWindow-Fehler gilt als "noch nicht bereit"',
+    ctx.kiNochNichtBereit(new Error("Cannot read properties of null (reading 'contentWindow')")));
+  pruefe('echter Fehler gilt nicht als "noch nicht bereit"',
+    !ctx.kiNochNichtBereit(new Error('KI-Timeout (90s)')));
+
+  let versuche = 0;
+  ctx.ai = () => { versuche++; if (versuche < 3) throw new Error("Cannot read properties of null (reading 'contentWindow')"); return 'endlich da'; };
+  const antwort = await ctx.frageKI('test');
+  pruefe('nach zwei Fehlversuchen kommt die Antwort durch', antwort === 'endlich da', antwort);
+  // Hinweis: frageKIEinmal ruft ai() zweimal je Anlauf — erst direkt, dann in
+  // der Objektform als Rückfallebene. Zwei Anläufe sind also drei Aufrufe,
+  // weil der dritte bereits gelingt.
+  pruefe('es wurde genau dreimal aufgerufen', versuche === 3, String(versuche));
+
+  versuche = 0;
+  ctx.ai = () => { versuche++; throw new Error("Cannot read properties of null (reading 'contentWindow')"); };
+  let meldung = '';
+  try { await ctx.frageKI('test'); } catch (e) { meldung = e.message; }
+  pruefe('bleibt es dabei, gibt es eine verständliche Meldung', /nicht bereit/.test(meldung) && /neu laden/.test(meldung), meldung);
+  pruefe('und es wird nicht endlos wiederholt', versuche === 6, String(versuche));   // 3 Anläufe à 2 Aufrufe
+
+  versuche = 0;
+  ctx.ai = () => { versuche++; throw new Error('irgendein anderer Fehler'); };
+  meldung = '';
+  try { await ctx.frageKI('test'); } catch (e) { meldung = e.message; }
+  // Kein zweiter Anlauf, nur die Objektform-Rückfallebene innerhalb desselben Anlaufs.
+  pruefe('andere Fehler werden sofort durchgereicht', versuche === 2 && /anderer Fehler/.test(meldung), meldung + ' / ' + versuche);
 };
 
 console.log('\n— Negativprompt —');
