@@ -160,7 +160,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.9</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.10</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -439,6 +439,9 @@ var BILDQUELLEN={
         return await ladeBildUrl(ersteUrl,120000);
       }catch(e){
         var meldung=String((e&&e.message)||e);
+        // 429 heisst: zu viele Anfragen. Ein sofortiger zweiter Versuch macht es
+        // schlimmer, also gar nicht erst nachfassen.
+        if(/HTTP 429/.test(meldung))throw e;
         // Zweiter Anlauf: ohne Negativprompt, benachbarter Seed. Hilft bei
         // seed-abhaengigen 500ern und bei Modellen, die den Parameter nicht kennen.
         try{
@@ -555,7 +558,14 @@ async function ladeBildUrl(url,timeoutMs){
     var t=ctl?setTimeout(function(){ctl.abort();},limit):null;
     var r=await fetch(url,ctl?{signal:ctl.signal}:{});
     if(t)clearTimeout(t);
-    if(!r.ok)throw new Error('Dienst antwortete HTTP '+r.status+(r.statusText?' '+r.statusText:''));
+    if(!r.ok){
+      var wartehinweis='';
+      try{
+        var ra=r.headers&&r.headers.get&&r.headers.get('retry-after');
+        if(ra)wartehinweis=', frühestens in '+ra+'s wieder';
+      }catch(e0){}
+      throw new Error('Dienst antwortete HTTP '+r.status+(r.statusText?' '+r.statusText:'')+wartehinweis);
+    }
     var b=await r.blob();
     if(!b||b.size<200)throw new Error('Antwort enthielt kein Bild ('+(b?b.size:0)+' Bytes).');
     if(b.type&&b.type.indexOf('image')!==0)throw new Error('Antwort war kein Bild, sondern '+b.type+'.');
@@ -688,7 +698,7 @@ var S = {
   stimmung:[], kleidung:[], regieAnweisung:[],
   handlung:'', fakten:[],           // Kurzzeit-Zusammenfassung + Langzeitgedaechtnis
   seed:0,                           // fest, damit Figuren wiedererkennbar bleiben
-  bildGeneriert:false, bildZaehler:0, bildLaeuft:false, bildAusstehend:null,
+  bildGeneriert:false, bildZaehler:0, bildLaeuft:false, bildAusstehend:null, bildPauseBis:0,
   szeneText:'', szeneGlobal:'', letzterPrompt:'', letzterNegativ:'', letzteBildUrl:'',
   // Von Hand geschriebener Prompt. Solange gesetzt, gilt er statt des aus der
   // Szene gebauten — auch ueber einen Wechsel der Bildquelle hinweg.
@@ -1044,6 +1054,7 @@ function bildTakt(){
   S.bildZaehler=(S.bildZaehler||0)+1;
   if(S.bildZaehler<CFG.bildTakt)return;
   S.bildZaehler=0;
+  if(S.bildPauseBis&&Date.now()<S.bildPauseBis)return;   // Dienst drosselt gerade
   if(S.eigenerPrompt){
     // Festgehalten: das Bild soll bewusst stehenbleiben, also gar nicht erst
     // dieselbe Anfrage noch einmal stellen.
@@ -1172,13 +1183,26 @@ async function zeichneBild(opts){
                  :(S.seed||(S.seed=neuerSeed()));
     S.seed=seed;
     var src=await quelle().zeichne({prompt:prompt,negativ:negativ,seed:seed,breite:auf64(CFG.breite),hoehe:auf64(CFG.hoehe)});
+    if(S.letzteBildUrl&&S.letzteBildUrl.indexOf('blob:')===0&&S.letzteBildUrl!==src){
+      try{ URL.revokeObjectURL(S.letzteBildUrl); }catch(e1){}
+    }
     el('img0').src=src;
     S.letzteBildUrl=src;
     S.bildGeneriert=true;
     S.letzterPrompt=prompt;
     S.letzterNegativ=negativ;
   }catch(e){
-    zeigeFehler('Bild ('+quelle().label+')',e);
+    var m=String((e&&e.message)||e);
+    if(/HTTP 429/.test(m)){
+      // Drosselung: eine Weile gar nicht mehr anfragen, statt weiter anzuklopfen.
+      var sek=60, ra=m.match(/in (\d+)s/);
+      if(ra)sek=Math.max(15,Math.min(600,parseInt(ra[1],10)||60));
+      S.bildPauseBis=Date.now()+sek*1000;
+      errZeile('⚠ '+quelle().label+' drosselt (HTTP 429). Keine Bildanfragen für '+sek+'s. '+
+               'Dauerhaft hilft: Bild-Takt in ⚙ erhöhen, anderes Modell, oder zurück auf Perchance.');
+    }else{
+      zeigeFehler('Bild ('+quelle().label+')',e);
+    }
   }
   el('szenelade').classList.remove('an');
   S.bildLaeuft=false;
@@ -1893,7 +1917,7 @@ function migriere(d){
   s.wartet=false;s.bildLaeuft=false;s.bildAusstehend=null;s.npcErscheint=false;
   s.bildGeneriert=false;s.bildZaehler=0;s.imSpiel=true;
   s.autoAktiv=false;s.autoLaeuft=false;s.autoForceIdx=null;
-  s.letzteBildUrl='';
+  s.letzteBildUrl='';s.bildPauseBis=0;
   return d;
 }
 function oeffneSpeicher(){

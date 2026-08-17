@@ -53,11 +53,19 @@ blockiert. Die Fehlerzeile im Dialog zeigt deshalb, woran es liegt:
 | `Dienst antwortete HTTP 4xx/5xx` | Der Dienst wurde erreicht und hat abgelehnt — falscher Modellname, Prompt zu lang, Limit erschöpft. |
 | `Failed to fetch` / `NetworkError` | Gar nicht erst hingekommen: Adresse falsch, Dienst tot, oder Perchance lässt den Aufruf nicht zu. |
 | `Antwort war kein Bild, sondern text/html` | Der Dienst schickt eine Fehlerseite statt eines Bildes. |
+| `HTTP 429` | **Drosselung** — zu viele Anfragen in kurzer Zeit. Kein Fehler der Anfrage. |
 | `Zeitüberschreitung` | Dienst überlastet — bei AI Horde anonym normal. |
 
 Erste Handgriffe: **Modellfeld leeren** (ein nicht mehr existierender Modellname ist die häufigste
 Ursache), Bildgröße auf 512×512 stellen, in den Einstellungen **QUELLE TESTEN** drücken — der
 schickt einen kurzen Testprompt und schließt damit die Prompt-Länge als Ursache aus.
+
+**HTTP 429** trifft anonyme Nutzung offener Dienste schnell — Pollinations zählt Anfragen pro
+Adresse, und im Auto-Modus entsteht alle paar Züge ein Bild. Der Generator klopft dann nicht
+weiter an: er legt eine Pause ein (Länge aus dem `Retry-After` des Dienstes, sonst 60 Sekunden),
+setzt in dieser Zeit den Bildtakt aus und sagt es im Dialog. Dauerhaft hilft nur, seltener zu
+fragen — **Bild-Takt in ⚙ erhöhen** (etwa 5 statt 2) oder auf `0` stellen und Bilder nur noch per
+`/bild:` anfordern.
 
 Bei **HTTP 500** fasst der Generator einmal selbst nach: kurze Pause, benachbarter Seed, zweiter
 Versuch. Seeds werden für alle externen Dienste auf 32 Bit gefaltet — Bild-Backends rechnen mit

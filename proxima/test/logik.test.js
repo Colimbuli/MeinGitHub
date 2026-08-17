@@ -33,6 +33,7 @@ const ctx = {
   },
   window: { open() {}, addEventListener() {} },
   Image: function () { this.src = ''; },
+  URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} },
   fetch: () => Promise.reject(new Error('kein Netz im Test')),
   Date, Math, JSON, Object, Array, String, Number, RegExp, Promise, isNaN, parseInt, parseFloat, encodeURIComponent
 };
@@ -236,6 +237,31 @@ const laufen = async () => {
   pruefe('Quellenwechsel reicht den festgehaltenen Prompt weiter', gesendet.at(-1).prompt === 'mein prompt');
   ctx.CFG.quelle = 'perchance';
   ctx.S.eigenerPrompt = ''; ctx.S.promptFesthalten = false; ctx.CFG.bildTakt = 2;
+
+  console.log('\n— Drosselung (HTTP 429) —');
+  // 429 heißt: zu viele Anfragen. Weiter anzuklopfen macht es schlimmer, also
+  // muss der Generator eine Pause einlegen statt im Takt weiterzufragen.
+  ctx.S.bildPauseBis = 0; ctx.S.eigenerPrompt = ''; ctx.S.promptFesthalten = false;
+  ctx.BILDQUELLEN.pollinations.zeichne = async () => { throw new Error('Dienst antwortete HTTP 429 Too Many Requests, frühestens in 45s wieder'); };
+  ctx.CFG.quelle = 'pollinations';
+  await ctx.zeichneBild({});
+  pruefe('429 löst eine Pause aus', ctx.S.bildPauseBis > Date.now(), String(ctx.S.bildPauseBis - Date.now()));
+  pruefe('Retry-After wird übernommen (~45s)', Math.abs((ctx.S.bildPauseBis - Date.now()) - 45000) < 2000,
+    String(Math.round((ctx.S.bildPauseBis - Date.now()) / 1000)) + 's');
+
+  ctx.CFG.quelle = 'perchance';
+  ctx.CFG.bildTakt = 1; ctx.S.bildZaehler = 0;
+  const vorPause = gesendet.length;
+  ctx.bildTakt();
+  await new Promise(r => setTimeout(r, 30));
+  pruefe('während der Pause wird nicht angefragt', gesendet.length === vorPause);
+
+  ctx.S.bildPauseBis = Date.now() - 1;   // Pause abgelaufen
+  ctx.S.bildZaehler = 0;
+  ctx.bildTakt();
+  await new Promise(r => setTimeout(r, 30));
+  pruefe('nach der Pause geht es weiter', gesendet.length > vorPause);
+  ctx.CFG.bildTakt = 2; ctx.S.bildPauseBis = 0;
 
   console.log('\n— Text-Plugin noch nicht bereit —');
   // Perchance meldet "Cannot read properties of null (reading 'contentWindow')",
