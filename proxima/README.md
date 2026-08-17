@@ -74,7 +74,16 @@ bei einer Quelle oder passt den Stiltext per `/stil:` an die gewählte Quelle an
 
 Der Prompt selbst **bleibt beim Wechsel erhalten**: Was im Bildmenü von Hand geschrieben wurde,
 gilt weiter und wandert in die nächste Engine — nur die Längengrenze der neuen Quelle wird noch
-angewandt. Zurück zur Automatik geht es über **↺ AUS SZENE** im Bildmenü oder über `/bild: …`.
+angewandt.
+
+Wie lange er gilt, entscheidet der Haken **„Prompt festhalten"** im Bildmenü:
+
+| | |
+|---|---|
+| **ohne Haken** (Standard) | Der Prompt überlebt Quellenwechsel und sofortige Neuzeichnungen. Beim nächsten Bildtakt übernimmt wieder die Handlung — das Bild folgt also weiter der Geschichte. |
+| **mit Haken** | Der Prompt bleibt, bis du ihn änderst. Der Bildtakt zeichnet nicht neu, statt dieselbe Anfrage zu wiederholen. |
+
+Zurück zur Automatik geht es jederzeit über **↺ AUS SZENE** im Bildmenü oder über `/bild: …`.
 
 Zwei Unterschiede sind dagegen hausgemacht und behoben:
 

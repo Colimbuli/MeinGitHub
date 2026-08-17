@@ -160,7 +160,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.8</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.9</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -253,6 +253,7 @@ select.feld option{background:var(--panel);}
       <textarea id="bildPromptFeld" class="feld" rows="6"></textarea>
       <label class="feldlabel" for="bildNegativFeld">NEGATIVPROMPT</label>
       <textarea id="bildNegativFeld" class="feld" rows="2"></textarea>
+      <label class="feldlabel"><input type="checkbox" id="bildFest"> Prompt festhalten — Bild folgt dann nicht mehr der Handlung</label>
       <label class="feldlabel" for="bildSeedFeld">SEED — bleibt fest, damit die Figuren sich ähnlich bleiben</label>
       <div class="reihe">
         <input id="bildSeedFeld" class="feld" type="text" inputmode="numeric">
@@ -414,25 +415,40 @@ var BILDQUELLEN={
   },
   pollinations:{
     label:'Pollinations (frei, ohne Schlüssel)',
-    maxPrompt:1200,
+    maxPrompt:550,
     info:'Offener Dienst, die Beschreibung steckt in der Adresse — deshalb wird der Prompt gekürzt. Kein Negativprompt. Bei HTTP 500 hilft meist: Modellfeld leeren, Bildgröße auf 512×512, oder im Bildmenü einen neuen Seed würfeln.',
     felder:[{k:'pollModell',l:'Modell (leer = Standard des Dienstes)',typ:'text'}],
     zeichne:async function(a){
+      // Die Beschreibung steckt bei diesem Dienst im Pfad. Lange Adressen sind
+      // ein bekannter Stolperstein, deshalb: knapp halten, den Negativprompt nur
+      // anhaengen, wenn danach noch Luft ist, und die Laenge im Fehlerfall nennen.
+      var GRENZE=1300;
       var bau=function(seed,mitNegativ){
-        return 'https://image.pollinations.ai/prompt/'+encodeURIComponent(a.prompt)+
-               '?width='+a.breite+'&height='+a.hoehe+'&seed='+seed+
-               (CFG.pollModell?'&model='+encodeURIComponent(CFG.pollModell):'')+
-               ((mitNegativ&&a.negativ)?'&negative_prompt='+encodeURIComponent(a.negativ):'');
+        var u='https://image.pollinations.ai/prompt/'+encodeURIComponent(a.prompt)+
+              '?width='+a.breite+'&height='+a.hoehe+'&seed='+seed+
+              (CFG.pollModell?'&model='+encodeURIComponent(CFG.pollModell):'');
+        if(mitNegativ&&a.negativ){
+          var mitNeg=u+'&negative_prompt='+encodeURIComponent(a.negativ);
+          if(mitNeg.length<=GRENZE)u=mitNeg;
+        }
+        return u;
       };
       var seed=seedFuerDienst(a.seed);
+      var ersteUrl=bau(seed,true);
       try{
-        return await ladeBildUrl(bau(seed,true),120000);
+        return await ladeBildUrl(ersteUrl,120000);
       }catch(e){
-        // Zweiter Anlauf ohne Negativprompt und mit benachbartem Seed: nicht jedes
-        // Modell dort kennt den Parameter, und 500er sind oft seed-abhängig.
-        if(!/HTTP \d/.test(String(e&&e.message)))throw e;
-        await warte(2500);
-        return await ladeBildUrl(bau((seed+1)%2147483647||1,false),120000);
+        var meldung=String((e&&e.message)||e);
+        // Zweiter Anlauf: ohne Negativprompt, benachbarter Seed. Hilft bei
+        // seed-abhaengigen 500ern und bei Modellen, die den Parameter nicht kennen.
+        try{
+          await warte(2500);
+          return await ladeBildUrl(bau((seed+1)%2147483647||1,false),120000);
+        }catch(e2){
+          throw new Error(String((e2&&e2.message)||e2)+
+            ' [Adresse war '+ersteUrl.length+' Zeichen lang, Prompt '+a.prompt.length+
+            '. Falls „QUELLE TESTEN" mit kurzem Prompt gelingt, liegt es an der Länge.]');
+        }
       }
     }
   },
@@ -676,7 +692,7 @@ var S = {
   szeneText:'', szeneGlobal:'', letzterPrompt:'', letzterNegativ:'', letzteBildUrl:'',
   // Von Hand geschriebener Prompt. Solange gesetzt, gilt er statt des aus der
   // Szene gebauten — auch ueber einen Wechsel der Bildquelle hinweg.
-  eigenerPrompt:'', eigenerNegativ:'',
+  eigenerPrompt:'', eigenerNegativ:'', promptFesthalten:false,
   npcErscheint:false,
   autoAktiv:false, autoRegie:'', autoLaeuft:false, autoForceIdx:null,
   stil:'', stilLabel:'',
@@ -1026,7 +1042,16 @@ async function fuehreSchlagabtausch(erzwungenerIdx){
 function bildTakt(){
   if(!CFG.bildTakt)return;
   S.bildZaehler=(S.bildZaehler||0)+1;
-  if(S.bildZaehler>=CFG.bildTakt){ S.bildZaehler=0; zeichneBild({}); }
+  if(S.bildZaehler<CFG.bildTakt)return;
+  S.bildZaehler=0;
+  if(S.eigenerPrompt){
+    // Festgehalten: das Bild soll bewusst stehenbleiben, also gar nicht erst
+    // dieselbe Anfrage noch einmal stellen.
+    if(S.promptFesthalten)return;
+    // Sonst hat die Handlung Vorrang: ab hier folgt das Bild wieder der Szene.
+    S.eigenerPrompt='';S.eigenerNegativ='';
+  }
+  zeichneBild({});
 }
 
 // ── AUTO-MODUS ────────────────────────────────
@@ -1254,7 +1279,7 @@ function bildBefehl(descRaw){
   if(!beschreibung){ sysZeile('/bild: gib nach dem Doppelpunkt eine Bildbeschreibung an.'); return; }
   S.szeneText=beschreibung;
   S.bildZaehler=0;
-  S.eigenerPrompt='';S.eigenerNegativ='';   // ausdrueckliche Neubeschreibung schlaegt den eigenen Prompt
+  S.eigenerPrompt='';S.eigenerNegativ='';S.promptFesthalten=false;   // ausdrueckliche Neubeschreibung schlaegt den eigenen Prompt
   sysZeile('✦ Neues Bild: '+beschreibung+' ✦');
   zeichneBild({szene:beschreibung});
 }
@@ -1604,9 +1629,12 @@ function oeffneBildModal(){
   el('bildPromptFeld').value=S.eigenerPrompt||S.letzterPrompt||'';
   el('bildNegativFeld').value=S.eigenerNegativ||S.letzterNegativ||baueNegativ();
   el('bildSeedFeld').value=S.seed||'';
+  el('bildFest').checked=!!S.promptFesthalten;
   el('bildQuelleInfo').textContent=(S.eigenerPrompt
-      ? '✎ Eigener Prompt aktiv — er bleibt auch beim Wechsel der Bildquelle erhalten. „AUS SZENE" stellt die Automatik wieder her. '
-      : 'Automatisch aus der Szene gebaut — jede Bearbeitung wird dauerhaft übernommen. ')
+      ? (S.promptFesthalten
+         ? '✎ Prompt festgehalten — das Bild bleibt so, bis du den Haken entfernst oder „AUS SZENE" drückst. '
+         : '✎ Eigener Prompt — er überlebt den Wechsel der Bildquelle, beim nächsten Bildtakt übernimmt aber wieder die Handlung. ')
+      : 'Automatisch aus der Szene gebaut. ')
     +'Quelle: '+quelle().label+' — '+quelle().info;
   oeffneModal('mBild');
 }
@@ -1620,6 +1648,7 @@ function bildNeuZeichnen(){
   // beim Wechsel der Bildquelle zu verlieren.
   S.eigenerPrompt=p;
   S.eigenerNegativ=(n&&n!==baueNegativ())?n:'';
+  S.promptFesthalten=!!(el('bildFest')&&el('bildFest').checked);
   schliesseModal();
   autosave();
   zeichneBild({seedOverride:s});
@@ -1627,7 +1656,7 @@ function bildNeuZeichnen(){
 // Zurueck zur Automatik: Prompt und Negativprompt entstehen wieder aus der Szene.
 function bildAusSzene(){
   if(!S.imSpiel)return;
-  S.eigenerPrompt='';S.eigenerNegativ='';
+  S.eigenerPrompt='';S.eigenerNegativ='';S.promptFesthalten=false;
   schliesseModal();
   sysZeile('✦ Bild folgt wieder der Szene ✦');
   autosave();
@@ -1854,6 +1883,7 @@ function migriere(d){
   if(typeof s.letzterNegativ!=='string')s.letzterNegativ='';
   if(typeof s.eigenerPrompt!=='string')s.eigenerPrompt='';
   if(typeof s.eigenerNegativ!=='string')s.eigenerNegativ='';
+  s.promptFesthalten=!!s.promptFesthalten;
   if(!s.seed)s.seed=(w.ort&&parseInt(w.ort.seed,10))||neuerSeed();   // V6 hielt den Seed am Ort
   if(w.protagonist){
     if(typeof w.protagonist.aussehen!=='string')w.protagonist.aussehen='';

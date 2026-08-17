@@ -211,6 +211,32 @@ const laufen = async () => {
   await ctx.zeichneBild({});
   pruefe('nach dem Zurücksetzen greift wieder die Szene', gesendet.at(-1).prompt.includes('anime manga style'));
 
+  console.log('\n— Bildtakt gegen festgehaltenen Prompt —');
+  // Ein bearbeiteter Prompt darf den Wechsel der Bildquelle überleben, aber das
+  // Bild nicht für immer einfrieren — sonst zeigt der Generator ewig dasselbe.
+  ctx.CFG.bildTakt = 1;
+  ctx.S.eigenerPrompt = 'mein prompt'; ctx.S.eigenerNegativ = ''; ctx.S.promptFesthalten = false;
+  ctx.S.bildZaehler = 0;
+  const vorher = gesendet.length;
+  ctx.bildTakt();
+  await new Promise(r => setTimeout(r, 30));
+  pruefe('ohne Haken übernimmt beim Bildtakt wieder die Handlung', ctx.S.eigenerPrompt === '');
+  pruefe('und es wird tatsächlich neu gezeichnet', gesendet.length > vorher);
+
+  ctx.S.eigenerPrompt = 'mein prompt'; ctx.S.promptFesthalten = true; ctx.S.bildZaehler = 0;
+  const vorher2 = gesendet.length;
+  ctx.bildTakt();
+  await new Promise(r => setTimeout(r, 30));
+  pruefe('mit Haken bleibt der Prompt stehen', ctx.S.eigenerPrompt === 'mein prompt');
+  pruefe('und es wird keine gleiche Anfrage wiederholt', gesendet.length === vorher2);
+
+  // Der Quellenwechsel muss ihn in beiden Fällen weiterreichen
+  ctx.CFG.quelle = 'pollinations';
+  await ctx.zeichneBild({});
+  pruefe('Quellenwechsel reicht den festgehaltenen Prompt weiter', gesendet.at(-1).prompt === 'mein prompt');
+  ctx.CFG.quelle = 'perchance';
+  ctx.S.eigenerPrompt = ''; ctx.S.promptFesthalten = false; ctx.CFG.bildTakt = 2;
+
   console.log('\n— Text-Plugin noch nicht bereit —');
   // Perchance meldet "Cannot read properties of null (reading 'contentWindow')",
   // wenn ai() gerufen wird, bevor das Plugin sein Iframe hat. Das ist kein
