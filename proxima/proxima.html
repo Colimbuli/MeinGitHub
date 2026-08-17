@@ -160,7 +160,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.14</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.15</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -392,7 +392,7 @@ var CFG={
   apiUrl:'https://api.openai.com/v1', apiKey:'', apiModell:'gpt-image-1',
   urlVorlage:'https://example.org/bild?p={prompt}&seed={seed}&w={breite}&h={hoehe}',
   gradioHost:'https://ibarakidouji-wai-nsfw-illustrious-sdxl.hf.space',
-  gradioApi:'/infer', gradioFnIndex:'', gradioToken:'',
+  gradioApi:'/generate', gradioFnIndex:'', gradioToken:'',
   gradioVorlage:'["{prompt}", "{negativ}", {seed}, false, {breite}, {hoehe}, 7, 28]'
 };
 function ladeCfg(){
@@ -564,7 +564,7 @@ var BILDQUELLEN={
     info:'Spricht einen Gradio-Space über seine HTTP-Schnittstelle an. Die genaue Reihenfolge der Parameter steht auf der Space-Seite unten unter „Use via API" — von dort in die Vorlage übertragen. ZeroGPU-Spaces brauchen meist ein Token und haben ein Kontingent.',
     felder:[
       {k:'gradioHost',l:'Space-Adresse (…hf.space, ohne Schrägstrich am Ende)',typ:'text'},
-      {k:'gradioApi',l:'API-Name laut „Use via API" (z.B. /infer)',typ:'text'},
+      {k:'gradioApi',l:'API-Name (z.B. /generate) - leer lassen, dann wird er gesucht',typ:'text'},
       {k:'gradioFnIndex',l:'fn_index (leer = automatisch aus /config)',typ:'text'},
       {k:'gradioToken',l:'Hugging-Face-Token (nur bei ZeroGPU oder privat)',typ:'passwort'},
       {k:'gradioVorlage',l:'Parameter-Vorlage — Platzhalter: "{prompt}" "{negativ}" {seed} {breite} {hoehe}',typ:'text'}
@@ -596,7 +596,8 @@ var BILDQUELLEN={
       if(ausgabe===null)ausgabe=sseDaten(strom);   // Rueckfallebene fuer andere Fassungen
       var bild=bildAusGradio(ausgabe,host);
       if(!bild)throw new Error('Kein Bild in der Antwort. Anfang des Stroms: '+strom.substring(0,220));
-      return await ladeBildUrl(bild,180000);
+      // Token auch beim Herunterladen mitschicken - Space-Dateien koennen geschuetzt sein.
+      return await ladeBildUrl(bild,180000,CFG.gradioToken?{'Authorization':'Bearer '+CFG.gradioToken}:null);
     }
   },
   url:{
@@ -675,6 +676,24 @@ function gradioQueueErgebnis(text){
 function sitzungsNummer(){
   return Math.random().toString(36).substring(2)+Date.now().toString(36);
 }
+// Passenden Endpunkt aus /config waehlen. Steht im Feld Unsinn (leer, "False",
+// ein Tippfehler), wird nicht abgebrochen, sondern der plausibelste genommen -
+// Hilfsendpunkte wie lambda oder load_example aber nie.
+function waehleEndpunkt(deps,wunsch){
+  var liste=(deps||[]).map(function(d,i){
+    return {name:String(d.api_name||'').replace(/^\//,''),id:(d.id!=null?d.id:i)};
+  }).filter(function(d){return d.name;});
+  if(!liste.length)return null;
+  var g=String(wunsch||'').replace(/^\//,'').trim();
+  var passt=function(pruef){ return liste.filter(pruef)[0]||null; };
+  if(g&&!/^(false|true|undefined|null|nan)$/i.test(g)){
+    var genau=passt(function(d){return d.name===g;});
+    if(genau)return genau;
+  }
+  return passt(function(d){return /^(generate|infer|predict|txt2img|run)$/i.test(d.name);})
+      || passt(function(d){return /generat|infer|predict|img|image/i.test(d.name);})
+      || null;
+}
 // fn_index aus /config holen: dort steht zu jedem api_name die passende id.
 async function gradioFnIndex(host,api,kopf){
   if(CFG.gradioFnIndex!==''&&CFG.gradioFnIndex!=null&&!isNaN(parseInt(CFG.gradioFnIndex,10)))
@@ -682,15 +701,16 @@ async function gradioFnIndex(host,api,kopf){
   var r=await fetch(host+'/config',{headers:kopf});
   if(!r.ok)throw new Error('/config nicht abrufbar (HTTP '+r.status+') - fn_index bitte von Hand eintragen.');
   var c=await r.json();
-  var gesucht=String(api||'').replace(/^\//,'');
-  var treffer=null;
-  (c&&c.dependencies||[]).forEach(function(d,i){
-    var name=String(d.api_name||'').replace(/^\//,'');
-    if(name&&name===gesucht&&treffer===null)treffer=(d.id!=null?d.id:i);
-  });
-  if(treffer===null)throw new Error('Kein Endpunkt namens "'+api+'" in /config. Vorhanden: '+
-    (c&&c.dependencies||[]).map(function(d){return d.api_name;}).filter(Boolean).join(', '));
-  return treffer;
+  var deps=(c&&c.dependencies)||[];
+  var ep=waehleEndpunkt(deps,api);
+  if(!ep)throw new Error('Kein brauchbarer Endpunkt in /config. Vorhanden: '+
+    deps.map(function(d){return d.api_name;}).filter(Boolean).join(', '));
+  var gesucht=String(api||'').replace(/^\//,'').trim();
+  if(ep.name!==gesucht){
+    sysZeile('Endpunkt "'+ep.name+'" statt "'+(gesucht||'(leer)')+'" verwendet.');
+    CFG.gradioApi='/'+ep.name;speichereCfg();
+  }
+  return ep.id;
 }
 // Aus der Parameterliste von /gradio_api/info eine Vorlage bauen.
 function gradioVorlageAus(params){
@@ -754,12 +774,12 @@ function kuerzeText(p,max){
 //    die auch dann noch anzeigbar ist, wenn fremde Bild-Hosts gesperrt sind.
 // 2. Scheitert fetch an CORS, bleibt der klassische <img>-Weg — der lädt zwar,
 //    verrät aber nie, woran es lag.
-async function ladeBildUrl(url,timeoutMs){
+async function ladeBildUrl(url,timeoutMs,kopf){
   var limit=timeoutMs||90000, ersterGrund='';
   try{
     var ctl=(typeof AbortController==='function')?new AbortController():null;
     var t=ctl?setTimeout(function(){ctl.abort();},limit):null;
-    var r=await fetch(url,ctl?{signal:ctl.signal}:{});
+    var r=await fetch(url,{signal:ctl?ctl.signal:undefined,headers:kopf||{}});
     if(t)clearTimeout(t);
     if(!r.ok){
       var wartehinweis='';
@@ -770,8 +790,13 @@ async function ladeBildUrl(url,timeoutMs){
       throw new Error('Dienst antwortete HTTP '+r.status+(r.statusText?' '+r.statusText:'')+wartehinweis);
     }
     var b=await r.blob();
-    if(!b||b.size<200)throw new Error('Antwort enthielt kein Bild ('+(b?b.size:0)+' Bytes).');
-    if(b.type&&b.type.indexOf('image')!==0)throw new Error('Antwort war kein Bild, sondern '+b.type+'.');
+    if(!b||b.size<200||(b.type&&b.type.indexOf('image')!==0)){
+      // Zu klein oder falscher Typ: hineinschauen, sonst raetselt man ewig.
+      var probe='';
+      try{ probe=(await b.text()).replace(/\s+/g,' ').substring(0,160); }catch(e2){}
+      throw new Error('Antwort war kein Bild ('+(b?b.size:0)+' Bytes'+(b&&b.type?', '+b.type:'')+')'+
+        (probe?': '+probe:'')+' [Adresse: '+String(url).substring(0,120)+']');
+    }
     return URL.createObjectURL(b);
   }catch(e){
     ersterGrund=(e&&e.message)?e.message:String(e);

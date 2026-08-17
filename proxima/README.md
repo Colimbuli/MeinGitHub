@@ -89,6 +89,10 @@ sonst wuerfelt der Space seinen eigenen Seed und die Figuren sehen von Bild zu B
 Laesst sich die API nicht abfragen, stehen dieselben Angaben auf der Space-Seite unter
 *Use via API* und koennen von Hand eingetragen werden.
 
+Steht im API-Feld nichts Brauchbares, bricht der Generator nicht ab: er sucht sich aus `/config`
+den plausibelsten Endpunkt (`generate`, `infer`, `predict` und Aehnliches), sagt im Dialog welchen
+er genommen hat und merkt ihn sich. Hilfsendpunkte wie `lambda` oder `load_example` waehlt er nie.
+
 Anime-Modelle vom Typ Illustrious oder Pony reagieren auf **Tag-Ketten** deutlich besser als auf
 Prosa. Dafuer gibt es im Menue 🎬 den Stil *Illustrious / Anime-Tags*.
 

@@ -416,6 +416,28 @@ pruefe('randomize_seed wird abgeschaltet, trotz Vorgabewert true', /\{seed\}, fa
 const gefuellt = ctx.gradioDaten(vorlage, { prompt: 'a', negativ: 'b', seed: 7, breite: 1024, hoehe: 768 });
 pruefe('gebaute Vorlage lässt sich füllen', gefuellt.length === 8 && gefuellt[2] === 7 && gefuellt[5] === 768, JSON.stringify(gefuellt));
 
+console.log('\n— Endpunktwahl im Space —');
+// Genau die Endpunkte, die der Space laut Fehlermeldung anbietet.
+const deps = [
+  { api_name: 'load_example', id: 0 },
+  { api_name: 'lambda', id: 1 },
+  { api_name: 'generate', id: 2 },
+  { api_name: 'lambda_1', id: 3 },
+  { api_name: null, id: 4 }
+];
+pruefe('genauer Treffer gewinnt', ctx.waehleEndpunkt(deps, '/generate').id === 2);
+pruefe('führender Schrägstrich egal', ctx.waehleEndpunkt(deps, 'generate').id === 2);
+pruefe('leeres Feld findet generate', ctx.waehleEndpunkt(deps, '').id === 2);
+pruefe('Unsinn im Feld findet generate statt abzubrechen', ctx.waehleEndpunkt(deps, 'False').id === 2, 'False');
+pruefe('undefined ebenso', ctx.waehleEndpunkt(deps, undefined).id === 2);
+pruefe('Tippfehler fällt auf generate zurück', ctx.waehleEndpunkt(deps, '/genrate').id === 2);
+pruefe('Hilfsendpunkte werden nie blind genommen',
+  ctx.waehleEndpunkt([{ api_name: 'lambda', id: 0 }, { api_name: 'load_example', id: 1 }], 'False') === null);
+pruefe('ohne Endpunkte null', ctx.waehleEndpunkt([], 'x') === null);
+pruefe('Alternativname infer wird erkannt', ctx.waehleEndpunkt([{ api_name: 'infer', id: 7 }], '').id === 7);
+pruefe('id wird gegenüber der Position bevorzugt', ctx.waehleEndpunkt([{ api_name: 'generate', id: 42 }], '').id === 42);
+pruefe('ohne id zählt die Position', ctx.waehleEndpunkt([{ api_name: 'a' }, { api_name: 'generate' }], '').id === 1);
+
 console.log('\n— Seeds für externe Dienste —');
 pruefe('zwölfstelliger Seed wird auf 32 Bit gefaltet', ctx.seedFuerDienst(777777777777) <= 2147483647);
 pruefe('gefalteter Seed bleibt stabil', ctx.seedFuerDienst(777777777777) === ctx.seedFuerDienst(777777777777));
