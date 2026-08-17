@@ -117,6 +117,7 @@ blockiert. Die Fehlerzeile im Dialog zeigt deshalb, woran es liegt:
 | `Failed to fetch` / `NetworkError` | Gar nicht erst hingekommen: Adresse falsch, Dienst tot, oder Perchance lässt den Aufruf nicht zu. |
 | `Antwort war kein Bild, sondern text/html` | Der Dienst schickt eine Fehlerseite statt eines Bildes. |
 | `HTTP 429` | **Drosselung** — zu viele Anfragen in kurzer Zeit. Kein Fehler der Anfrage. |
+| `exceeded your ZeroGPU runs limit` | Kontingent des Space aufgebraucht. Ein Hugging-Face-Token im Token-Feld hebt es deutlich an. |
 | `HTTP 403` bei AI Horde | Auftrag zu groß oder zu aufwendig für das vorhandene Kudos-Guthaben. Die Meldung nennt die geltende Grenze und die tatsächlich angefragten Maße. |
 | `Zeitüberschreitung` | Dienst überlastet — bei AI Horde anonym normal. |
 
@@ -130,6 +131,10 @@ weiter an: er legt eine Pause ein (Länge aus dem `Retry-After` des Dienstes, so
 setzt in dieser Zeit den Bildtakt aus und sagt es im Dialog. Dauerhaft hilft nur, seltener zu
 fragen — **Bild-Takt in ⚙ erhöhen** (etwa 5 statt 2) oder auf `0` stellen und Bilder nur noch per
 `/bild:` anfordern.
+
+Nicht jeder Dienst meldet ein erschoepftes Kontingent als 429 -- ZeroGPU schreibt es als Text
+in die Antwort. Auch das erkennt der Generator und legt dann eine laengere Pause ein (fuenf
+Minuten), statt bei jedem Bildtakt erneut anzuklopfen.
 
 Bei **HTTP 500** fasst der Generator einmal selbst nach: kurze Pause, benachbarter Seed, zweiter
 Versuch. Seeds werden für alle externen Dienste auf 32 Bit gefaltet — Bild-Backends rechnen mit

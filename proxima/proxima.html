@@ -160,7 +160,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.16</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.17</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -1466,13 +1466,18 @@ async function zeichneBild(opts){
     S.letzterNegativ=negativ;
   }catch(e){
     var m=String((e&&e.message)||e);
-    if(/HTTP 429/.test(m)){
-      // Drosselung: eine Weile gar nicht mehr anfragen, statt weiter anzuklopfen.
-      var sek=60, ra=m.match(/in (\d+)s/);
+    var gedrosselt=/HTTP 429/.test(m);
+    // Ein erschöpftes Kontingent meldet nicht jeder Dienst als 429 — ZeroGPU
+    // etwa schreibt es in die Antwort. Auch dann nicht weiter anklopfen.
+    var kontingent=/zerogpu|quota|rate.?limit|exceeded|kontingent/i.test(m);
+    if(gedrosselt||kontingent){
+      var sek=gedrosselt?60:300, ra=m.match(/in (\d+)s/);
       if(ra)sek=Math.max(15,Math.min(600,parseInt(ra[1],10)||60));
       S.bildPauseBis=Date.now()+sek*1000;
-      errZeile('⚠ '+quelle().label+' drosselt (HTTP 429). Keine Bildanfragen für '+sek+'s. '+
-               'Dauerhaft hilft: Bild-Takt in ⚙ erhöhen, anderes Modell, oder zurück auf Perchance.');
+      errZeile('⚠ '+quelle().label+(kontingent?' — Kontingent erschöpft':' drosselt (HTTP 429)')+
+               '. Keine Bildanfragen für '+sek+'s. '+
+               (/token/i.test(m)?'Ein Hugging-Face-Token im Feld „Token" (⚙) hebt das Kontingent deutlich an. ':'')+
+               'Sonst: Bild-Takt in ⚙ erhöhen oder zurück auf Perchance.');
     }else{
       zeigeFehler('Bild ('+quelle().label+')',e);
     }

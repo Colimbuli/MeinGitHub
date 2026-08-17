@@ -274,8 +274,19 @@ const laufen = async () => {
   pruefe('Retry-After wird übernommen (~45s)', Math.abs((ctx.S.bildPauseBis - Date.now()) - 45000) < 2000,
     String(Math.round((ctx.S.bildPauseBis - Date.now()) / 1000)) + 's');
 
+  // Ein erschöpftes ZeroGPU-Kontingent kommt nicht als HTTP 429, sondern als
+  // Text in der Antwort — auch dann muss der Generator eine Pause einlegen.
+  ctx.S.bildPauseBis = 0;
+  ctx.BILDQUELLEN.gradio.zeichne = async () => { throw new Error('You have exceeded your ZeroGPU runs limit. Authenticate with a Hugging Face token for more quota'); };
+  ctx.CFG.quelle = 'gradio';
+  await ctx.zeichneBild({});
+  pruefe('erschöpftes Kontingent löst ebenfalls eine Pause aus', ctx.S.bildPauseBis > Date.now(),
+    String(Math.round((ctx.S.bildPauseBis - Date.now()) / 1000)) + 's');
+  pruefe('Pause dabei länger als bei einer Drosselung', (ctx.S.bildPauseBis - Date.now()) > 120000);
+
   ctx.CFG.quelle = 'perchance';
   ctx.CFG.bildTakt = 1; ctx.S.bildZaehler = 0;
+  ctx.S.bildPauseBis = Date.now() + 60000;   // laufende Pause, unabhängig vom Block davor
   const vorPause = gesendet.length;
   ctx.bildTakt();
   await new Promise(r => setTimeout(r, 30));
