@@ -72,6 +72,10 @@ Jede Quelle rechnet mit einem **anderen Bildmodell**. Gleicher Prompt, gleicher 
 deutlich anderes Bild — das ist normal und nicht abstellbar. Wer einen bestimmten Look will, bleibt
 bei einer Quelle oder passt den Stiltext per `/stil:` an die gewählte Quelle an.
 
+Der Prompt selbst **bleibt beim Wechsel erhalten**: Was im Bildmenü von Hand geschrieben wurde,
+gilt weiter und wandert in die nächste Engine — nur die Längengrenze der neuen Quelle wird noch
+angewandt. Zurück zur Automatik geht es über **↺ AUS SZENE** im Bildmenü oder über `/bild: …`.
+
 Zwei Unterschiede sind dagegen hausgemacht und behoben:
 
 * **Negativprompt.** Perchance bekommt ihn schon immer. An Pollinations geht er jetzt als

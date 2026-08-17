@@ -160,7 +160,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.6</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.7</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -263,6 +263,7 @@ select.feld option{background:var(--panel);}
     <div class="modalNav">
       <button onclick="schliesseModal()">SCHLIESSEN</button>
       <button onclick="bildOeffnen()">↗ ÖFFNEN</button>
+      <button onclick="bildAusSzene()" title="Prompt wieder automatisch aus der Szene bauen">↺ AUS SZENE</button>
       <button class="haupt" onclick="bildNeuZeichnen()">✦ NEU ZEICHNEN</button>
     </div>
   </div>
@@ -651,6 +652,9 @@ var S = {
   seed:0,                           // fest, damit Figuren wiedererkennbar bleiben
   bildGeneriert:false, bildZaehler:0, bildLaeuft:false, bildAusstehend:null,
   szeneText:'', szeneGlobal:'', letzterPrompt:'', letzterNegativ:'', letzteBildUrl:'',
+  // Von Hand geschriebener Prompt. Solange gesetzt, gilt er statt des aus der
+  // Szene gebauten — auch ueber einen Wechsel der Bildquelle hinweg.
+  eigenerPrompt:'', eigenerNegativ:'',
   npcErscheint:false,
   autoAktiv:false, autoRegie:'', autoLaeuft:false, autoForceIdx:null,
   stil:'', stilLabel:'',
@@ -1109,8 +1113,13 @@ async function zeichneBild(opts){
   S.bildLaeuft=true;
   el('szenelade').classList.add('an');
   try{
-    var prompt = (opts.promptOverride!=null)?String(opts.promptOverride).trim():bauePrompt(opts,quelle().maxPrompt);
-    var negativ= (opts.negativOverride!=null)?String(opts.negativOverride).trim():baueNegativ();
+    // Rangfolge: einmaliger Override → eigener Prompt (überdauert Quellenwechsel)
+    // → automatisch aus der Szene gebaut.
+    var max=quelle().maxPrompt;
+    var prompt = (opts.promptOverride!=null) ? String(opts.promptOverride).trim()
+               : (S.eigenerPrompt ? S.eigenerPrompt : bauePrompt(opts,max));
+    if(max&&prompt.length>max)prompt=kuerzeText(prompt,max);   // greift nur bei eigenen Prompts
+    var negativ= (opts.negativOverride!=null)?String(opts.negativOverride).trim():(S.eigenerNegativ||baueNegativ());
     var seed   = (opts.seedOverride!=null&&String(opts.seedOverride).trim()!=='')
                  ?(parseInt(opts.seedOverride,10)||S.seed)
                  :(S.seed||(S.seed=neuerSeed()));
@@ -1213,6 +1222,7 @@ function kleidungBefehl(idx,outfitRaw){
   if(!outfit){ sysZeile('/kleidung'+(idx+1)+': gib nach dem Doppelpunkt ein Outfit an.'); return; }
   S.kleidung[idx]=outfit;
   sysZeile('✦ Neues Outfit für '+W.npcs[idx].name+': '+outfit+' ✦');
+  if(S.eigenerPrompt)sysZeile('Hinweis: Ein eigener Prompt ist aktiv, das Outfit wirkt erst nach „AUS SZENE" im Bildmenü.');
   autosave();
   zeichneBild({});
 }
@@ -1222,6 +1232,7 @@ function bildBefehl(descRaw){
   if(!beschreibung){ sysZeile('/bild: gib nach dem Doppelpunkt eine Bildbeschreibung an.'); return; }
   S.szeneText=beschreibung;
   S.bildZaehler=0;
+  S.eigenerPrompt='';S.eigenerNegativ='';   // ausdrueckliche Neubeschreibung schlaegt den eigenen Prompt
   sysZeile('✦ Neues Bild: '+beschreibung+' ✦');
   zeichneBild({szene:beschreibung});
 }
@@ -1237,6 +1248,7 @@ function stilBefehl(raw){
   if(STILE[key]){ S.stil=STILE[key]; S.stilLabel=key; }
   else{ S.stil=t; S.stilLabel=t; }
   sysZeile('✦ Bildstil: '+S.stilLabel+' ✦');
+  if(S.eigenerPrompt)sysZeile('Hinweis: Ein eigener Prompt ist aktiv, der Stil wirkt erst nach „AUS SZENE" im Bildmenü.');
   autosave();
   zeichneBild({});
 }
@@ -1552,11 +1564,14 @@ function zeigeChronik(ziel){
 // ── BILD-MENÜ ─────────────────────────────────
 function oeffneBildModal(){
   if(!S.imSpiel)return;
-  if(!S.bildGeneriert&&!S.letzterPrompt){ sysZeile('Das erste Bild entsteht gerade…'); return; }
-  el('bildPromptFeld').value=S.letzterPrompt||'';
-  el('bildNegativFeld').value=S.letzterNegativ||baueNegativ();
+  if(!S.bildGeneriert&&!S.letzterPrompt&&!S.eigenerPrompt){ sysZeile('Das erste Bild entsteht gerade…'); return; }
+  el('bildPromptFeld').value=S.eigenerPrompt||S.letzterPrompt||'';
+  el('bildNegativFeld').value=S.eigenerNegativ||S.letzterNegativ||baueNegativ();
   el('bildSeedFeld').value=S.seed||'';
-  el('bildQuelleInfo').textContent='Quelle: '+quelle().label+' — '+quelle().info;
+  el('bildQuelleInfo').textContent=(S.eigenerPrompt
+      ? '✎ Eigener Prompt aktiv — er bleibt auch beim Wechsel der Bildquelle erhalten. „AUS SZENE" stellt die Automatik wieder her. '
+      : 'Automatisch aus der Szene gebaut — jede Bearbeitung wird dauerhaft übernommen. ')
+    +'Quelle: '+quelle().label+' — '+quelle().info;
   oeffneModal('mBild');
 }
 function wuerfelSeed(){ el('bildSeedFeld').value=String(neuerSeed()); }
@@ -1565,8 +1580,22 @@ function bildNeuZeichnen(){
   var p=el('bildPromptFeld').value.trim();
   var n=el('bildNegativFeld').value.trim();
   var s=el('bildSeedFeld').value.trim();
+  // Bearbeitung festhalten, statt sie beim naechsten automatischen Bild oder
+  // beim Wechsel der Bildquelle zu verlieren.
+  S.eigenerPrompt=p;
+  S.eigenerNegativ=(n&&n!==baueNegativ())?n:'';
   schliesseModal();
-  zeichneBild({promptOverride:p,negativOverride:n,seedOverride:s});
+  autosave();
+  zeichneBild({seedOverride:s});
+}
+// Zurueck zur Automatik: Prompt und Negativprompt entstehen wieder aus der Szene.
+function bildAusSzene(){
+  if(!S.imSpiel)return;
+  S.eigenerPrompt='';S.eigenerNegativ='';
+  schliesseModal();
+  sysZeile('✦ Bild folgt wieder der Szene ✦');
+  autosave();
+  zeichneBild({});
 }
 function bildOeffnen(){
   if(!S.letzteBildUrl)return;
@@ -1787,6 +1816,8 @@ function migriere(d){
   if(typeof s.szeneGlobal!=='string')s.szeneGlobal='';
   if(typeof s.szeneText!=='string')s.szeneText='';
   if(typeof s.letzterNegativ!=='string')s.letzterNegativ='';
+  if(typeof s.eigenerPrompt!=='string')s.eigenerPrompt='';
+  if(typeof s.eigenerNegativ!=='string')s.eigenerNegativ='';
   if(!s.seed)s.seed=(w.ort&&parseInt(w.ort.seed,10))||neuerSeed();   // V6 hielt den Seed am Ort
   if(w.protagonist){
     if(typeof w.protagonist.aussehen!=='string')w.protagonist.aussehen='';

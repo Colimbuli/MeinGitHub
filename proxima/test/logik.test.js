@@ -164,6 +164,54 @@ pruefe('kein Wort mittendrin zerrissen', !/[a-zäöü]\.\.\.$/.test(kurz));
 const winzig = ctx.bauePrompt({ szene: 'x' }, 120);
 pruefe('auch bei winzigem Budget bleibt der Stil erhalten', winzig.includes('anime manga style'));
 
+console.log('\n— Eigener Prompt überlebt den Quellenwechsel —');
+// Stellt nach, was beim Umschalten zwischen den Engines passiert: zeichneBild
+// baut normalerweise neu aus der Szene — ein von Hand geschriebener Prompt
+// darf dabei nicht verlorengehen.
+const gesendet = [];
+const laufen = async () => {
+  // Attrappen erst hier setzen, sonst treffen sie die synchronen Tests weiter unten.
+  Object.keys(ctx.BILDQUELLEN).forEach(k => {
+    ctx.BILDQUELLEN[k].zeichne = async (a) => { gesendet.push({ quelle: k, prompt: a.prompt, negativ: a.negativ }); return 'data:image/png;base64,xx'; };
+  });
+  ctx.S.imSpiel = true;
+  ctx.S.eigenerPrompt = ''; ctx.S.eigenerNegativ = '';
+  ctx.CFG.quelle = 'perchance';
+  await ctx.zeichneBild({});
+  const auto = gesendet.at(-1).prompt;
+  pruefe('ohne eigenen Prompt wird aus der Szene gebaut', auto.includes('anime manga style'));
+
+  // Nutzer bearbeitet den Prompt im Bildmenü
+  ctx.S.eigenerPrompt = 'ein ganz eigener prompt, handgeschrieben, mit eigenem stil';
+  ctx.S.eigenerNegativ = 'nur mein negativ';
+  await ctx.zeichneBild({});
+  pruefe('eigener Prompt wird verwendet', gesendet.at(-1).prompt === ctx.S.eigenerPrompt);
+  pruefe('eigener Negativprompt wird verwendet', gesendet.at(-1).negativ === 'nur mein negativ');
+
+  // Engine-Wechsel — genau hier wurde der Prompt bisher zurückgesetzt
+  ctx.CFG.quelle = 'pollinations';
+  await ctx.zeichneBild({});
+  pruefe('nach Wechsel zu Pollinations bleibt er erhalten', gesendet.at(-1).prompt === ctx.S.eigenerPrompt, gesendet.at(-1).prompt);
+  pruefe('Quelle hat tatsächlich gewechselt', gesendet.at(-1).quelle === 'pollinations');
+  ctx.CFG.quelle = 'perchance';
+  await ctx.zeichneBild({});
+  pruefe('und beim Zurückwechseln ebenfalls', gesendet.at(-1).prompt === ctx.S.eigenerPrompt);
+
+  // Zu langer eigener Prompt wird für Quellen mit Grenze gekappt
+  ctx.S.eigenerPrompt = 'sehr lang, '.repeat(300);
+  ctx.CFG.quelle = 'pollinations';
+  await ctx.zeichneBild({});
+  pruefe('eigener Prompt respektiert die Längengrenze der Quelle', gesendet.at(-1).prompt.length <= 1200, String(gesendet.at(-1).prompt.length));
+  ctx.CFG.quelle = 'perchance';
+  await ctx.zeichneBild({});
+  pruefe('ohne Grenze bleibt er ungekürzt', gesendet.at(-1).prompt.length > 1200);
+
+  // Zurück zur Automatik
+  ctx.S.eigenerPrompt = ''; ctx.S.eigenerNegativ = '';
+  await ctx.zeichneBild({});
+  pruefe('nach dem Zurücksetzen greift wieder die Szene', gesendet.at(-1).prompt.includes('anime manga style'));
+};
+
 console.log('\n— Negativprompt —');
 ctx.S.stilLabel = 'realistisch'; ctx.S.stil = ctx.STILE.realistisch;
 pruefe('Stil-Negativ ergänzt', ctx.baueNegativ().includes('airbrushed skin'));
@@ -231,5 +279,11 @@ pruefe('Stimmungen aus NPCs abgeleitet', neu.stand.stimmung[0] === 'heiter');
 pruefe('transiente Flags zurückgesetzt', neu.stand.bildLaeuft === false && neu.stand.autoAktiv === false && neu.stand.imSpiel === true);
 pruefe('Held-Aussehen ergänzt', neu.welt.protagonist.aussehen === '');
 
-console.log('\n' + (bad ? '✗ ' + bad + ' Fehler, ' : '✓ alles grün — ') + ok + ' Prüfungen bestanden');
-process.exit(bad ? 1 : 0);
+// Der asynchrone Teil (Quellenwechsel) laeuft zum Schluss, danach die Auswertung.
+laufen().then(() => {
+  console.log('\n' + (bad ? '✗ ' + bad + ' Fehler, ' : '✓ alles grün — ') + ok + ' Prüfungen bestanden');
+  process.exit(bad ? 1 : 0);
+}).catch(e => {
+  console.log('\n✗ Test brach ab: ' + (e && e.stack ? e.stack : e));
+  process.exit(1);
+});
