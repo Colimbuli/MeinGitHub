@@ -81,6 +81,15 @@ und ändert sonst nichts.
    Endpunkt mit Bildausgabe, traegt `fn_index` ein und baut die **Parameter-Vorlage**.
 5. Vorlage kurz pruefen, **UEBERNEHMEN**, dann **QUELLE TESTEN**.
 
+**API ERKUNDEN** baut die Vorlage aus den echten Vorgabewerten des Space (`props.value` der
+zugehoerigen Bedienelemente), nicht aus geratenen Zahlen. Zwei Feinheiten dabei:
+
+* Ein `aspect_ratio_selector` wird auf **Custom** gestellt, sofern der Space diese Auswahl
+  anbietet -- sonst bleiben `custom_width` und `custom_height` wirkungslos und der Space rechnet
+  mit seiner eigenen Groesse.
+* Die Bildgroesse fuer Spaces steht in eigenen Feldern (Vorgabe 1024x1024). Viele SDXL-Spaces
+  lehnen alles darunter ab, waehrend fuer andere Quellen 512 sinnvoll sein kann.
+
 Die Vorlage ist die Parameterliste des Space in seiner Reihenfolge, mit Platzhaltern:
 `"{prompt}"` `"{negativ}"` `{seed}` `{breite}` `{hoehe}`. Alles andere sind feste Werte, die aus den
 Vorgaben des Space uebernommen werden. Ein `randomize_seed` wird bewusst auf `false` gesetzt --

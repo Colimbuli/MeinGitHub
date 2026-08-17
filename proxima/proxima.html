@@ -160,7 +160,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.15</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.16</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -392,7 +392,7 @@ var CFG={
   apiUrl:'https://api.openai.com/v1', apiKey:'', apiModell:'gpt-image-1',
   urlVorlage:'https://example.org/bild?p={prompt}&seed={seed}&w={breite}&h={hoehe}',
   gradioHost:'https://ibarakidouji-wai-nsfw-illustrious-sdxl.hf.space',
-  gradioApi:'/generate', gradioFnIndex:'', gradioToken:'',
+  gradioApi:'/generate', gradioFnIndex:'', gradioToken:'', gradioBreite:1024, gradioHoehe:1024,
   gradioVorlage:'["{prompt}", "{negativ}", {seed}, false, {breite}, {hoehe}, 7, 28]'
 };
 function ladeCfg(){
@@ -567,6 +567,8 @@ var BILDQUELLEN={
       {k:'gradioApi',l:'API-Name (z.B. /generate) - leer lassen, dann wird er gesucht',typ:'text'},
       {k:'gradioFnIndex',l:'fn_index (leer = automatisch aus /config)',typ:'text'},
       {k:'gradioToken',l:'Hugging-Face-Token (nur bei ZeroGPU oder privat)',typ:'passwort'},
+      {k:'gradioBreite',l:'Breite für diesen Space (viele SDXL-Spaces verlangen mindestens 1024)',typ:'zahl'},
+      {k:'gradioHoehe',l:'Höhe für diesen Space',typ:'zahl'},
       {k:'gradioVorlage',l:'Parameter-Vorlage — Platzhalter: "{prompt}" "{negativ}" {seed} {breite} {hoehe}',typ:'text'}
     ],
     zeichne:async function(a){
@@ -574,7 +576,12 @@ var BILDQUELLEN={
       if(!host)throw new Error('Keine Space-Adresse hinterlegt.');
       var api=String(CFG.gradioApi||'/infer');
       if(api.charAt(0)!=='/')api='/'+api;
-      var daten=gradioDaten(CFG.gradioVorlage,a);
+      // Eigene Masse: viele SDXL-Spaces lehnen alles unter 1024 ab, waehrend
+      // andere Quellen mit 512 gut fahren. Deshalb hier getrennt einstellbar.
+      var daten=gradioDaten(CFG.gradioVorlage,{
+        prompt:a.prompt, negativ:a.negativ, seed:a.seed,
+        breite:auf64(CFG.gradioBreite||a.breite), hoehe:auf64(CFG.gradioHoehe||a.hoehe)
+      });
       var kopf={'Content-Type':'application/json'};
       if(CFG.gradioToken)kopf['Authorization']='Bearer '+CFG.gradioToken;
 
@@ -664,13 +671,19 @@ function gradioQueueErgebnis(text){
     try{ o=JSON.parse(z.substring(5).trim()); }catch(e){ return; }
     if(!o||typeof o!=='object')return;
     if(o.msg==='process_completed'){
-      if(o.success===false)fehler=(o.output&&(o.output.error||o.output.detail))||'Der Space meldete einen Fehler.';
-      else ergebnis=(o.output&&o.output.data)||o.output||null;
+      if(o.success===false){
+        fehler=(o.output&&(o.output.error||o.output.detail||o.output.message))||'';
+        if(!fehler){
+          // Ohne Klartext wenigstens zeigen, was der Space geschickt hat.
+          try{ fehler='ohne Klartext, Rohmeldung: '+JSON.stringify(o.output||o).substring(0,200); }
+          catch(e1){ fehler='Der Space meldete einen Fehler.'; }
+        }
+      }else ergebnis=(o.output&&o.output.data)||o.output||null;
     }else if(o.msg==='unexpected_error'||o.msg==='queue_full'){
       fehler=o.message||o.msg;
     }
   });
-  if(fehler)throw new Error(String(fehler).substring(0,220));
+  if(fehler)throw new Error(String(fehler).substring(0,260));
   return ergebnis;
 }
 function sitzungsNummer(){
@@ -724,6 +737,38 @@ function gradioVorlageAus(params){
     if(/seed/.test(n))return '{seed}';
     if(/width|breite/.test(n))return '{breite}';
     if(/height/.test(n))return '{hoehe}';
+    if(pa.parameter_has_default&&pa.parameter_default!==undefined)return JSON.stringify(pa.parameter_default);
+    var t=String((pa.type&&pa.type.type)||(pa.python_type&&pa.python_type.type)||'').toLowerCase();
+    if(/bool/.test(t))return 'false';
+    if(/number|int|float/.test(t))return '0';
+    return '""';
+  }).join(', ')+']';
+}
+// Bessere Vorlage: die festen Werte kommen aus den Vorgaben des Space selbst
+// (props.value der zugehoerigen Bedienelemente), nicht aus geratenen Zahlen.
+function gradioVorlageAusConfig(params,dep,components){
+  var nachId={};
+  (components||[]).forEach(function(c){ nachId[c.id]=c; });
+  var eingaben=(dep&&dep.inputs)||[];
+  var wahlWert=function(x){
+    if(Array.isArray(x))return (x.length>1&&x[1]!=null)?x[1]:x[0];
+    return x;
+  };
+  return '['+(params||[]).map(function(pa,i){
+    var n=String(pa.parameter_name||pa.label||'').toLowerCase();
+    if(/negativ/.test(n))return '"{negativ}"';
+    if(/random/.test(n)&&/seed/.test(n))return 'false';
+    if(/prompt/.test(n))return '"{prompt}"';
+    if(/seed/.test(n))return '{seed}';
+    if(/width|breite/.test(n))return '{breite}';
+    if(/height/.test(n))return '{hoehe}';
+    var comp=nachId[eingaben[i]], props=(comp&&comp.props)||{};
+    // Seitenverhaeltnis auf "Custom" stellen, sonst bleiben Breite und Hoehe wirkungslos.
+    if(/aspect|ratio/.test(n)&&Array.isArray(props.choices)){
+      var eigen=props.choices.map(wahlWert).filter(function(x){return /custom/i.test(String(x));})[0];
+      if(eigen!=null)return JSON.stringify(String(eigen));
+    }
+    if(props.value!==undefined&&props.value!==null)return JSON.stringify(props.value);
     if(pa.parameter_has_default&&pa.parameter_default!==undefined)return JSON.stringify(pa.parameter_default);
     var t=String((pa.type&&pa.type.type)||(pa.python_type&&pa.python_type.type)||'').toLowerCase();
     if(/bool/.test(t))return 'false';
@@ -2135,8 +2180,11 @@ async function gradioErkunden(){
     // Gewuenschten Endpunkt nehmen, sonst den ersten mit Bildausgabe.
     var wunsch=String(CFG.gradioApi||'');
     if(wunsch.charAt(0)!=='/')wunsch='/'+wunsch;
-    var name=(punkte[wunsch]?wunsch:null);
-    if(!name){
+    // Nach denselben Regeln waehlen wie zur Laufzeit: der Space nennt seinen
+    // ersten Endpunkt "/False", der ist ganz sicher nicht der Bildgenerator.
+    var gewaehlt=waehleEndpunkt(namen.map(function(n){return {api_name:n};}),wunsch);
+    var name=gewaehlt?('/'+gewaehlt.name):null;
+    if(!name||!punkte[name]){
       name=namen.filter(function(n){
         return (punkte[n].returns||[]).some(function(rt){return /image/i.test(String(rt.component||rt.label||''));});
       })[0]||namen[0];
@@ -2146,20 +2194,42 @@ async function gradioErkunden(){
 
     var feldApi=el('q_gradioApi'), feldVor=el('q_gradioVorlage'), feldFn=el('q_gradioFnIndex');
     if(feldApi)feldApi.value=name;
-    if(feldVor)feldVor.value=gradioVorlageAus(params);
+    if(feldVor)feldVor.value=gradioVorlageAus(params);   // vorlaeufig, ohne /config
 
-    // fn_index gleich mitnehmen, dann muss es zur Laufzeit nicht geholt werden.
+    // fn_index und die echten Vorgabewerte aus /config nachziehen.
     var fnText='';
     try{
       var c=await (await fetch(host+'/config',{headers:kopf})).json();
-      var gesucht=name.replace(/^\//,''), gefunden=null;
+      var gesucht=name.replace(/^\//,''), dep=null, gefunden=null;
       (c&&c.dependencies||[]).forEach(function(d,i){
-        if(String(d.api_name||'').replace(/^\//,'')===gesucht&&gefunden===null)gefunden=(d.id!=null?d.id:i);
+        if(String(d.api_name||'').replace(/^\//,'')===gesucht&&gefunden===null){
+          gefunden=(d.id!=null?d.id:i); dep=d;
+        }
       });
       if(gefunden!==null&&feldFn){ feldFn.value=String(gefunden); fnText=', fn_index '+gefunden; }
+      if(dep&&feldVor)feldVor.value=gradioVorlageAusConfig(params,dep,c&&c.components);
     }catch(e2){}
 
-    info.textContent='Endpunkte: '+namen.join(', ')+'  |  gewählt: '+name+fnText+
+    // Vorgabewerte fuer Breite und Hoehe aus /config lesen, damit die Masse
+    // von vornherein im erlaubten Bereich liegen.
+    var masseText='';
+    try{
+      var cc=await (await fetch(host+'/config',{headers:kopf})).json();
+      var werte={};
+      (cc&&cc.components||[]).forEach(function(comp){
+        var lab=String((comp.props&&(comp.props.label||comp.props.info))||'').toLowerCase();
+        var pr=comp.props||{};
+        if(pr.minimum==null&&pr.value==null)return;
+        if(/width|breite/.test(lab)&&!werte.b)werte.b=Math.max(Number(pr.minimum)||0,Number(pr.value)||0);
+        if(/height|h(ö|oe)he/.test(lab)&&!werte.h)werte.h=Math.max(Number(pr.minimum)||0,Number(pr.value)||0);
+      });
+      var fb=el('q_gradioBreite'), fh=el('q_gradioHoehe');
+      if(werte.b&&fb){ fb.value=String(auf64(werte.b)); }
+      if(werte.h&&fh){ fh.value=String(auf64(werte.h)); }
+      if(werte.b||werte.h)masseText='  |  Maße: '+auf64(werte.b||1024)+'x'+auf64(werte.h||1024);
+    }catch(e3){}
+
+    info.textContent='Endpunkte: '+namen.join(', ')+'  |  gewählt: '+name+fnText+masseText+
       '  |  Parameter: '+params.map(function(pa,i){
         return (i+1)+'. '+(pa.parameter_name||pa.label||'?')+
                ' ('+String((pa.type&&pa.type.type)||(pa.python_type&&pa.python_type.type)||'?')+')';

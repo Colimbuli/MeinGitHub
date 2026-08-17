@@ -416,6 +416,50 @@ pruefe('randomize_seed wird abgeschaltet, trotz Vorgabewert true', /\{seed\}, fa
 const gefuellt = ctx.gradioDaten(vorlage, { prompt: 'a', negativ: 'b', seed: 7, breite: 1024, hoehe: 768 });
 pruefe('gebaute Vorlage lässt sich füllen', gefuellt.length === 8 && gefuellt[2] === 7 && gefuellt[5] === 768, JSON.stringify(gefuellt));
 
+console.log('\n— Vorlage aus den Vorgaben des Space —');
+// Genau die 14 Parameter, die der Space laut Erkundung anbietet.
+const spaceParams = [
+  { parameter_name: 'prompt', python_type: { type: 'str' } },
+  { parameter_name: 'negative_prompt', python_type: { type: 'str' } },
+  { parameter_name: 'seed', python_type: { type: 'float' } },
+  { parameter_name: 'custom_width', python_type: { type: 'float' } },
+  { parameter_name: 'custom_height', python_type: { type: 'float' } },
+  { parameter_name: 'guidance_scale', python_type: { type: 'float' } },
+  { parameter_name: 'num_inference_steps', python_type: { type: 'float' } },
+  { parameter_name: 'sampler', python_type: { type: 'str' } },
+  { parameter_name: 'model_name', python_type: { type: 'str' } },
+  { parameter_name: 'aspect_ratio_selector', python_type: { type: 'str' } },
+  { parameter_name: 'use_upscaler', python_type: { type: 'bool' } },
+  { parameter_name: 'upscaler_strength', python_type: { type: 'float' } },
+  { parameter_name: 'upscale_by', python_type: { type: 'float' } },
+  { parameter_name: 'add_quality_tags', python_type: { type: 'bool' } }
+];
+const spaceDep = { api_name: 'generate', id: 5, inputs: [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23] };
+const spaceComps = [
+  { id: 10, props: { value: '' } }, { id: 11, props: { value: '' } },
+  { id: 12, props: { value: 0, minimum: 0 } },
+  { id: 13, props: { value: 1024, minimum: 1024 } }, { id: 14, props: { value: 1024, minimum: 1024 } },
+  { id: 15, props: { value: 7 } }, { id: 16, props: { value: 28 } },
+  { id: 17, props: { value: 'Euler a', choices: [['Euler a', 'Euler a'], ['DPM++ 2M', 'DPM++ 2M']] } },
+  { id: 18, props: { value: 'WAI-illustrious', choices: [['WAI-illustrious', 'WAI-illustrious']] } },
+  { id: 19, props: { value: '1024 x 1024', choices: [['1024 x 1024', '1024 x 1024'], ['Custom', 'Custom']] } },
+  { id: 20, props: { value: false } }, { id: 21, props: { value: 0.55 } },
+  { id: 22, props: { value: 1.5 } }, { id: 23, props: { value: true } }
+];
+const v = ctx.gradioVorlageAusConfig(spaceParams, spaceDep, spaceComps);
+const geparst = JSON.parse(v.replace(/"\{prompt\}"/, '"P"').replace(/"\{negativ\}"/, '"N"')
+  .replace(/\{seed\}/, '1').replace(/\{breite\}/, '2').replace(/\{hoehe\}/, '3'));
+pruefe('alle 14 Parameter in der Vorlage', geparst.length === 14, String(geparst.length));
+pruefe('Platzhalter an den richtigen Stellen', geparst[0] === 'P' && geparst[1] === 'N' && geparst[2] === 1 && geparst[3] === 2 && geparst[4] === 3, JSON.stringify(geparst.slice(0, 5)));
+pruefe('sampler kommt aus der Vorgabe des Space', geparst[7] === 'Euler a', String(geparst[7]));
+pruefe('model_name kommt aus der Vorgabe', geparst[8] === 'WAI-illustrious', String(geparst[8]));
+// Ohne "Custom" bleiben custom_width und custom_height wirkungslos.
+pruefe('aspect_ratio_selector wird auf Custom gestellt', geparst[9] === 'Custom', String(geparst[9]));
+pruefe('Wahrheitswerte übernommen', geparst[10] === false && geparst[13] === true);
+pruefe('Kommazahlen übernommen', geparst[11] === 0.55 && geparst[12] === 1.5);
+const gef = ctx.gradioDaten(v, { prompt: 'x', negativ: 'y', seed: 99, breite: 1024, hoehe: 1024 });
+pruefe('Vorlage lässt sich füllen', gef.length === 14 && gef[3] === 1024 && gef[9] === 'Custom', JSON.stringify(gef.slice(0, 5)));
+
 console.log('\n— Endpunktwahl im Space —');
 // Genau die Endpunkte, die der Space laut Fehlermeldung anbietet.
 const deps = [
