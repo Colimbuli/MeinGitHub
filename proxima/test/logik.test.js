@@ -72,6 +72,19 @@ const nackteWorte = (html.match(/\[[^\]\n]*\]/g) || []).filter(k =>
 pruefe('keine nackten Wortfolgen in eckigen Klammern (ganze Datei)', nackteWorte.length === 0, nackteWorte.join(' '));
 pruefe('Version im Startbildschirm ablesbar', /V\d+\.\d+/.test(markup));
 
+console.log('\n— Stapelreihenfolge —');
+// Modale müssen über dem Startbildschirm liegen, sonst öffnen sich
+// Spielstand- und Einstellungsmenü unsichtbar dahinter.
+const css = (html.match(/<style>([\s\S]*)<\/style>/) || ['', ''])[1];
+const zIndex = (sel) => {
+  const block = css.match(new RegExp(sel.replace(/[.#]/g, '\\$&') + '\\s*\\{[^}]*\\}'));
+  const z = block && block[0].match(/z-index:\s*(\d+)/);
+  return z ? Number(z[1]) : null;
+};
+const zStart = zIndex('#start'), zModal = zIndex('.modal');
+pruefe('Startbildschirm hat einen z-index', zStart !== null, String(zStart));
+pruefe('Modale liegen über dem Startbildschirm', zModal !== null && zModal > zStart, `modal ${zModal} vs start ${zStart}`);
+
 console.log('\n— jsonAus —');
 pruefe('sauberes JSON', ctx.jsonAus('{"a":1}').a === 1);
 pruefe('JSON in Codeblock', ctx.jsonAus('```json\n{"a":2}\n```').a === 2);

@@ -125,6 +125,9 @@ fehl, bevor es in Perchance auffällt.
 * Der **Schreibmaschinen-Effekt** stellt die vorherige Zeile sauber fertig, statt sie halb getippt
   stehenzulassen. Klick ins Dialogfenster überspringt die Animation, `0` als Tempo schaltet sie ab.
 * Ein **manuell bearbeiteter Prompt** verliert den Negativprompt nicht mehr.
+* **Spielstände und Einstellungen sind schon vom Startbildschirm aus erreichbar.** Die Menüs
+  öffneten sich hinter dem Startbildschirm, weil dieser höher lag — sichtbar wurden sie erst,
+  sobald ein Spiel lief.
 
 **Aufgeräumt**
 
