@@ -39,8 +39,26 @@ Zwei Dinge, die man wissen sollte:
   dorthin. Wenn ein Dienst keine Anfragen aus dem Browser erlaubt (CORS) oder Perchance den Aufruf
   blockt, bleibt das Bild leer — dafür gibt es in den Einstellungen den Knopf **QUELLE TESTEN**, der
   ein einzelnes Testbild anfordert und die genaue Fehlermeldung anzeigt.
-* **API-Schlüssel liegen unverschlüsselt im Browser** (`localStorage`) und gehen bei jedem Bild an
-  den Dienst. Nur eigene Schlüssel mit Ausgabenlimit verwenden, keine geteilten.
+* **API-Schlüssel liegen unverschlüsselt im Browser** (`localStorage`, Schlüssel `proxima_cfg_v1`)
+  und gehen bei jedem Bild an den Dienst. Nur eigene Schlüssel mit Ausgabenlimit verwenden, keine
+  geteilten.
+
+### Wohin mit einem Schlüssel
+
+In den Generator, **nie in den Code**: ⚙ EINSTELLUNGEN → Bildquelle wählen → Feld *API-Schlüssel*
+→ ÜBERNEHMEN → QUELLE TESTEN.
+
+Der Quelltext eines Perchance-Generators ist für alle einsehbar. Ein dort eingetragener Schlüssel
+ist damit veröffentlicht — dasselbe gilt für diese Datei im Repository.
+
+Was das Feld dagegen sicher trennt:
+
+| | |
+|---|---|
+| Spielstand-Export, Speicherplätze | enthalten **keinen** Schlüssel — die Konfiguration liegt getrennt davon |
+| `proxima.html` | enthält keinen Schlüssel, kann also bedenkenlos geteilt werden |
+| Browserdaten löschen | löscht auch den Schlüssel — er muss dann neu eingetragen werden |
+| anderes Gerät oder anderer Browser | kennt ihn nicht, dort erneut eintragen |
 
 ### Wenn eine Quelle nichts liefert
 
