@@ -28,7 +28,7 @@ Die Auswahl gilt generatorweit und überlebt Spielstände.
 | Quelle | Schlüssel nötig | Anmerkung |
 |---|---|---|
 | **Perchance** | nein | Das eingebaute Plugin. Nichts verlässt Perchance. Standard. |
-| **Pollinations** | nein | Offener Dienst, Bild kommt als URL. Ignoriert den Negativprompt. |
+| **Pollinations** | nein | Offener Dienst, Bild kommt als URL. Anderes Modell als Perchance — dieselbe Beschreibung ergibt sichtbar andere Bilder. Negativprompt wird mitgeschickt, aber nicht von jedem Modell dort beachtet. |
 | **AI Horde** | nein (`0000000000`) | Gratis über freiwillige Rechner; anonym langsam, mit eigenem Schlüssel von [aihorde.net](https://aihorde.net) deutlich schneller. |
 | **OpenAI-kompatible API** | ja | Alles, was `POST {basis}/images/generations` versteht. |
 | **Eigene URL-Vorlage** | je nachdem | Platzhalter `{prompt}` `{negativ}` `{seed}` `{breite}` `{hoehe}`. |
@@ -65,6 +65,21 @@ Versuch. Seeds werden für alle externen Dienste auf 32 Bit gefaltet — Bild-Ba
 
 Bleibt es bei `Failed to fetch` für *jede* externe Quelle, während Perchance selbst zeichnet, dann
 lässt die Perchance-Umgebung keine fremden Bild-Aufrufe zu; dann hilft nur die eingebaute Quelle.
+
+### Warum dieselbe Szene je nach Quelle anders aussieht
+
+Jede Quelle rechnet mit einem **anderen Bildmodell**. Gleicher Prompt, gleicher Seed, trotzdem ein
+deutlich anderes Bild — das ist normal und nicht abstellbar. Wer einen bestimmten Look will, bleibt
+bei einer Quelle oder passt den Stiltext per `/stil:` an die gewählte Quelle an.
+
+Zwei Unterschiede sind dagegen hausgemacht und behoben:
+
+* **Negativprompt.** Perchance bekommt ihn schon immer. An Pollinations geht er jetzt als
+  `negative_prompt` mit; lehnt der Dienst ab, wird ohne ihn nachgefasst. Nicht jedes Modell dort
+  wertet ihn aus.
+* **Prompt-Länge.** Quellen mit Längengrenze (`maxPrompt`) bekamen den Prompt vorher stumpf
+  abgeschnitten — und weil Stil und Bildaufbau am **Ende** stehen, fiel bei zwei Figuren genau der
+  Look weg. Gekürzt wird jetzt in der Mitte, Stil und Bildaufbau bleiben immer erhalten.
 
 Eine weitere Quelle hinzufügen heißt: einen Eintrag in `BILDQUELLEN` ergänzen. Jede Quelle bekommt
 `{prompt, negativ, seed, breite, hoehe}` und gibt eine Bildadresse zurück — mehr ist der Vertrag nicht.

@@ -139,6 +139,31 @@ p = ctx.bauePrompt({});
 pruefe('zwei Figuren → 2 distinct characters', p.includes('2 distinct characters'), p.slice(-90));
 pruefe('Figuren mit AND verbunden', p.includes(' AND '));
 
+console.log('\n— Prompt-Kürzung mit Budget —');
+// Der Stil steht am Ende des Prompts. Blindes Abschneiden entfernt genau ihn,
+// und das Bild sieht dann völlig anders aus als bei einer Quelle ohne Grenze.
+ctx.W.npcs = [
+  { name: 'Ida', rolle: 'Wirtin', aussehen: 'a woman in her forties with sharp green eyes, freckles across the nose, unruly copper hair tied back loosely, tall and broad-shouldered, an old scar along her left jaw'.repeat(3), kleidung: 'a heavy linen apron over a patched woolen dress, brass rings on every finger'.repeat(2) },
+  { name: 'Bo', rolle: 'Gast', aussehen: 'an elderly man, deeply lined face, thin white beard, stooped posture, milky left eye'.repeat(3), kleidung: 'a threadbare travelling coat and muddy boots'.repeat(2) }
+];
+ctx.S.stimmung = ['heiter', 'müde'];
+ctx.S.kleidung = [ctx.W.npcs[0].kleidung, ctx.W.npcs[1].kleidung];
+ctx.S.szeneGlobal = 'a dim candlelit tavern with low wooden beams and rain against the windows';
+ctx.S.stil = ctx.STILE.manga; ctx.S.stilLabel = 'manga';
+const lang = ctx.bauePrompt({ szene: 'she leans over the table pouring wine while he watches, medium shot, warm candlelight' });
+pruefe('ohne Grenze bleibt der Prompt vollständig', lang.length > 1200, String(lang.length));
+const kurz = ctx.bauePrompt({ szene: 'she leans over the table pouring wine while he watches, medium shot, warm candlelight' }, 1200);
+pruefe('mit Grenze wird das Budget eingehalten', kurz.length <= 1200, String(kurz.length));
+pruefe('Stil überlebt die Kürzung', kurz.includes('anime manga style'), kurz.slice(-120));
+pruefe('Bildaufbau überlebt die Kürzung', kurz.includes('comic panel composition'));
+pruefe('Figurenzahl überlebt die Kürzung', kurz.includes('2 distinct characters'));
+pruefe('Identität ist noch vertreten', kurz.includes('a woman in her forties'));
+pruefe('Szene ist noch vertreten', kurz.includes('Scene:') || kurz.includes('Setting:'));
+pruefe('kein Wort mittendrin zerrissen', !/[a-zäöü]\.\.\.$/.test(kurz));
+// Extremfall: winziges Budget darf nicht zu Bruchstücken führen
+const winzig = ctx.bauePrompt({ szene: 'x' }, 120);
+pruefe('auch bei winzigem Budget bleibt der Stil erhalten', winzig.includes('anime manga style'));
+
 console.log('\n— Negativprompt —');
 ctx.S.stilLabel = 'realistisch'; ctx.S.stil = ctx.STILE.realistisch;
 pruefe('Stil-Negativ ergänzt', ctx.baueNegativ().includes('airbrushed skin'));

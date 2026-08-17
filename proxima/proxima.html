@@ -160,7 +160,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.5</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.6</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -413,23 +413,25 @@ var BILDQUELLEN={
   },
   pollinations:{
     label:'Pollinations (frei, ohne Schlüssel)',
+    maxPrompt:1200,
     info:'Offener Dienst, die Beschreibung steckt in der Adresse — deshalb wird der Prompt gekürzt. Kein Negativprompt. Bei HTTP 500 hilft meist: Modellfeld leeren, Bildgröße auf 512×512, oder im Bildmenü einen neuen Seed würfeln.',
     felder:[{k:'pollModell',l:'Modell (leer = Standard des Dienstes)',typ:'text'}],
     zeichne:async function(a){
-      var bau=function(seed){
-        return 'https://image.pollinations.ai/prompt/'+encodeURIComponent(kuerzePrompt(a.prompt,700))+
+      var bau=function(seed,mitNegativ){
+        return 'https://image.pollinations.ai/prompt/'+encodeURIComponent(a.prompt)+
                '?width='+a.breite+'&height='+a.hoehe+'&seed='+seed+
-               (CFG.pollModell?'&model='+encodeURIComponent(CFG.pollModell):'');
+               (CFG.pollModell?'&model='+encodeURIComponent(CFG.pollModell):'')+
+               ((mitNegativ&&a.negativ)?'&negative_prompt='+encodeURIComponent(a.negativ):'');
       };
       var seed=seedFuerDienst(a.seed);
       try{
-        return await ladeBildUrl(bau(seed),120000);
+        return await ladeBildUrl(bau(seed,true),120000);
       }catch(e){
-        // 500er sind bei diesem Dienst oft vorübergehend oder seed-abhängig:
-        // genau einmal mit benachbartem Seed nachfassen, dann aufgeben.
-        if(!/HTTP 5\d\d/.test(String(e&&e.message)))throw e;
+        // Zweiter Anlauf ohne Negativprompt und mit benachbartem Seed: nicht jedes
+        // Modell dort kennt den Parameter, und 500er sind oft seed-abhängig.
+        if(!/HTTP \d/.test(String(e&&e.message)))throw e;
         await warte(2500);
-        return await ladeBildUrl(bau((seed+1)%2147483647||1),120000);
+        return await ladeBildUrl(bau((seed+1)%2147483647||1,false),120000);
       }
     }
   },
@@ -496,6 +498,7 @@ var BILDQUELLEN={
   },
   url:{
     label:'Eigene URL-Vorlage',
+    maxPrompt:1200,
     info:'Für alles, was ein Bild per einfachem Aufruf liefert. Platzhalter: {prompt} {negativ} {seed} {breite} {hoehe}.',
     felder:[{k:'urlVorlage',l:'URL-Vorlage',typ:'text'}],
     zeichne:async function(a){
@@ -515,10 +518,10 @@ function auf64(n){ n=Math.round((Number(n)||1024)/64)*64; return Math.max(256,Ma
 // Bild-Backends rechnen mit 32-Bit-Seeds. Aeltere Spielstaende halten
 // zwoelfstellige Werte — die quittieren manche Dienste mit HTTP 500.
 function seedFuerDienst(s){ return (Math.abs(parseInt(s,10)||0)%2147483647)||1; }
-// Lange Prompts sprengen URL-basierte Dienste (die Beschreibung steckt im Pfad).
 // Am letzten Komma vor der Grenze kappen, damit kein Wort zerrissen wird.
-function kuerzePrompt(p,max){
+function kuerzeText(p,max){
   p=String(p||'');
+  if(max<=0)return '';
   if(p.length<=max)return p;
   var schnitt=p.lastIndexOf(',',max);
   return p.substring(0,schnitt>max*0.6?schnitt:max).trim();
@@ -1059,7 +1062,10 @@ function setzeAutoRegie(txt){
 }
 
 // ── BILD-PIPELINE ─────────────────────────────
-function bauePrompt(opts){
+// Der Prompt wird aus Bausteinen gebaut, damit beim Kuerzen nicht ausgerechnet
+// das Ende verlorengeht: dort stehen Stil und Bildaufbau, und die bestimmen,
+// wie das Bild ueberhaupt aussieht. Gekuerzt wird in der Mitte.
+function bauePrompt(opts,max){
   var figurenArr=[];
   var P=W.protagonist;
   if(P&&(P.aussehen||'').trim()){
@@ -1078,12 +1084,18 @@ function bauePrompt(opts){
   var setting=(S.szeneGlobal||'').trim().replace(/[.\s]+$/,'');
   var stimmungen=W.npcs.map(function(n,i){return S.stimmung[i];}).filter(Boolean).join(' and ');
   var anzahl=figCount>1?(figCount+' distinct characters together in the scene, interacting'):'single character in the foreground';
-  return figuren+
-    (setting?'. Setting: '+setting:'')+
-    (szene?'. Scene: '+szene:'')+
-    (stimmungen?', mood: '+stimmungen:'')+
-    ', '+aktuellerStil()+
-    ', '+anzahl+', comic panel composition, dramatic lighting, detailed background';
+
+  var schwanz=', '+aktuellerStil()+', '+anzahl+', comic panel composition, dramatic lighting, detailed background';
+  var mitte=(setting?'. Setting: '+setting:'')+(szene?'. Scene: '+szene:'')+(stimmungen?', mood: '+stimmungen:'');
+  var ganz=figuren+mitte+schwanz;
+  if(!max||ganz.length<=max)return ganz;
+
+  // Zu lang: Stil und Bildaufbau bleiben unangetastet, der Rest teilt sich den Platz.
+  var frei=Math.max(80,max-schwanz.length);
+  var figurAnteil=Math.floor(frei*0.55);
+  if(figuren.length>figurAnteil)figuren=kuerzeText(figuren,figurAnteil);
+  mitte=kuerzeText(mitte,Math.max(0,frei-figuren.length));
+  return figuren+mitte+schwanz;
 }
 function baueNegativ(){
   var extra=STIL_NEGATIV[aktuellerStilSchluessel()];
@@ -1097,7 +1109,7 @@ async function zeichneBild(opts){
   S.bildLaeuft=true;
   el('szenelade').classList.add('an');
   try{
-    var prompt = (opts.promptOverride!=null)?String(opts.promptOverride).trim():bauePrompt(opts);
+    var prompt = (opts.promptOverride!=null)?String(opts.promptOverride).trim():bauePrompt(opts,quelle().maxPrompt);
     var negativ= (opts.negativOverride!=null)?String(opts.negativOverride).trim():baueNegativ();
     var seed   = (opts.seedOverride!=null&&String(opts.seedOverride).trim()!=='')
                  ?(parseInt(opts.seedOverride,10)||S.seed)
