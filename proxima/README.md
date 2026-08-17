@@ -42,6 +42,26 @@ Zwei Dinge, die man wissen sollte:
 * **API-Schlüssel liegen unverschlüsselt im Browser** (`localStorage`) und gehen bei jedem Bild an
   den Dienst. Nur eigene Schlüssel mit Ausgabenlimit verwenden, keine geteilten.
 
+### Wenn eine Quelle nichts liefert
+
+Der Generator holt jedes Bild zuerst per `fetch` und erst danach klassisch über ein `<img>`.
+Der erste Weg nennt den **echten Grund**, der zweite lädt auch dann noch, wenn CORS den ersten
+blockiert. Die Fehlerzeile im Dialog zeigt deshalb, woran es liegt:
+
+| Meldung | Bedeutung |
+|---|---|
+| `Dienst antwortete HTTP 4xx/5xx` | Der Dienst wurde erreicht und hat abgelehnt — falscher Modellname, Prompt zu lang, Limit erschöpft. |
+| `Failed to fetch` / `NetworkError` | Gar nicht erst hingekommen: Adresse falsch, Dienst tot, oder Perchance lässt den Aufruf nicht zu. |
+| `Antwort war kein Bild, sondern text/html` | Der Dienst schickt eine Fehlerseite statt eines Bildes. |
+| `Zeitüberschreitung` | Dienst überlastet — bei AI Horde anonym normal. |
+
+Erste Handgriffe: **Modellfeld leeren** (ein nicht mehr existierender Modellname ist die häufigste
+Ursache), Bildgröße auf 512×512 stellen, in den Einstellungen **QUELLE TESTEN** drücken — der
+schickt einen kurzen Testprompt und schließt damit die Prompt-Länge als Ursache aus.
+
+Bleibt es bei `Failed to fetch` für *jede* externe Quelle, während Perchance selbst zeichnet, dann
+lässt die Perchance-Umgebung keine fremden Bild-Aufrufe zu; dann hilft nur die eingebaute Quelle.
+
 Eine weitere Quelle hinzufügen heißt: einen Eintrag in `BILDQUELLEN` ergänzen. Jede Quelle bekommt
 `{prompt, negativ, seed, breite, hoehe}` und gibt eine Bildadresse zurück — mehr ist der Vertrag nicht.
 

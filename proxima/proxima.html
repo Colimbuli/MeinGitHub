@@ -64,13 +64,18 @@ html,body{width:100%;height:var(--hoehe);background:var(--bg);font-family:'EB Ga
 #spiel{position:fixed;inset:0;height:var(--hoehe);z-index:10;display:none;flex-direction:column;pointer-events:none;}
 #spiel.aktiv{display:flex;}
 #oben{flex:1;position:relative;pointer-events:none;min-height:0;}
-#raumtitel{position:absolute;top:0;left:0;right:0;font-family:'Cinzel',serif;font-size:clamp(0.75rem,1.9vw,1.05rem);font-weight:700;letter-spacing:0.18em;color:var(--gold2);text-shadow:0 0 14px rgba(212,160,51,0.6),0 2px 6px rgba(0,0,0,0.9);text-align:center;padding:9px 10px 5px;pointer-events:none;z-index:5;}
-#werkzeuge{position:absolute;top:6px;right:8px;z-index:7;pointer-events:all;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;max-width:62%;}
+/* Kopfbereich als echte Reihenfolge statt uebereinandergelegter Ebenen:
+   Werkzeuge und NPC-Anzeige teilen sich die erste Zeile, der Titel steht
+   darunter. Sonst laeuft der Titel auf schmalen Displays hinter die Knoepfe. */
+#kopf{position:absolute;top:0;left:0;right:0;z-index:6;pointer-events:none;padding:6px 8px 0;}
+#kopfreihe{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+#raumtitel{font-family:'Cinzel',serif;font-size:clamp(0.75rem,1.9vw,1.05rem);font-weight:700;letter-spacing:0.18em;color:var(--gold2);text-shadow:0 0 14px rgba(212,160,51,0.6),0 2px 6px rgba(0,0,0,0.9);text-align:center;padding:8px 4px 0;pointer-events:none;}
+#werkzeuge{flex:0 0 auto;pointer-events:all;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;max-width:62%;}
 #werkzeuge button{background:rgba(42,28,14,0.82);border:1px solid var(--border);color:var(--gold2);font-family:'Cinzel',serif;font-size:0.65rem;letter-spacing:0.08em;padding:4px 8px;cursor:pointer;transition:background 0.15s,border-color 0.15s;}
 #werkzeuge button:hover{background:rgba(212,160,51,0.12);border-color:var(--gold);}
 #werkzeuge button:disabled{opacity:0.3;cursor:default;}
 #autobtn.an{background:var(--gold);color:#2a1c0e;border-color:var(--gold2);}
-#npcstatus{position:absolute;top:6px;left:8px;z-index:7;pointer-events:auto;background:rgba(6,4,2,0.7);border:1px solid var(--border);border-radius:3px;padding:4px 8px;font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.06em;color:var(--dim);max-width:34%;display:flex;flex-wrap:wrap;gap:4px 8px;}
+#npcstatus{flex:1 1 auto;min-width:0;pointer-events:auto;background:rgba(6,4,2,0.7);border:1px solid var(--border);border-radius:3px;padding:4px 8px;font-family:'Cinzel',serif;font-size:0.6rem;letter-spacing:0.06em;color:var(--dim);display:flex;flex-wrap:wrap;gap:4px 8px;align-self:flex-start;}
 #npcstatus .npcchip{display:inline-flex;align-items:center;gap:5px;}
 #npcstatus .npcweg{cursor:pointer;color:var(--dim);border:1px solid var(--border);border-radius:50%;width:14px;height:14px;line-height:12px;text-align:center;font-size:0.62rem;transition:all 0.15s;}
 #npcstatus .npcweg:hover{color:#e08080;border-color:var(--rot);}
@@ -149,7 +154,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.2</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.3</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -188,7 +193,8 @@ select.feld option{background:var(--panel);}
 <!-- SPIEL -->
 <div id="spiel">
   <div id="oben">
-    <div id="raumtitel"></div>
+   <div id="kopf">
+    <div id="kopfreihe">
     <div id="npcstatus"></div>
     <div id="werkzeuge">
       <button id="chronikbtn" onclick="zeigeChronik('ort')" title="Chronik">📖</button>
@@ -201,6 +207,9 @@ select.feld option{background:var(--panel);}
       <button id="npcbtn" onclick="erscheineNPC('')" title="Weitere Person auftreten lassen">+ NPC</button>
       <button id="autobtn" onclick="autoUmschalten()" title="Figuren spielen allein weiter">▶ AUTO</button>
     </div>
+    </div>
+    <div id="raumtitel"></div>
+   </div>
   </div>
   <div id="unten">
     <div id="gespraech" aria-live="polite" onclick="tippenFertig()"></div>
@@ -358,7 +367,7 @@ var CFG={
   negativ:'low quality, worst quality, blurry, deformed, bad anatomy, extra limbs, extra fingers, text, watermark, signature',
   tempo:16,        // ms pro Zeichen im Schreibmaschinen-Effekt (0 = sofort)
   bildTakt:2,      // alle N Zuege ein neues Bild (0 = nur auf Zuruf)
-  pollModell:'flux',
+  pollModell:'',
   hordeKey:'0000000000', hordeModell:'', hordeSchritte:25,
   apiUrl:'https://api.openai.com/v1', apiKey:'', apiModell:'gpt-image-1',
   urlVorlage:'https://example.org/bild?p={prompt}&seed={seed}&w={breite}&h={hoehe}'
@@ -394,10 +403,10 @@ var BILDQUELLEN={
   },
   pollinations:{
     label:'Pollinations (frei, ohne Schlüssel)',
-    info:'Offener Dienst, Bild kommt als URL. Kein Negativprompt — der wird ignoriert.',
-    felder:[{k:'pollModell',l:'Modell (z.B. flux, turbo)',typ:'text'}],
+    info:'Offener Dienst, die Beschreibung steckt in der Adresse — deshalb wird der Prompt gekürzt. Kein Negativprompt. Modellfeld leer lassen, wenn Bilder ausbleiben: ein nicht (mehr) vorhandener Modellname lässt den Dienst scheitern.',
+    felder:[{k:'pollModell',l:'Modell (leer = Standard des Dienstes)',typ:'text'}],
     zeichne:async function(a){
-      var u='https://image.pollinations.ai/prompt/'+encodeURIComponent(a.prompt)+
+      var u='https://image.pollinations.ai/prompt/'+encodeURIComponent(kuerzePrompt(a.prompt,700))+
             '?width='+a.breite+'&height='+a.hoehe+'&seed='+a.seed+'&nologo=true'+
             (CFG.pollModell?'&model='+encodeURIComponent(CFG.pollModell):'');
       return await ladeBildUrl(u,120000);
@@ -482,13 +491,43 @@ var BILDQUELLEN={
 };
 function quelle(){ return BILDQUELLEN[CFG.quelle]||BILDQUELLEN.perchance; }
 function auf64(n){ n=Math.round((Number(n)||1024)/64)*64; return Math.max(256,Math.min(2048,n)); }
-function ladeBildUrl(url,timeoutMs){
-  return new Promise(function(res,rej){
+// Lange Prompts sprengen URL-basierte Dienste (die Beschreibung steckt im Pfad).
+// Am letzten Komma vor der Grenze kappen, damit kein Wort zerrissen wird.
+function kuerzePrompt(p,max){
+  p=String(p||'');
+  if(p.length<=max)return p;
+  var schnitt=p.lastIndexOf(',',max);
+  return p.substring(0,schnitt>max*0.6?schnitt:max).trim();
+}
+// Zwei Wege, weil jeder für sich blind ist:
+// 1. fetch() nennt den echten HTTP-Status und liefert das Bild als blob:-Adresse,
+//    die auch dann noch anzeigbar ist, wenn fremde Bild-Hosts gesperrt sind.
+// 2. Scheitert fetch an CORS, bleibt der klassische <img>-Weg — der lädt zwar,
+//    verrät aber nie, woran es lag.
+async function ladeBildUrl(url,timeoutMs){
+  var limit=timeoutMs||90000, ersterGrund='';
+  try{
+    var ctl=(typeof AbortController==='function')?new AbortController():null;
+    var t=ctl?setTimeout(function(){ctl.abort();},limit):null;
+    var r=await fetch(url,ctl?{signal:ctl.signal}:{});
+    if(t)clearTimeout(t);
+    if(!r.ok)throw new Error('Dienst antwortete HTTP '+r.status+(r.statusText?' '+r.statusText:''));
+    var b=await r.blob();
+    if(!b||b.size<200)throw new Error('Antwort enthielt kein Bild ('+(b?b.size:0)+' Bytes).');
+    if(b.type&&b.type.indexOf('image')!==0)throw new Error('Antwort war kein Bild, sondern '+b.type+'.');
+    return URL.createObjectURL(b);
+  }catch(e){
+    ersterGrund=(e&&e.message)?e.message:String(e);
+    // Ein echter Dienstfehler bleibt einer — dann nicht noch einmal probieren.
+    if(/HTTP \d|kein Bild|war kein Bild/.test(ersterGrund))throw e;
+  }
+  return await new Promise(function(res,rej){
     var fertig=false;
-    var t=setTimeout(function(){ if(!fertig){fertig=true;rej(new Error('Zeitüberschreitung beim Laden des Bildes.'));} },timeoutMs||90000);
+    var t=setTimeout(function(){ if(!fertig){fertig=true;rej(new Error('Zeitüberschreitung nach '+Math.round(limit/1000)+'s. Vorher: '+ersterGrund));} },limit);
     var im=new Image();
     im.onload=function(){ if(fertig)return;fertig=true;clearTimeout(t);res(url); };
-    im.onerror=function(){ if(fertig)return;fertig=true;clearTimeout(t);rej(new Error('Bild konnte nicht geladen werden (Adresse, CORS oder Dienst nicht erreichbar).')); };
+    im.onerror=function(){ if(fertig)return;fertig=true;clearTimeout(t);
+      rej(new Error('Bild nicht ladbar. Direktabruf meldete: '+(ersterGrund||'unbekannt')+'. Prüfe URL-Länge, Dienst und ob Perchance externe Bilder zulässt.')); };
     im.src=url;
   });
 }
