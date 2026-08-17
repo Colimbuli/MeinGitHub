@@ -238,6 +238,31 @@ const laufen = async () => {
   ctx.CFG.quelle = 'perchance';
   ctx.S.eigenerPrompt = ''; ctx.S.promptFesthalten = false; ctx.CFG.bildTakt = 2;
 
+  console.log('\n— Modell-Listen der Dienste —');
+  // Die Listen kommen vom jeweiligen Dienst. Pollinations antwortet mal mit
+  // Namen, mal mit Objekten; die Horde liefert Rechnerzahlen zum Sortieren.
+  const antworte = (daten) => { ctx.fetch = async () => ({ ok: true, json: async () => daten }); };
+
+  antworte(['flux', 'turbo', 'kontext']);
+  let liste = await ctx.BILDQUELLEN.pollinations.modelle();
+  pruefe('Pollinations: reine Namensliste', liste.length === 3 && liste[0].wert === 'flux', JSON.stringify(liste[0]));
+
+  antworte([{ name: 'flux', description: 'schnell' }, { id: 'sdxl' }, { name: '' }]);
+  liste = await ctx.BILDQUELLEN.pollinations.modelle();
+  pruefe('Pollinations: Objektliste mit Beschreibung', liste.length === 2 && liste[0].label === 'flux — schnell', JSON.stringify(liste));
+  pruefe('Pollinations: namenlose Einträge fliegen raus', !liste.some(m => !m.wert));
+
+  antworte([{ name: 'klein', count: 2 }, { name: 'gross', count: 40, queued: 17.4 }, { name: 'mittel', count: 9 }]);
+  liste = await ctx.BILDQUELLEN.horde.modelle();
+  pruefe('Horde: nach Rechnerzahl sortiert', liste.map(m => m.wert).join(',') === 'gross,mittel,klein', liste.map(m => m.wert).join(','));
+  pruefe('Horde: Rechner und Warteschlange im Text', liste[0].label === 'gross — 40 Rechner, 17 wartend', liste[0].label);
+
+  ctx.fetch = async () => ({ ok: false, status: 503, json: async () => ({}) });
+  let fehler = '';
+  try { await ctx.BILDQUELLEN.horde.modelle(); } catch (e) { fehler = e.message; }
+  pruefe('Fehlerstatus wird gemeldet', /503/.test(fehler), fehler);
+  ctx.fetch = () => Promise.reject(new Error('kein Netz im Test'));
+
   console.log('\n— Drosselung (HTTP 429) —');
   // 429 heißt: zu viele Anfragen. Weiter anzuklopfen macht es schlimmer, also
   // muss der Generator eine Pause einlegen statt im Takt weiterzufragen.

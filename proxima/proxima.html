@@ -160,7 +160,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.12</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.13</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -206,7 +206,7 @@ select.feld option{background:var(--panel);}
     <div id="werkzeuge">
       <button id="chronikbtn" onclick="zeigeChronik('ort')" title="Chronik">📖</button>
       <button id="figurbtn" onclick="oeffneFigurMenu()" title="Figuren bearbeiten">👤</button>
-      <button id="szenebtn" onclick="oeffneSzeneMenu()" title="Globale Kulisse">🎬</button>
+      <button id="szenebtn" onclick="oeffneSzeneMenu()" title="Szene und Bildstil">🎬</button>
       <button id="bildbtn" onclick="oeffneBildModal()" title="Bild bearbeiten">🖼</button>
       <button id="einstellbtn" onclick="oeffneEinstellungen()" title="Einstellungen">⚙</button>
       <button id="speicherbtn" onclick="oeffneSpeicher()" title="Speichern / Laden">💾</button>
@@ -283,10 +283,15 @@ select.feld option{background:var(--panel);}
 
 <div class="modal" id="mSzene">
   <div class="modalBox">
-    <div class="modalKopf"><span>🎬 GLOBALE KULISSE</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalKopf"><span>🎬 SZENE &amp; STIL</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
     <div class="modalInhalt">
+      <label class="feldlabel" for="szeneStil">BILDSTIL — gilt für alle weiteren Bilder</label>
+      <select id="szeneStil" class="feld" onchange="szeneStilGewechselt()"></select>
+      <input id="szeneStilEigen" class="feld" type="text" placeholder="z.B. noir ink sketch, high contrast" style="display:none">
+      <label class="feldlabel" for="szeneFeld">UMGEBUNG / KULISSE</label>
       <div class="hinweis">Gilt dauerhaft für alle Bilder — z.B. „a dim candlelit tavern, wooden beams, rain against the windows".</div>
-      <textarea id="szeneFeld" class="feld" rows="6" placeholder="Beschreibe die durchgehende Umgebung der Szene…"></textarea>
+      <textarea id="szeneFeld" class="feld" rows="5" placeholder="Beschreibe die durchgehende Umgebung der Szene…"></textarea>
+      <div class="hinweis" id="szeneStilHinweis"></div>
     </div>
     <div class="modalNav">
       <button onclick="schliesseModal()">SCHLIESSEN</button>
@@ -418,6 +423,18 @@ var BILDQUELLEN={
     maxPrompt:550,
     info:'Offener Dienst, die Beschreibung steckt in der Adresse — deshalb wird der Prompt gekürzt. Kein Negativprompt. Bei HTTP 500 hilft meist: Modellfeld leeren, Bildgröße auf 512×512, oder im Bildmenü einen neuen Seed würfeln.',
     felder:[{k:'pollModell',l:'Modell (leer = Standard des Dienstes)',typ:'text'}],
+    modellSchluessel:'pollModell',
+    modelle:async function(){
+      var r=await fetch('https://image.pollinations.ai/models');
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      var j=await r.json();
+      // Der Dienst liefert mal eine Liste von Namen, mal von Objekten.
+      return (Array.isArray(j)?j:[]).map(function(m){
+        var name=(typeof m==='string')?m:(m&&(m.name||m.id)||'');
+        var zusatz=(m&&typeof m==='object'&&m.description)?(' — '+m.description):'';
+        return {wert:name,label:name+zusatz};
+      }).filter(function(m){return m.wert;});
+    },
     zeichne:async function(a){
       // Die Beschreibung steckt bei diesem Dienst im Pfad. Lange Adressen sind
       // ein bekannter Stolperstein, deshalb: knapp halten, den Negativprompt nur
@@ -463,6 +480,19 @@ var BILDQUELLEN={
       {k:'hordeModell',l:'Modell (leer = beliebig)',typ:'text'},
       {k:'hordeSchritte',l:'Schritte',typ:'zahl'}
     ],
+    modellSchluessel:'hordeModell',
+    modelle:async function(){
+      var r=await fetch('https://stablehorde.net/api/v2/status/models?type=image',
+                        {headers:{'Client-Agent':'PROXIMA:7:perchance'}});
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      var j=await r.json();
+      // Nach Anzahl der Rechner sortieren: je mehr, desto kuerzer die Wartezeit.
+      return (Array.isArray(j)?j:[]).slice().sort(function(a,b){return (b.count||0)-(a.count||0);})
+        .map(function(m){
+          return {wert:m.name,
+                  label:m.name+' — '+(m.count||0)+' Rechner'+(m.queued?', '+Math.round(m.queued)+' wartend':'')};
+        }).filter(function(m){return m.wert;});
+    },
     zeichne:async function(a){
       var kopf={'Content-Type':'application/json','apikey':(CFG.hordeKey||'0000000000'),'Client-Agent':'PROXIMA:7:perchance'};
       var m=hordeMasse(a.breite,a.hoehe);
@@ -1766,14 +1796,56 @@ function speichereFiguren(){
 }
 
 // ── SZENEN-MENÜ ───────────────────────────────
+// Dieselbe Stilauswahl wie auf dem Startbildschirm, nur im laufenden Spiel.
+var STIL_NAMEN={manga:'Manga / Anime',comic:'Westlicher Comic',aquarell:'Aquarell',
+                oel:'Ölgemälde',realistisch:'Fotorealistisch',pixel:'Pixel-Art'};
 function oeffneSzeneMenu(){
   if(!S.imSpiel)return;
   el('szeneFeld').value=S.szeneGlobal||'';
+
+  var sel=el('szeneStil');
+  sel.innerHTML='';
+  Object.keys(STILE).forEach(function(k){
+    var o=document.createElement('option');
+    o.value=k;o.textContent=STIL_NAMEN[k]||k;
+    sel.appendChild(o);
+  });
+  var oe=document.createElement('option');
+  oe.value='eigen';oe.textContent='Eigener Stil…';
+  sel.appendChild(oe);
+
+  // Vorbelegen: gesetzter Stil, sonst eigener Text, sonst die Startauswahl.
+  var eigen=el('szeneStilEigen');
+  if(S.stilLabel&&STILE[S.stilLabel]){
+    sel.value=S.stilLabel;eigen.value='';
+  }else if(S.stil){
+    sel.value='eigen';eigen.value=S.stilLabel||S.stil;
+  }else{
+    var start=el('stilwahl');
+    sel.value=(start&&STILE[start.value])?start.value:'manga';
+    eigen.value='';
+  }
+  szeneStilGewechselt();
+  el('szeneStilHinweis').textContent=S.eigenerPrompt
+    ? 'Ein eigener Prompt ist aktiv — Stil und Kulisse wirken erst, wenn du im Bildmenü „AUS SZENE" drückst.'
+    : '';
   oeffneModal('mSzene');
+}
+function szeneStilGewechselt(){
+  var eigen=el('szeneStilEigen');
+  eigen.style.display=(el('szeneStil').value==='eigen')?'block':'none';
 }
 function speichereSzene(){
   S.szeneGlobal=el('szeneFeld').value.trim();
+  var wahl=el('szeneStil').value;
+  if(wahl==='eigen'){
+    var t=el('szeneStilEigen').value.trim();
+    if(t){ S.stil=t; S.stilLabel=t; }
+  }else if(STILE[wahl]){
+    S.stil=STILE[wahl];S.stilLabel=wahl;
+  }
   schliesseModal();
+  sysZeile('✦ Stil: '+(S.stilLabel||'unverändert')+(S.szeneGlobal?' · Kulisse gesetzt':'')+' ✦');
   autosave();
   zeichneBild({});
 }
@@ -1810,6 +1882,12 @@ function zeichneQuellenFelder(){
   if((q.felder||[]).some(function(f){return f.typ==='passwort';})){
     html+='<div class="warnung">Schlüssel werden unverschlüsselt im Browser (localStorage) abgelegt und bei jedem Bild an den Dienst geschickt. Nur eigene Schlüssel mit Ausgabenlimit verwenden.</div>';
   }
+  if(q.modelle){
+    html+='<label class="feldlabel" for="modellWahl">VERFÜGBARE MODELLE — Liste kommt vom Dienst</label>'+
+      '<div class="reihe"><select id="modellWahl" class="feld" onchange="modellGewaehlt()">'+
+      '<option value="">(noch nicht geladen)</option></select>'+
+      '<button onclick="ladeModelle()" title="Modell-Liste abrufen">⟳</button></div>';
+  }
   if(k!=='perchance'){
     html+='<div class="warnung">Prompt und Bild laufen über einen fremden Server, nicht über Perchance. Wenn der Dienst keine Anfragen aus dem Browser erlaubt (CORS), bleibt das Bild leer — dann „QUELLE TESTEN" nutzen und notfalls zurück auf Perchance wechseln.</div>';
   }
@@ -1817,6 +1895,40 @@ function zeichneQuellenFelder(){
   (q.felder||[]).forEach(function(f){ var e=el('q_'+f.k); if(e)e.value=(CFG[f.k]==null?'':CFG[f.k]); });
   el('quellePruef').textContent='';el('quellePruef').className='pruefzeile';
 }
+// Modell-Liste beim Dienst abrufen. Schlaegt das fehl, bleibt das Textfeld
+// bestehen — ein Modellname laesst sich immer von Hand eintragen.
+async function ladeModelle(){
+  var k=el('cfgQuelle').value, q=BILDQUELLEN[k];
+  var sel=el('modellWahl'), pr=el('quellePruef');
+  if(!q||!q.modelle||!sel)return;
+  pr.className='pruefzeile';pr.textContent='Rufe Modell-Liste ab…';
+  try{
+    var liste=await q.modelle();
+    var feld=el('q_'+q.modellSchluessel);
+    var aktuell=feld?feld.value.trim():'';
+    sel.innerHTML='';
+    var o0=document.createElement('option');
+    o0.value='';o0.textContent='(Standard des Dienstes)';
+    sel.appendChild(o0);
+    liste.forEach(function(m){
+      var o=document.createElement('option');
+      o.value=m.wert;o.textContent=m.label;
+      if(m.wert===aktuell)o.selected=true;
+      sel.appendChild(o);
+    });
+    pr.className='pruefzeile ok';
+    pr.textContent='✓ '+liste.length+' Modelle verfügbar'+(aktuell?'':' — oben auswählen');
+  }catch(e){
+    pr.className='pruefzeile fehler';
+    pr.textContent='✕ Liste nicht abrufbar ('+((e&&e.message)||e)+'). Modellname von Hand eintragen.';
+  }
+}
+function modellGewaehlt(){
+  var q=BILDQUELLEN[el('cfgQuelle').value];
+  var sel=el('modellWahl'), feld=q&&el('q_'+q.modellSchluessel);
+  if(sel&&feld)feld.value=sel.value;
+}
+
 function leseEinstellungen(){
   CFG.quelle=el('cfgQuelle').value;
   CFG.breite=auf64(el('cfgBreite').value);

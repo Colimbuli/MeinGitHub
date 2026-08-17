@@ -60,6 +60,16 @@ Was das Feld dagegen sicher trennt:
 | Browserdaten löschen | löscht auch den Schlüssel — er muss dann neu eingetragen werden |
 | anderes Gerät oder anderer Browser | kennt ihn nicht, dort erneut eintragen |
 
+### Modelle auswählen
+
+Für **Pollinations** und **AI Horde** holt der Knopf ⟳ neben *Verfügbare Modelle* die aktuelle
+Liste beim Dienst ab. Bei der Horde steht dabei, wie viele Rechner ein Modell gerade anbieten und
+wie viele Aufträge warten — sortiert ist nach Rechnerzahl, oben stehen also die schnellsten.
+
+Die Liste ist nur eine Hilfe: Das Textfeld darunter bleibt maßgeblich, ein Modellname lässt sich
+also weiterhin von Hand eintragen. Ist der Dienst gerade nicht erreichbar, sagt die Statuszeile das
+und ändert sonst nichts.
+
 ### Wenn eine Quelle nichts liefert
 
 Der Generator holt jedes Bild zuerst per `fetch` und erst danach klassisch über ein `<img>`.
@@ -175,7 +185,7 @@ Behebbar ist die Ursache von hier aus nicht: das Iframe gehört dem Plugin, nich
 | `/kleidungN: …` | dauerhaftes Outfit für Figur N (englisch) |
 | `/regie: …` | stehende Regie für die ganze Szene, leer = löschen |
 | `/bild: …` | neues Bild aus eigener Beschreibung |
-| `/stil: …` | Bildstil wechseln (`manga`, `comic`, `aquarell`, `oel`, `realistisch`, `pixel` oder freier Text) |
+| `/stil: …` | Bildstil wechseln (`manga`, `comic`, `aquarell`, `oel`, `realistisch`, `pixel` oder freier Text) — dasselbe geht im Menü 🎬 |
 | `/quelle` | Bildquelle wechseln |
 | `/undo` | letzten Zug zurücknehmen |
 | `/nochmal` | letzten Zug verwerfen und die Antwort neu würfeln |
@@ -215,6 +225,8 @@ Behebbar ist die Ursache von hier aus nicht: das Iframe gehört dem Plugin, nich
   auch `**NAME:**`, Aufzählungszeichen und umgebrochene Fließtexte.
 * **Langzeitgedächtnis**: Neben der fortgeschriebenen Handlung sammelt der Generator harte Fakten
   (max. 24) und legt sie jedem Zug bei, damit sich die Figuren nicht widersprechen.
+* **Bildstil auch im laufenden Spiel wählbar** — im Menü 🎬 (Szene & Stil), mit denselben
+  Vorgaben wie auf dem Startbildschirm plus eigenem Text. Vorher ging das nur über `/stil:`.
 * **Einklappbare Kopfleiste**: Der Schalter unter der Titelzeile fährt Werkzeuge, Figurenanzeige
   und Titel nach oben aus dem Bild — das Szenenbild bleibt unverdeckt. Der Zustand wird gemerkt.
 * **Bis zu vier Figuren** gleichzeitig statt zwei.
