@@ -348,6 +348,40 @@ const laufen = async () => {
   pruefe('andere Fehler werden sofort durchgereicht', versuche === 2 && /anderer Fehler/.test(meldung), meldung + ' / ' + versuche);
 };
 
+console.log('\n— Erzählweise —');
+ctx.W.protagonist = { name: 'Julian', herkunft: 'Wien', beruf: 'Apotheker', eigenart: 'summt beim Denken',
+                      aussehen: 'a tall man in his thirties, dark hair', kleidung: 'a grey suit' };
+ctx.W.npcs = [{ name: 'Ida', rolle: 'Wirtin', aussehen: 'a woman in her forties', kleidung: 'an apron' }];
+ctx.S.stimmung = ['heiter']; ctx.S.kleidung = ['an apron'];
+ctx.S.szeneGlobal = 'a candlelit tavern'; ctx.S.stil = ctx.STILE.manga; ctx.S.stilLabel = 'manga';
+
+ctx.W.perspektive = 'er';
+let pEr = ctx.bauePrompt({ szene: 'they talk across the table' });
+pruefe('Er-Perspektive: Held ist im Bild', pEr.includes('a tall man in his thirties'), pEr.slice(0, 60));
+pruefe('Er-Perspektive: zwei Figuren', pEr.includes('2 distinct characters'));
+pruefe('Er-Perspektive: keine Ich-Kamera', !pEr.includes('first person point of view'));
+
+ctx.W.perspektive = 'ich';
+let pIch = ctx.bauePrompt({ szene: 'they talk across the table' });
+pruefe('Ich-Perspektive: Held nicht im Bild', !pIch.includes('a tall man in his thirties'), pIch.slice(0, 60));
+pruefe('Ich-Perspektive: Kamera ist sein Blick', pIch.includes('first person point of view'));
+pruefe('Ich-Perspektive: nur die Gegenüber im Bild', pIch.includes('single character'));
+pruefe('Stil bleibt in beiden erhalten', pEr.includes('anime manga style') && pIch.includes('anime manga style'));
+
+// Der Weltkontext muss die Erzählweise an die KI weitergeben
+ctx.W.stadt = 'Wien'; ctx.W.rahmenhandlung = '';
+const kIch = ctx.weltKontext();
+pruefe('Kontext nennt die Ich-Form', /ICH-Form/.test(kIch), kIch.split('\n').filter(z => /ERZAEHLWEISE/.test(z))[0]);
+ctx.W.perspektive = 'er';
+const kEr = ctx.weltKontext();
+pruefe('Kontext nennt in der Er-Form den Namen', /Julian greift/.test(kEr), kEr.split('\n').filter(z => /ERZAEHLWEISE/.test(z))[0]);
+
+console.log('\n— Befehl /perspektive —');
+const treff = t => { for (const b of ctx.BEFEHLE) { const m = t.match(b.muster); if (m) return { b, m }; } return null; };
+pruefe('/perspektive: ich erkannt', treff('/perspektive: ich').m[1] === 'ich');
+pruefe('/perspektive ohne Angabe erkannt', !!treff('/perspektive'));
+pruefe('kollidiert nicht mit anderen Befehlen', treff('/perspektive: er').b.hilfe[0].indexOf('/perspektive') === 0);
+
 console.log('\n— Negativprompt —');
 ctx.S.stilLabel = 'realistisch'; ctx.S.stil = ctx.STILE.realistisch;
 pruefe('Stil-Negativ ergänzt', ctx.baueNegativ().includes('airbrushed skin'));

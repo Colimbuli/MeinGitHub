@@ -215,6 +215,33 @@ unbehandelten Fehlers. Bleibt es dabei, hilft die Seite neu zu laden — direkt 
 
 Behebbar ist die Ursache von hier aus nicht: das Iframe gehört dem Plugin, nicht diesem Code.
 
+## Erzaehlweise und mitspielender Held
+
+Auf dem Startbildschirm steht neben Bildstil und Bildquelle die **Erzaehlweise**:
+
+| | |
+|---|---|
+| **Er-Perspektive** (Vorgabe) | Handlungen des Helden werden mit seinem Namen geschrieben, und er ist als Figur im Bild zu sehen. |
+| **Ich-Perspektive** | Handlungen in der Ich-Form, und die Kamera ist sein Blick -- er selbst erscheint nicht im Bild, du siehst durch seine Augen. |
+
+Die Wahl gilt fuer die ganze Partie, laesst sich aber jederzeit mit `/perspektive: ich` bzw.
+`/perspektive: er` wechseln. Sie steckt im Spielstand; aeltere Staende starten in der
+Er-Perspektive.
+
+### Der Held im Auto-Modus
+
+In ⚙ steht der Schalter **Im Auto-Modus handelt der Held selbst mit** (an). Ist er gesetzt, darf
+die Regie im Auto-Modus auch deine Figur sprechen und handeln lassen -- sie verfolgt eigene
+Absichten, fragt nach und ergreift die Initiative, statt nur Stichwortgeber zu sein. Alle
+bisherigen Eingriffe bleiben:
+
+* freier Text = stehende Regie fuer die ganze Szene
+* `/sag: …` = du sprichst selbst, mitten im Auto-Modus
+* `/npcN: …` = verdeckte Regie an eine Figur, die dann als Naechste dran ist
+* AUTO ausschalten = du uebernimmst wieder vollstaendig
+
+Ist der Schalter aus, verhaelt sich der Auto-Modus wie bisher: nur die uebrigen Figuren spielen.
+
 ## Befehle im Spiel
 
 | Befehl | Wirkung |
@@ -227,6 +254,7 @@ Behebbar ist die Ursache von hier aus nicht: das Iframe gehört dem Plugin, nich
 | `/regie: …` | stehende Regie für die ganze Szene, leer = löschen |
 | `/bild: …` | neues Bild aus eigener Beschreibung |
 | `/stil: …` | Bildstil wechseln (`manga`, `comic`, `aquarell`, `oel`, `realistisch`, `pixel` oder freier Text) — dasselbe geht im Menü 🎬 |
+| `/perspektive: ich\|er` | Erzählweise wechseln (ohne Angabe: aktuelle anzeigen) |
 | `/quelle` | Bildquelle wechseln |
 | `/undo` | letzten Zug zurücknehmen |
 | `/nochmal` | letzten Zug verwerfen und die Antwort neu würfeln |

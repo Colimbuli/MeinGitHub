@@ -160,7 +160,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.18</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.19</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -179,6 +179,13 @@ select.feld option{background:var(--panel);}
       <option value="eigen">Eigener Stil…</option>
     </select>
     <input id="stilEigen" type="text" placeholder="z.B. noir ink sketch, high contrast" style="display:none">
+  </div>
+  <div class="startreihe">
+    <label for="perspektive">ERZÄHLWEISE</label>
+    <select id="perspektive" class="feld" style="flex:1;min-width:150px">
+      <option value="er" selected>Er-Perspektive — dein Held ist im Bild zu sehen</option>
+      <option value="ich">Ich-Perspektive — du siehst durch seine Augen</option>
+    </select>
   </div>
   <div class="startreihe">
     <label for="quelleKurz">BILDQUELLE</label>
@@ -385,6 +392,7 @@ var CFG={
   breite:1024, hoehe:1024,
   negativ:'low quality, worst quality, blurry, deformed, bad anatomy, extra limbs, extra fingers, text, watermark, signature',
   kopfOffen:true,  // Kopfleiste aus- oder eingeklappt
+  autoHeld:true,   // im Auto-Modus handelt der Held selbst mit
   tempo:16,        // ms pro Zeichen im Schreibmaschinen-Effekt (0 = sofort)
   bildTakt:2,      // alle N Zuege ein neues Bild (0 = nur auf Zuruf)
   pollModell:'',
@@ -985,6 +993,7 @@ function einWort(s){ return String(s||'').toLowerCase().trim().split(/[\s,.;:]/)
 var W = {
   protagonist:{name:'',herkunft:'',beruf:'',eigenart:'',aussehen:'',kleidung:''},
   stadt:'', rahmenhandlung:'', rahmenhandlungOriginal:'',
+  perspektive:'er',   // 'er' = Held im Bild, 'ich' = Blick durch seine Augen
   ort:null,          // mit name, geschichte, bildPrompt
   npcs:[]            // Figuren mit name, rolle, aussehen, kleidung, person, grundstimmung, eroeffnung
 };
@@ -1181,7 +1190,13 @@ async function leiteNpcAusStoryAb(story){
     eroeffnung:   f('eroeffnung','NPC_EROEFFNUNG',a.eroeffnung||'Oh – Besuch. Schön!')
   };
 }
+// Die zuletzt getroffene Wahl auf dem Startbildschirm gilt.
+function leseErzaehlweise(){
+  var e=el('perspektive');
+  W.perspektive=(e&&e.value==='ich')?'ich':'er';
+}
 async function spielStarten(){
+  leseErzaehlweise();
   var feld=el('storyEdit');
   var neueStory=feld?feld.value.trim():W.rahmenhandlung;
   var geaendert=neueStory && neueStory!==W.rahmenhandlungOriginal;
@@ -1229,6 +1244,9 @@ function weltKontext(){
     var rh=W.rahmenhandlung.length>400?W.rahmenhandlung.substring(0,400)+'…':W.rahmenhandlung;
     k+='VORGESCHICHTE: '+rh+'\n';
   }
+  k+=(W.perspektive==='ich')
+    ? 'ERZAEHLWEISE: Ich-Perspektive. Handlungen des Helden werden in der ICH-Form geschrieben ("\x5Bich greife nach dem Glas\x5D"). Die Figuren sprechen ihn direkt an. Das Geschehen wird durch SEINE Augen erlebt.\n'
+    : 'ERZAEHLWEISE: Er-Perspektive. Handlungen des Helden werden mit seinem NAMEN geschrieben ("\x5B'+W.protagonist.name+' greift nach dem Glas\x5D"). Das Geschehen wird von aussen beobachtet.\n';
   if(S.fakten.length)k+='WAS BISHER FESTSTEHT:\n- '+S.fakten.join('\n- ')+'\n';
   if(S.handlung)k+='BISHERIGE HANDLUNG: '+S.handlung+'\n';
   return k;
@@ -1263,11 +1281,16 @@ async function naechsterZug(erzwinge,autoModus){
   }
   var szeneRegie=S.autoRegie?('STEHENDE REGIE (szenenweit, ALLE Figuren beachten sie dauerhaft): '+S.autoRegie+'. Baue das laufend in Rede/Handlung ein, ohne es zu zitieren.\n'):'';
   var zwang=(erzwinge>=0)?('WICHTIG: In DIESEM Zug MUSS NPC'+(erzwinge+1)+' ('+W.npcs[erzwinge].name+') sprechen.\n'):'';
-  var letzterNpc=-1;
-  for(var j=S.verlauf.length-1;j>=0;j--){ if(S.verlauf[j].rolle==='npc'){letzterNpc=S.verlauf[j].idx;break;} }
-  var altern=(autoModus&&mehrere&&erzwinge<0&&letzterNpc>=0&&W.npcs[letzterNpc])
-    ?('Zuletzt sprach '+W.npcs[letzterNpc].name+'. Lass nun bevorzugt eine ANDERE Figur zu Wort kommen, damit sich alle abwechseln.\n'):'';
+  var letzterNpc=-1, letzterWar='';
+  for(var j=S.verlauf.length-1;j>=0;j--){
+    if(S.verlauf[j].rolle==='npc'){letzterNpc=S.verlauf[j].idx;letzterWar=(W.npcs[letzterNpc]&&W.npcs[letzterNpc].name)||'';break;}
+    if(S.verlauf[j].rolle==='ich'){letzterWar=W.protagonist.name;break;}
+  }
+  var altern=(autoModus&&erzwinge<0&&letzterWar&&(mehrere||heldSpielt))
+    ?('Zuletzt sprach '+letzterWar+'. Lass nun bevorzugt jemand ANDEREN zu Wort kommen, damit sich alle abwechseln.\n'):'';
+  var heldSpielt=!!(autoModus&&CFG.autoHeld);
   var werOpt=W.npcs.map(function(n,i){return 'NPC'+(i+1);}).join(' oder ');
+  if(heldSpielt)werOpt+=' oder HELD';
 
   var instruction=
     'Du fuehrst Regie UND spielst die Figuren in einem deutschen Dialog-Adventure. Am Ort sind '+W.npcs.length+' Person(en) anwesend. Du entscheidest, wer als Naechstes spricht, und schreibst diese EINE Zeile voll in der Rolle dieser Figur.\n\n'+
@@ -1275,7 +1298,9 @@ async function naechsterZug(erzwinge,autoModus){
     'ORT: '+W.ort.name+' — '+W.ort.geschichte+'\n'+
     'ANWESENDE FIGUREN:\n'+liste+'\n\n'+
     (mehrere?'Die Figuren duerfen sich auch GEGENSEITIG ansprechen und die Handlung gemeinsam vorantreiben. Jede Figur handelt eigenstaendig, mit eigener Stimme.\n':'')+
-    (autoModus?'AUTO-MODUS: Der Held schweigt gerade. Die Figuren treiben die Szene EIGENSTAENDIG voran, reden miteinander und handeln.\n':'')+
+    (autoModus&&!heldSpielt?'AUTO-MODUS: Der Held schweigt gerade. Die Figuren treiben die Szene EIGENSTAENDIG voran, reden miteinander und handeln.\n':'')+
+    (heldSpielt?('AUTO-MODUS MIT MITSPIELENDEM HELDEN: Auch '+W.protagonist.name+' handelt jetzt eigenstaendig. Du darfst ihn sprechen und handeln lassen, dann ist WER = HELD. Er bleibt dabei ganz er selbst: '+
+                 W.protagonist.beruf+' aus '+W.protagonist.herkunft+', Eigenart: '+W.protagonist.eigenart+'. Er ist kein blosser Stichwortgeber, sondern verfolgt eigene Absichten, fragt nach, widerspricht auch mal und ergreift die Initiative.\n'):'')+
     (autoModus&&!mehrere?'Es ist nur EINE Figur anwesend: sie handelt allein weiter – denkt laut, beschaeftigt sich, kommentiert die Umgebung, geht ihrer Taetigkeit nach und treibt die Szene voran, auch ohne Gegenueber.\n':'')+
     'REGISTER: Der Ton ist warm, freundlich und offen. Alle Figuren begegnen einander UND dem Helden mit Respekt und Sympathie. Frivole, freche, anzuegliche und teils obszoene Sprueche sind erlaubt und erwuenscht, solange sie SPIELERISCH und gutmuetig bleiben. KEINE Beleidigungen, keine Herablassung, keine Feindseligkeit untereinander — necken ja, verletzen oder respektlos sein nein.\n'+
     '- Text des Helden in eckigen Klammern sind seine HANDLUNGEN. Figuren antworten mit EIGENEN Handlungen (in eckigen Klammern) und Rede.\n'+
@@ -1309,6 +1334,12 @@ async function naechsterZug(erzwinge,autoModus){
   var weiter   = (weiterRoh===true)||/^(ja|yes|true)/i.test(String(weiterRoh||''));
 
   if(!antwort||(!autoModus&&/STOP/i.test(wer)))return {stop:true};
+  if(heldSpielt&&/\bHELD\b|PROTAGONIST/i.test(wer)){
+    if(handlung)S.handlung=handlung;
+    if(fakt)merkeFakt(fakt);
+    if(bild)S.szeneText=bild;
+    return {stop:false,held:true,text:antwort,weiter:false};
+  }
   var idx=0;
   var m=String(wer).match(/(\d+)/);
   if(m)idx=parseInt(m[1],10)-1;
@@ -1368,7 +1399,8 @@ function autoUmschalten(){
   S.autoAktiv=!S.autoAktiv;
   aktualisiereUI();
   if(S.autoAktiv){
-    sysZeile('▶ Auto-Modus an — die Figuren übernehmen. Deine Eingaben sind jetzt Regie (mit /sag: sprichst du selbst).');
+    sysZeile('▶ Auto-Modus an — '+(CFG.autoHeld?(W.protagonist.name+' und die Figuren übernehmen'):'die Figuren übernehmen')+
+             '. Deine Eingaben sind jetzt Regie (mit /sag: sprichst du selbst).');
     autoSchleife();
   }else{
     sysZeile('⏹ Auto-Modus aus.');
@@ -1400,9 +1432,14 @@ async function autoSchleife(){
     }
     if(!S.autoAktiv)break;
     if(res&&!res.stop){
-      npcSagt(res.idx,res.text);
-      S.verlauf.push({rolle:'npc',idx:res.idx,text:res.text,name:W.npcs[res.idx].name});
-      if(res.stimmung){ S.stimmung[res.idx]=res.stimmung; zeigeStimmung(); }
+      if(res.held){
+        ichSage(res.text);
+        S.verlauf.push({rolle:'ich',text:res.text});
+      }else{
+        npcSagt(res.idx,res.text);
+        S.verlauf.push({rolle:'npc',idx:res.idx,text:res.text,name:W.npcs[res.idx].name});
+        if(res.stimmung){ S.stimmung[res.idx]=res.stimmung; zeigeStimmung(); }
+      }
       bildTakt();
       autosave();
       await warte(Math.min(6000,900+String(res.text).length*Math.max(8,CFG.tempo)));
@@ -1426,7 +1463,10 @@ function setzeAutoRegie(txt){
 function bauePrompt(opts,max){
   var figurenArr=[];
   var P=W.protagonist;
-  if(P&&(P.aussehen||'').trim()){
+  var ichSicht=(W.perspektive==='ich');
+  // In der Ich-Perspektive taucht der Held nicht als eigene Figur auf -
+  // die Kamera ist sein Blick.
+  if(!ichSicht&&P&&(P.aussehen||'').trim()){
     var pa=P.aussehen.trim().replace(/[.\s]+$/,'');
     var pk=(P.kleidung||'').trim().replace(/[.\s]+$/,'');
     figurenArr.push(pa+(pk?', wearing '+pk:''));
@@ -1443,7 +1483,10 @@ function bauePrompt(opts,max){
   var stimmungen=W.npcs.map(function(n,i){return S.stimmung[i];}).filter(Boolean).join(' and ');
   var anzahl=figCount>1?(figCount+' distinct characters together in the scene, interacting'):'single character in the foreground';
 
-  var schwanz=', '+aktuellerStil()+', '+anzahl+', comic panel composition, dramatic lighting, detailed background';
+  var sicht=ichSicht
+    ? ', first person point of view, seen through the protagonist eyes, the viewer is the protagonist, protagonist himself not visible'
+    : '';
+  var schwanz=', '+aktuellerStil()+', '+anzahl+sicht+', comic panel composition, dramatic lighting, detailed background';
   var mitte=(setting?'. Setting: '+setting:'')+(szene?'. Scene: '+szene:'')+(stimmungen?', mood: '+stimmungen:'');
   var ganz=figuren+mitte+schwanz;
   if(!max||ganz.length<=max)return ganz;
@@ -1533,6 +1576,8 @@ var BEFEHLE=[
    fn:function(m){ stilBefehl(m[1]); }},
   {muster:/^\/quelle\b\s*:?\s*([\s\S]*)$/i,     hilfe:['/quelle','Bildquelle wechseln (öffnet die Einstellungen)'],
    fn:function(m){ quelleBefehl(m[1]); }},
+  {muster:/^\/perspektive\s*:?\s*([\s\S]*)$/i,   hilfe:['/perspektive: ich|er','Erzählweise wechseln (ohne Angabe: aktuelle anzeigen)'],
+   fn:function(m){ perspektiveBefehl(m[1]); }},
   {muster:/^\/undo\b/i,                         hilfe:['/undo','letzten Zug zurücknehmen'],
    fn:function(){ undo(); }},
   {muster:/^\/nochmal\b/i,                      hilfe:['/nochmal','letzten Zug verwerfen und die Antwort neu würfeln'],
@@ -1626,6 +1671,22 @@ function stilBefehl(raw){
   else{ S.stil=t; S.stilLabel=t; }
   sysZeile('✦ Bildstil: '+S.stilLabel+' ✦');
   if(S.eigenerPrompt)sysZeile('Hinweis: Ein eigener Prompt ist aktiv, der Stil wirkt erst nach „AUS SZENE" im Bildmenü.');
+  autosave();
+  zeichneBild({});
+}
+function perspektiveBefehl(raw){
+  if(!S.imSpiel)return;
+  var t=entkleide(raw).toLowerCase();
+  if(!t){
+    sysZeile('Erzählweise: '+(W.perspektive==='ich'?'Ich-Perspektive (du siehst durch seine Augen)'
+                                                   :'Er-Perspektive ('+W.protagonist.name+' ist im Bild)')+
+             ' — umschalten mit /perspektive: ich  oder  /perspektive: er');
+    return;
+  }
+  var neu=/^(ich|first|1|ego)/.test(t)?'ich':(/^(er|sie|third|3)/.test(t)?'er':'');
+  if(!neu){ sysZeile('Unbekannt. Möglich: /perspektive: ich  oder  /perspektive: er'); return; }
+  W.perspektive=neu;
+  sysZeile(neu==='ich'?'✦ Ab jetzt durch deine Augen ✦':'✦ Ab jetzt aus der Beobachterperspektive ✦');
   autosave();
   zeichneBild({});
 }
@@ -2122,6 +2183,8 @@ function oeffneEinstellungen(){
     '<textarea id="cfgNegativ" class="feld" rows="3"></textarea>'+
     '<label class="feldlabel" for="cfgTakt">BILD-TAKT — neues Bild alle N Züge (0 = nur auf Zuruf)</label>'+
     '<input id="cfgTakt" class="feld" type="number" min="0" max="20" value="'+(Number(CFG.bildTakt)||0)+'">'+
+    '<label class="feldlabel"><input type="checkbox" id="cfgAutoHeld"'+(CFG.autoHeld?' checked':'')+
+    '> Im Auto-Modus handelt der Held selbst mit</label>'+
     '<label class="feldlabel" for="cfgTempo">SCHREIBTEMPO in ms pro Zeichen (0 = sofort)</label>'+
     '<input id="cfgTempo" class="feld" type="number" min="0" max="120" value="'+(Number(CFG.tempo)||0)+'">';
   el('einstellInhalt').innerHTML=html;
@@ -2283,6 +2346,7 @@ function leseEinstellungen(){
   CFG.negativ=el('cfgNegativ').value.trim();
   CFG.bildTakt=Math.max(0,Math.min(20,parseInt(el('cfgTakt').value,10)||0));
   CFG.tempo=Math.max(0,Math.min(120,parseInt(el('cfgTempo').value,10)||0));
+  var ah=el('cfgAutoHeld'); if(ah)CFG.autoHeld=!!ah.checked;
   var q=BILDQUELLEN[CFG.quelle];
   (q.felder||[]).forEach(function(f){
     var e=el('q_'+f.k);
@@ -2387,6 +2451,7 @@ function migriere(d){
   if(typeof s.eigenerNegativ!=='string')s.eigenerNegativ='';
   s.promptFesthalten=!!s.promptFesthalten;
   if(!s.seed)s.seed=(w.ort&&parseInt(w.ort.seed,10))||neuerSeed();   // V6 hielt den Seed am Ort
+  if(w.perspektive!=='ich'&&w.perspektive!=='er')w.perspektive='er';
   if(w.protagonist){
     if(typeof w.protagonist.aussehen!=='string')w.protagonist.aussehen='';
     if(typeof w.protagonist.kleidung!=='string')w.protagonist.kleidung='';
