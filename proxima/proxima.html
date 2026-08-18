@@ -160,7 +160,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.17</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.18</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -599,7 +599,25 @@ var BILDQUELLEN={
                         {headers:CFG.gradioToken?{'Authorization':'Bearer '+CFG.gradioToken}:{}});
       if(!e.ok)throw new Error('Ergebnisstrom nicht abrufbar (HTTP '+e.status+').');
       var strom=await e.text();
-      var ausgabe=gradioQueueErgebnis(strom);
+      var ausgabe;
+      try{
+        ausgabe=gradioQueueErgebnis(strom);
+      }catch(panne){
+        // Einmal nachfassen, wenn es die GPU des Space erwischt hat.
+        if(!istServerPanne(panne&&panne.message))throw panne;
+        await warte(8000);
+        var s2=sitzungsNummer();
+        var r2=await fetch(host+'/gradio_api/queue/join',{
+          method:'POST',headers:kopf,
+          body:JSON.stringify({data:daten,fn_index:fn,session_hash:s2,trigger_id:null})
+        });
+        if(!r2.ok)throw panne;
+        var e2=await fetch(host+'/gradio_api/queue/data?session_hash='+encodeURIComponent(s2),
+                           {headers:CFG.gradioToken?{'Authorization':'Bearer '+CFG.gradioToken}:{}});
+        if(!e2.ok)throw panne;
+        strom=await e2.text();
+        ausgabe=gradioQueueErgebnis(strom);
+      }
       if(ausgabe===null)ausgabe=sseDaten(strom);   // Rueckfallebene fuer andere Fassungen
       var bild=bildAusGradio(ausgabe,host);
       if(!bild)throw new Error('Kein Bild in der Antwort. Anfang des Stroms: '+strom.substring(0,220));
@@ -789,6 +807,11 @@ function sseDaten(text){
   return letzte;
 }
 
+// GPU-Pannen des Dienstes (CUDA, NVML, Speichermangel) sind nicht unsere
+// Anfrage. Meist voruebergehend, ein zweiter Anlauf lohnt sich.
+function istServerPanne(m){
+  return /internal assert|nvml|cuda|out of memory|oom|allocator|device-side/i.test(String(m||''));
+}
 function quelle(){ return BILDQUELLEN[CFG.quelle]||BILDQUELLEN.perchance; }
 function auf64(n){ n=Math.round((Number(n)||1024)/64)*64; return Math.max(256,Math.min(2048,n)); }
 // Bild-Backends rechnen mit 32-Bit-Seeds. Aeltere Spielstaende halten
@@ -1470,7 +1493,12 @@ async function zeichneBild(opts){
     // Ein erschöpftes Kontingent meldet nicht jeder Dienst als 429 — ZeroGPU
     // etwa schreibt es in die Antwort. Auch dann nicht weiter anklopfen.
     var kontingent=/zerogpu|quota|rate.?limit|exceeded|kontingent/i.test(m);
-    if(gedrosselt||kontingent){
+    if(!gedrosselt&&!kontingent&&istServerPanne(m)){
+      S.bildPauseBis=Date.now()+90000;
+      errZeile('⚠ '+quelle().label+' ist auf einen GPU-Fehler gelaufen — das passiert auf dem Server, '+
+               'nicht in deiner Anfrage. Zweiter Anlauf ist schon gescheitert, daher 90s Pause. '+
+               'Bleibt es dabei, ist der Space gerade defekt; Perchance zeichnet weiter.');
+    }else if(gedrosselt||kontingent){
       var sek=gedrosselt?60:300, ra=m.match(/in (\d+)s/);
       if(ra)sek=Math.max(15,Math.min(600,parseInt(ra[1],10)||60));
       S.bildPauseBis=Date.now()+sek*1000;

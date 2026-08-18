@@ -284,6 +284,22 @@ const laufen = async () => {
     String(Math.round((ctx.S.bildPauseBis - Date.now()) / 1000)) + 's');
   pruefe('Pause dabei länger als bei einer Drosselung', (ctx.S.bildPauseBis - Date.now()) > 120000);
 
+  // GPU-Panne auf der Serverseite: eigene Klasse, kuerzere Pause, klare Ansage.
+  ctx.S.bildPauseBis = 0;
+  ctx.BILDQUELLEN.gradio.zeichne = async () => {
+    throw new Error('Generation failed: NVML_SUCCESS == r INTERNAL ASSERT FAILED at "/pytorch/c10/cuda/CUDACachingAllocator.cpp":1154');
+  };
+  ctx.CFG.quelle = 'gradio';
+  await ctx.zeichneBild({});
+  const pauseGpu = ctx.S.bildPauseBis - Date.now();
+  pruefe('GPU-Panne des Dienstes löst eine Pause aus', pauseGpu > 0, String(Math.round(pauseGpu / 1000)) + 's');
+  pruefe('kürzer als bei erschöpftem Kontingent', pauseGpu < 120000, String(Math.round(pauseGpu / 1000)) + 's');
+  pruefe('CUDA-Assert wird als Serverpanne erkannt',
+    ctx.istServerPanne('NVML_SUCCESS == r INTERNAL ASSERT FAILED at CUDACachingAllocator.cpp'));
+  pruefe('Speichermangel ebenso', ctx.istServerPanne('torch.cuda.OutOfMemoryError: CUDA out of memory'));
+  pruefe('ein Kontingentfehler ist keine Serverpanne', !ctx.istServerPanne('You have exceeded your ZeroGPU runs limit'));
+  pruefe('ein Zeitablauf ist keine Serverpanne', !ctx.istServerPanne('Zeitüberschreitung nach 120s'));
+
   ctx.CFG.quelle = 'perchance';
   ctx.CFG.bildTakt = 1; ctx.S.bildZaehler = 0;
   ctx.S.bildPauseBis = Date.now() + 60000;   // laufende Pause, unabhängig vom Block davor
