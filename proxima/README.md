@@ -228,6 +228,20 @@ Die Wahl gilt fuer die ganze Partie, laesst sich aber jederzeit mit `/perspektiv
 `/perspektive: er` wechseln. Sie steckt im Spielstand; aeltere Staende starten in der
 Er-Perspektive.
 
+### Besetzung folgt der Handlung
+
+Erzaehlt die Regie, dass jemand hereinkommt oder den Ort verlaesst, zieht die Besetzung nach: die
+Figur tritt tatsaechlich auf oder verschwindet, samt Stimmung, Kleidung, Chronik und Bild. Der
+Schalter dafuer steht in ⚙ (**Figuren treten auf und ab, wenn die Handlung es erzaehlt**, an).
+
+Eine blosse Erwaehnung reicht nicht -- die Regie wird ausdruecklich angewiesen, das nur zu melden,
+wenn es im selben Moment wirklich geschieht. Die Obergrenze von vier Figuren gilt weiterhin, und
+mindestens eine Person bleibt immer am Ort. Auftritte und Abgaenge landen als Fakten im
+Langzeitgedaechtnis, damit spaeter niemand mit einer Abwesenden spricht.
+
+Von Hand geht beides weiter wie bisher: **+ NPC** laesst jemanden auftreten, das ✕ am Namensschild
+laesst jemanden gehen.
+
 ### Der Held im Auto-Modus
 
 In ⚙ steht der Schalter **Im Auto-Modus handelt der Held selbst mit** (an). Ist er gesetzt, darf

@@ -28,6 +28,7 @@ const ctx = {
   document: {
     getElementById: fakeEl,
     createElement: fakeEl,
+    createTextNode: (t) => ({ nodeValue: t }),
     querySelectorAll: () => [],
     addEventListener() {}
   },
@@ -262,6 +263,49 @@ const laufen = async () => {
   try { await ctx.BILDQUELLEN.horde.modelle(); } catch (e) { fehler = e.message; }
   pruefe('Fehlerstatus wird gemeldet', /503/.test(fehler), fehler);
   ctx.fetch = () => Promise.reject(new Error('kein Netz im Test'));
+
+  console.log('\n— Besetzung folgt der Handlung —');
+  // Kuendigt die Regie jemanden an oder laesst jemanden gehen, soll die
+  // Besetzung nachziehen - aber nur, wenn wirklich etwas geschieht.
+  ctx.W.npcs = [
+    { name: 'Ida Berger', rolle: 'Wirtin', aussehen: 'a', kleidung: 'b', person: 'c', grundstimmung: 'heiter' },
+    { name: 'Marcelle', rolle: 'Gast', aussehen: 'd', kleidung: 'e', person: 'f', grundstimmung: 'müde' }
+  ];
+  ctx.S.stimmung = ['heiter', 'müde']; ctx.S.kleidung = ['b', 'e']; ctx.S.regieAnweisung = ['', ''];
+  ctx.S.verlauf = []; ctx.S.imSpiel = true; ctx.CFG.autoBesetzung = true;
+
+  pruefe('Figur am vollen Namen gefunden', ctx.findeNpc('Ida Berger') === 0);
+  pruefe('Figur am Vornamen gefunden', ctx.findeNpc('Ida') === 0);
+  pruefe('Figur im Satz gefunden', ctx.findeNpc('Marcelle verlässt den Raum') === 1);
+  pruefe('Unbekannte ergibt -1', ctx.findeNpc('Konrad') === -1);
+  pruefe('Leerangaben werden erkannt', ctx.leerAngabe('') && ctx.leerAngabe('keine') && ctx.leerAngabe('niemand') && ctx.leerAngabe('-'));
+  pruefe('echter Name ist keine Leerangabe', !ctx.leerAngabe('Marcelle'));
+
+  await ctx.besetzungAendern({ abgang: 'Marcelle', auftritt: '' });
+  pruefe('angekündigter Abgang entfernt die Figur', ctx.W.npcs.length === 1 && ctx.W.npcs[0].name === 'Ida Berger',
+    ctx.W.npcs.map(n => n.name).join(','));
+  pruefe('Stimmungen und Kleidung ziehen mit', ctx.S.stimmung.length === 1 && ctx.S.kleidung.length === 1);
+  pruefe('der Abgang steht im Gedächtnis', ctx.S.fakten.some(f => /Marcelle/.test(f)), JSON.stringify(ctx.S.fakten.slice(-2)));
+
+  await ctx.besetzungAendern({ abgang: 'Ida', auftritt: '' });
+  pruefe('die letzte Figur bleibt', ctx.W.npcs.length === 1);
+
+  // Auftritt: erscheineNPC fragt die KI, deshalb eine Attrappe
+  ctx.ai = () => JSON.stringify({ name: 'Konrad Steiner', rolle: 'Kutscher', aussehen: 'x', kleidung: 'y',
+    person: 'z', stimmung: 'neugierig', eroeffnung: 'Verzeihung, ist hier noch frei?' });
+  await ctx.besetzungAendern({ abgang: '', auftritt: 'ein Kutscher, der Schutz vor dem Regen sucht' });
+  pruefe('angekündigter Auftritt bringt die Figur herein', ctx.W.npcs.length === 2 && ctx.W.npcs[1].name === 'Konrad Steiner',
+    ctx.W.npcs.map(n => n.name).join(','));
+  pruefe('die neue Figur sagt ihren ersten Satz', ctx.S.verlauf.some(v => /noch frei/.test(v.text || '')));
+
+  const besetzungVorher = ctx.W.npcs.length;
+  await ctx.besetzungAendern({ abgang: 'niemand', auftritt: 'keine' });
+  pruefe('Leerangaben ändern nichts', ctx.W.npcs.length === besetzungVorher);
+
+  ctx.CFG.autoBesetzung = false;
+  await ctx.besetzungAendern({ abgang: 'Konrad', auftritt: '' });
+  pruefe('abgeschaltet passiert nichts', ctx.W.npcs.length === besetzungVorher);
+  ctx.CFG.autoBesetzung = true;
 
   console.log('\n— Drosselung (HTTP 429) —');
   // 429 heißt: zu viele Anfragen. Weiter anzuklopfen macht es schlimmer, also

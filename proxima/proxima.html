@@ -160,7 +160,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.19</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.20</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -393,6 +393,7 @@ var CFG={
   negativ:'low quality, worst quality, blurry, deformed, bad anatomy, extra limbs, extra fingers, text, watermark, signature',
   kopfOffen:true,  // Kopfleiste aus- oder eingeklappt
   autoHeld:true,   // im Auto-Modus handelt der Held selbst mit
+  autoBesetzung:true, // Figuren treten auf und ab, wenn die Handlung es erzaehlt
   tempo:16,        // ms pro Zeichen im Schreibmaschinen-Effekt (0 = sofort)
   bildTakt:2,      // alle N Zuege ein neues Bild (0 = nur auf Zuruf)
   pollModell:'',
@@ -1317,8 +1318,11 @@ async function naechsterZug(erzwinge,autoModus){
     '  "weiter": false,\n'+
     '  "bild": "one English sentence describing this moment PURELY VISUALLY: what the character(s) are doing, posture, gesture, facial expression, gaze, plus setting, objects, lighting and camera framing (close-up / medium shot / wide shot). No names, no art style, no dialogue.",\n'+
     '  "handlung": "1 bis 2 deutsche Saetze, die die bisherige Handlung logisch fortschreiben",\n'+
-    '  "fakt": "hoechstens ein kurzer neuer harter Fakt aus diesem Zug, der spaeter gelten soll, sonst leer"\n'+
+    '  "fakt": "hoechstens ein kurzer neuer harter Fakt aus diesem Zug, der spaeter gelten soll, sonst leer",\n'+
+    '  "auftritt": "nur wenn in DIESEM Moment eine NEUE Person dazustoesst: Name und Rolle in wenigen Worten, sonst leer",\n'+
+    '  "abgang": "nur wenn eine ANWESENDE Person in diesem Moment weggeht: ihr Name, sonst leer"\n'+
     '}\n\n'+
+    'FELDER "auftritt" und "abgang": Nur ausfuellen, wenn es WIRKLICH geschieht - jemand tritt ein, jemand verlaesst den Ort. Eine blosse Erwaehnung ("der Wirt kommt sicher gleich") gehoert NICHT hinein. Anwesend sind derzeit: '+W.npcs.map(function(n){return n.name;}).join(', ')+'.\n'+
     'FELD "wer": '+(autoModus?'Es MUSS eine Figur sprechen, niemals STOP.':'STOP bedeutet, dass niemand mehr spricht und der Held wieder dran ist.')+'\n'+
     'FELD "weiter": true, wenn unmittelbar noch eine ANDERE Figur reagieren sollte, sonst false.';
 
@@ -1330,6 +1334,8 @@ async function naechsterZug(erzwinge,autoModus){
   var bild     = entkleide(j2?hole(j2,['bild'],''):(z['BILD']||z['SZENE']||''));
   var handlung = entkleide(j2?hole(j2,['handlung'],''):(z['HANDLUNG']||''));
   var fakt     = entkleide(j2?hole(j2,['fakt'],''):(z['FAKT']||''));
+  var auftritt = entkleide(j2?hole(j2,['auftritt'],''):(z['AUFTRITT']||''));
+  var abgang   = entkleide(j2?hole(j2,['abgang'],''):(z['ABGANG']||''));
   var weiterRoh= j2?j2.weiter:(z['WEITER']||'');
   var weiter   = (weiterRoh===true)||/^(ja|yes|true)/i.test(String(weiterRoh||''));
 
@@ -1338,7 +1344,7 @@ async function naechsterZug(erzwinge,autoModus){
     if(handlung)S.handlung=handlung;
     if(fakt)merkeFakt(fakt);
     if(bild)S.szeneText=bild;
-    return {stop:false,held:true,text:antwort,weiter:false};
+    return {stop:false,held:true,text:antwort,weiter:false,auftritt:auftritt,abgang:abgang};
   }
   var idx=0;
   var m=String(wer).match(/(\d+)/);
@@ -1350,7 +1356,38 @@ async function naechsterZug(erzwinge,autoModus){
   if(fakt)merkeFakt(fakt);
   if(bild)S.szeneText=bild;
 
-  return {stop:false,idx:idx,text:antwort,stimmung:stimmung,weiter:(weiter&&W.npcs.length>1)};
+  return {stop:false,idx:idx,text:antwort,stimmung:stimmung,weiter:(weiter&&W.npcs.length>1),
+          auftritt:auftritt,abgang:abgang};
+}
+
+// Leere Angaben kommen in vielen Verkleidungen zurueck.
+function leerAngabe(t){
+  return !t||/^(nein|kein|keine[rn]?|niemand|none|null|nichts|-|\u2014)$/i.test(String(t).trim());
+}
+function findeNpc(name){
+  var n=String(name||'').toLowerCase().trim();
+  if(!n)return -1;
+  var erstes=n.split(/[\s,]+/)[0];
+  var idx=-1;
+  W.npcs.forEach(function(f,i){
+    if(idx>=0)return;
+    var fn=String(f.name||'').toLowerCase();
+    if(!fn)return;
+    if(fn===n||n.indexOf(fn)>=0||fn.split(/\s+/)[0]===erstes)idx=i;
+  });
+  return idx;
+}
+// Die Handlung entscheidet mit, wer am Ort ist: kuendigt sie jemanden an oder
+// laesst jemanden gehen, zieht die Besetzung nach.
+async function besetzungAendern(res){
+  if(!CFG.autoBesetzung||!res)return;
+  if(!leerAngabe(res.abgang)){
+    var i=findeNpc(res.abgang);
+    if(i>=0&&W.npcs.length>1)entferneNPC(i);
+  }
+  if(!leerAngabe(res.auftritt)&&W.npcs.length<MAX_NPCS&&!S.npcErscheint){
+    await erscheineNPC(res.auftritt,true);
+  }
 }
 
 // ── SCHLAGABTAUSCH ────────────────────────────
@@ -1369,6 +1406,7 @@ async function fuehreSchlagabtausch(erzwungenerIdx){
     npcSagt(res.idx,res.text);
     S.verlauf.push({rolle:'npc',idx:res.idx,text:res.text,name:W.npcs[res.idx].name});
     if(res.stimmung){ S.stimmung[res.idx]=res.stimmung; zeigeStimmung(); }
+    await besetzungAendern(res);
     zuege++;
     if(!res.weiter)break;
   }
@@ -1440,6 +1478,7 @@ async function autoSchleife(){
         S.verlauf.push({rolle:'npc',idx:res.idx,text:res.text,name:W.npcs[res.idx].name});
         if(res.stimmung){ S.stimmung[res.idx]=res.stimmung; zeigeStimmung(); }
       }
+      await besetzungAendern(res);
       bildTakt();
       autosave();
       await warte(Math.min(6000,900+String(res.text).length*Math.max(8,CFG.tempo)));
@@ -1754,13 +1793,13 @@ function zeichneVerlaufNeu(){
 }
 
 // ── FIGUREN AUFTRETEN / ABTRETEN ──────────────
-async function erscheineNPC(hint){
+async function erscheineNPC(hint,still){
   if(!S.imSpiel)return;
   if(W.npcs.length>=MAX_NPCS){ sysZeile('Mehr als '+MAX_NPCS+' Personen werden hier nicht gleichzeitig gespielt.'); return; }
-  if(S.wartet||S.npcErscheint){ sysZeile('— Bitte kurz warten —'); return; }
+  if(S.npcErscheint||(S.wartet&&!still)){ if(!still)sysZeile('— Bitte kurz warten —'); return; }
   hint=entkleide(hint);
   S.npcErscheint=true;
-  setWartet(true);
+  if(!still)setWartet(true);
   var anwesend=W.npcs.map(function(n){return n.name+' ('+n.rolle+')';}).join(', ');
   var instruction=
     'Erfinde spontan eine WEITERE Person, die JETZT am Ort dazustoesst, passend zur Situation.\n\n'+
@@ -1796,11 +1835,12 @@ async function erscheineNPC(hint){
     aktualisiereUI();
     S.npcErscheint=false;
     S.bildZaehler=0;
-    setWartet(false);
-    if(hint){ S.regieAnweisung[idx]=hint; await fuehreSchlagabtausch(idx); }
+    if(!still)setWartet(false);
+    // Aus der Handlung heraus: keine zusaetzliche Runde ausloesen, die laeuft schon.
+    if(hint&&!still){ S.regieAnweisung[idx]=hint; await fuehreSchlagabtausch(idx); }
     zeichneBild({});
   }catch(e){
-    S.npcErscheint=false;setWartet(false);
+    S.npcErscheint=false;if(!still)setWartet(false);
     zeigeFehler('Figur erscheinen',e);
   }
 }
@@ -2185,6 +2225,8 @@ function oeffneEinstellungen(){
     '<input id="cfgTakt" class="feld" type="number" min="0" max="20" value="'+(Number(CFG.bildTakt)||0)+'">'+
     '<label class="feldlabel"><input type="checkbox" id="cfgAutoHeld"'+(CFG.autoHeld?' checked':'')+
     '> Im Auto-Modus handelt der Held selbst mit</label>'+
+    '<label class="feldlabel"><input type="checkbox" id="cfgAutoBesetzung"'+(CFG.autoBesetzung?' checked':'')+
+    '> Figuren treten auf und ab, wenn die Handlung es erzählt</label>'+
     '<label class="feldlabel" for="cfgTempo">SCHREIBTEMPO in ms pro Zeichen (0 = sofort)</label>'+
     '<input id="cfgTempo" class="feld" type="number" min="0" max="120" value="'+(Number(CFG.tempo)||0)+'">';
   el('einstellInhalt').innerHTML=html;
@@ -2347,6 +2389,7 @@ function leseEinstellungen(){
   CFG.bildTakt=Math.max(0,Math.min(20,parseInt(el('cfgTakt').value,10)||0));
   CFG.tempo=Math.max(0,Math.min(120,parseInt(el('cfgTempo').value,10)||0));
   var ah=el('cfgAutoHeld'); if(ah)CFG.autoHeld=!!ah.checked;
+  var ab=el('cfgAutoBesetzung'); if(ab)CFG.autoBesetzung=!!ab.checked;
   var q=BILDQUELLEN[CFG.quelle];
   (q.felder||[]).forEach(function(f){
     var e=el('q_'+f.k);
