@@ -228,6 +228,22 @@ Die Wahl gilt fuer die ganze Partie, laesst sich aber jederzeit mit `/perspektiv
 `/perspektive: er` wechseln. Sie steckt im Spielstand; aeltere Staende starten in der
 Er-Perspektive.
 
+### Der Ort
+
+Das Menue 📍 fuehrt Name, Beschreibung und die **Kulisse fuer Bilder** (englisch). Die Kulisse ist
+von 🎬 hierher gewandert, weil sie zum Ort gehoert; 🎬 fuehrt jetzt nur noch den Bildstil.
+
+Erzaehlt die Handlung einen **Ortswechsel**, geschieht er wirklich: Name, Beschreibung, Bildkulisse
+und Ankunftsszene werden neu ausformuliert, der Raumtitel wechselt, das Bild wird neu gezeichnet
+und der Wechsel landet im Langzeitgedaechtnis. Wer nicht mitkommt, gehoert unter `abgang` -- wer am
+neuen Ort dazustoesst, unter `auftritt`; beides regelt dieselbe Antwort der Regie.
+
+Veraendert sich der Ort nur (die Kerzen erloeschen, Regen setzt ein), wird das an die Beschreibung
+angehaengt, statt den Ort zu wechseln. Dieselbe Veraenderung wird nicht doppelt eingetragen.
+
+Von Hand: im Menue 📍 einen neuen Ort beschreiben und **✦ DORTHIN** druecken, oder `/ort: …`
+schreiben. `/ort` ohne Angabe oeffnet das Menue.
+
 ### Besetzung folgt der Handlung
 
 Erzaehlt die Regie, dass jemand hereinkommt oder den Ort verlaesst, zieht die Besetzung nach: die
@@ -268,6 +284,7 @@ Ist der Schalter aus, verhaelt sich der Auto-Modus wie bisher: nur die uebrigen 
 | `/regie: …` | stehende Regie für die ganze Szene, leer = löschen |
 | `/bild: …` | neues Bild aus eigener Beschreibung |
 | `/stil: …` | Bildstil wechseln (`manga`, `comic`, `aquarell`, `oel`, `realistisch`, `pixel` oder freier Text) — dasselbe geht im Menü 🎬 |
+| `/ort: …` | an einen anderen Ort wechseln (ohne Angabe: Ort-Menü) |
 | `/perspektive: ich\|er` | Erzählweise wechseln (ohne Angabe: aktuelle anzeigen) |
 | `/quelle` | Bildquelle wechseln |
 | `/undo` | letzten Zug zurücknehmen |

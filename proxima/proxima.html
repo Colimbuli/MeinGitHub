@@ -160,7 +160,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.20</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.21</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -213,7 +213,8 @@ select.feld option{background:var(--panel);}
     <div id="werkzeuge">
       <button id="chronikbtn" onclick="zeigeChronik('ort')" title="Chronik">📖</button>
       <button id="figurbtn" onclick="oeffneFigurMenu()" title="Figuren bearbeiten">👤</button>
-      <button id="szenebtn" onclick="oeffneSzeneMenu()" title="Szene und Bildstil">🎬</button>
+      <button id="ortbtn" onclick="oeffneOrtMenu()" title="Ort bearbeiten">📍</button>
+      <button id="szenebtn" onclick="oeffneSzeneMenu()" title="Bildstil">🎬</button>
       <button id="bildbtn" onclick="oeffneBildModal()" title="Bild bearbeiten">🖼</button>
       <button id="einstellbtn" onclick="oeffneEinstellungen()" title="Einstellungen">⚙</button>
       <button id="speicherbtn" onclick="oeffneSpeicher()" title="Speichern / Laden">💾</button>
@@ -290,19 +291,39 @@ select.feld option{background:var(--panel);}
 
 <div class="modal" id="mSzene">
   <div class="modalBox">
-    <div class="modalKopf"><span>🎬 SZENE &amp; STIL</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalKopf"><span>🎬 BILDSTIL</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
     <div class="modalInhalt">
       <label class="feldlabel" for="szeneStil">BILDSTIL — gilt für alle weiteren Bilder</label>
       <select id="szeneStil" class="feld" onchange="szeneStilGewechselt()"></select>
       <input id="szeneStilEigen" class="feld" type="text" placeholder="z.B. noir ink sketch, high contrast" style="display:none">
-      <label class="feldlabel" for="szeneFeld">UMGEBUNG / KULISSE</label>
-      <div class="hinweis">Gilt dauerhaft für alle Bilder — z.B. „a dim candlelit tavern, wooden beams, rain against the windows".</div>
-      <textarea id="szeneFeld" class="feld" rows="5" placeholder="Beschreibe die durchgehende Umgebung der Szene…"></textarea>
+      <div class="hinweis">Die Kulisse steht jetzt im Ort-Menü 📍, weil sie zum Ort gehört.</div>
       <div class="hinweis" id="szeneStilHinweis"></div>
     </div>
     <div class="modalNav">
       <button onclick="schliesseModal()">SCHLIESSEN</button>
       <button class="haupt" onclick="speichereSzene()">✦ ÜBERNEHMEN</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="mOrt">
+  <div class="modalBox">
+    <div class="modalKopf"><span>📍 ORT</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalInhalt">
+      <label class="feldlabel" for="ortName">NAME DES ORTES</label>
+      <input id="ortName" class="feld" type="text">
+      <label class="feldlabel" for="ortGeschichte">BESCHREIBUNG — geht in Chronik und Regie ein</label>
+      <textarea id="ortGeschichte" class="feld" rows="5"></textarea>
+      <label class="feldlabel" for="ortKulisse">KULISSE FÜR BILDER (englisch) — gilt dauerhaft</label>
+      <textarea id="ortKulisse" class="feld" rows="3" placeholder="a dim candlelit tavern, wooden beams, rain against the windows"></textarea>
+      <label class="feldlabel" for="ortWechselFeld">ORTSWECHSEL — neuen Ort beschreiben, dann „✦ DORTHIN"</label>
+      <input id="ortWechselFeld" class="feld" type="text" placeholder="z.B. der verwilderte Innenhof hinter der Küche">
+      <div class="hinweis" id="ortHinweis"></div>
+    </div>
+    <div class="modalNav">
+      <button onclick="schliesseModal()">SCHLIESSEN</button>
+      <button onclick="ortWechselAusMenu()">✦ DORTHIN</button>
+      <button class="haupt" onclick="speichereOrt()">✦ ÜBERNEHMEN</button>
     </div>
   </div>
 </div>
@@ -1009,7 +1030,7 @@ var S = {
   // Von Hand geschriebener Prompt. Solange gesetzt, gilt er statt des aus der
   // Szene gebauten — auch ueber einen Wechsel der Bildquelle hinweg.
   eigenerPrompt:'', eigenerNegativ:'', promptFesthalten:false,
-  npcErscheint:false,
+  npcErscheint:false, ortLaeuft:false,
   autoAktiv:false, autoRegie:'', autoLaeuft:false, autoForceIdx:null,
   stil:'', stilLabel:'',
   rueckgaengig:[]                   // Schnappschuesse fuer /undo
@@ -1320,8 +1341,11 @@ async function naechsterZug(erzwinge,autoModus){
     '  "handlung": "1 bis 2 deutsche Saetze, die die bisherige Handlung logisch fortschreiben",\n'+
     '  "fakt": "hoechstens ein kurzer neuer harter Fakt aus diesem Zug, der spaeter gelten soll, sonst leer",\n'+
     '  "auftritt": "nur wenn in DIESEM Moment eine NEUE Person dazustoesst: Name und Rolle in wenigen Worten, sonst leer",\n'+
-    '  "abgang": "nur wenn eine ANWESENDE Person in diesem Moment weggeht: ihr Name, sonst leer"\n'+
+    '  "abgang": "nur wenn eine ANWESENDE Person in diesem Moment weggeht: ihr Name, sonst leer",\n'+
+    '  "ortwechsel": "nur wenn der Schauplatz JETZT gewechselt wird: Name und kurze Beschreibung des neuen Ortes, sonst leer",\n'+
+    '  "ortaenderung": "nur wenn sich am Ort etwas dauerhaft aendert (Licht erlischt, Regen setzt ein): ein kurzer deutscher Satz, sonst leer"\n'+
     '}\n\n'+
+    'FELD "ortwechsel": Nur wenn die Figuren den Schauplatz in diesem Moment WIRKLICH verlassen. Wer dabei NICHT mitkommt, gehoert unter "abgang" - wer am neuen Ort dazustoesst, unter "auftritt".\n'+
     'FELDER "auftritt" und "abgang": Nur ausfuellen, wenn es WIRKLICH geschieht - jemand tritt ein, jemand verlaesst den Ort. Eine blosse Erwaehnung ("der Wirt kommt sicher gleich") gehoert NICHT hinein. Anwesend sind derzeit: '+W.npcs.map(function(n){return n.name;}).join(', ')+'.\n'+
     'FELD "wer": '+(autoModus?'Es MUSS eine Figur sprechen, niemals STOP.':'STOP bedeutet, dass niemand mehr spricht und der Held wieder dran ist.')+'\n'+
     'FELD "weiter": true, wenn unmittelbar noch eine ANDERE Figur reagieren sollte, sonst false.';
@@ -1334,6 +1358,8 @@ async function naechsterZug(erzwinge,autoModus){
   var bild     = entkleide(j2?hole(j2,['bild'],''):(z['BILD']||z['SZENE']||''));
   var handlung = entkleide(j2?hole(j2,['handlung'],''):(z['HANDLUNG']||''));
   var fakt     = entkleide(j2?hole(j2,['fakt'],''):(z['FAKT']||''));
+  var ortwechsel  = entkleide(j2?hole(j2,['ortwechsel'],''):(z['ORTWECHSEL']||''));
+  var ortaenderung= entkleide(j2?hole(j2,['ortaenderung'],''):(z['ORTAENDERUNG']||''));
   var auftritt = entkleide(j2?hole(j2,['auftritt'],''):(z['AUFTRITT']||''));
   var abgang   = entkleide(j2?hole(j2,['abgang'],''):(z['ABGANG']||''));
   var weiterRoh= j2?j2.weiter:(z['WEITER']||'');
@@ -1344,7 +1370,8 @@ async function naechsterZug(erzwinge,autoModus){
     if(handlung)S.handlung=handlung;
     if(fakt)merkeFakt(fakt);
     if(bild)S.szeneText=bild;
-    return {stop:false,held:true,text:antwort,weiter:false,auftritt:auftritt,abgang:abgang};
+    return {stop:false,held:true,text:antwort,weiter:false,auftritt:auftritt,abgang:abgang,
+            ortwechsel:ortwechsel,ortaenderung:ortaenderung};
   }
   var idx=0;
   var m=String(wer).match(/(\d+)/);
@@ -1357,7 +1384,7 @@ async function naechsterZug(erzwinge,autoModus){
   if(bild)S.szeneText=bild;
 
   return {stop:false,idx:idx,text:antwort,stimmung:stimmung,weiter:(weiter&&W.npcs.length>1),
-          auftritt:auftritt,abgang:abgang};
+          auftritt:auftritt,abgang:abgang,ortwechsel:ortwechsel,ortaenderung:ortaenderung};
 }
 
 // Leere Angaben kommen in vielen Verkleidungen zurueck.
@@ -1379,6 +1406,14 @@ function findeNpc(name){
 }
 // Die Handlung entscheidet mit, wer am Ort ist: kuendigt sie jemanden an oder
 // laesst jemanden gehen, zieht die Besetzung nach.
+// Reihenfolge: erst der Ort, dann wer bleibt und wer dazukommt. Sonst
+// tritt die neue Person noch am alten Schauplatz auf.
+async function folgeHandlung(res){
+  if(!res)return;
+  if(CFG.autoBesetzung&&!leerAngabe(res.ortaenderung))ortNotiz(res.ortaenderung);
+  if(CFG.autoBesetzung&&!leerAngabe(res.ortwechsel)&&!S.ortLaeuft)await ortWechseln(res.ortwechsel);
+  await besetzungAendern(res);
+}
 async function besetzungAendern(res){
   if(!CFG.autoBesetzung||!res)return;
   if(!leerAngabe(res.abgang)){
@@ -1406,7 +1441,7 @@ async function fuehreSchlagabtausch(erzwungenerIdx){
     npcSagt(res.idx,res.text);
     S.verlauf.push({rolle:'npc',idx:res.idx,text:res.text,name:W.npcs[res.idx].name});
     if(res.stimmung){ S.stimmung[res.idx]=res.stimmung; zeigeStimmung(); }
-    await besetzungAendern(res);
+    await folgeHandlung(res);
     zuege++;
     if(!res.weiter)break;
   }
@@ -1478,7 +1513,7 @@ async function autoSchleife(){
         S.verlauf.push({rolle:'npc',idx:res.idx,text:res.text,name:W.npcs[res.idx].name});
         if(res.stimmung){ S.stimmung[res.idx]=res.stimmung; zeigeStimmung(); }
       }
-      await besetzungAendern(res);
+      await folgeHandlung(res);
       bildTakt();
       autosave();
       await warte(Math.min(6000,900+String(res.text).length*Math.max(8,CFG.tempo)));
@@ -1615,6 +1650,8 @@ var BEFEHLE=[
    fn:function(m){ stilBefehl(m[1]); }},
   {muster:/^\/quelle\b\s*:?\s*([\s\S]*)$/i,     hilfe:['/quelle','Bildquelle wechseln (öffnet die Einstellungen)'],
    fn:function(m){ quelleBefehl(m[1]); }},
+  {muster:/^\/ort\s*:?\s*([\s\S]*)$/i,          hilfe:['/ort: …','an einen anderen Ort wechseln (ohne Angabe: Ort-Menü)'],
+   fn:function(m){ var t=entkleide(m[1]); if(!t){oeffneOrtMenu();return;} if(S.wartet){sysZeile('— Bitte kurz warten —');return;} ortWechseln(t); }},
   {muster:/^\/perspektive\s*:?\s*([\s\S]*)$/i,   hilfe:['/perspektive: ich|er','Erzählweise wechseln (ohne Angabe: aktuelle anzeigen)'],
    fn:function(m){ perspektiveBefehl(m[1]); }},
   {muster:/^\/undo\b/i,                         hilfe:['/undo','letzten Zug zurücknehmen'],
@@ -2038,7 +2075,9 @@ function zeigeChronik(ziel){
   inhalt.style.whiteSpace=(ziel==='handlung')?'pre-wrap':'normal';
   if(ziel==='ort'){
     kopf.textContent='📖 '+((W.ort&&W.ort.name)||'Ort').toUpperCase();
-    inhalt.textContent=(W.ort&&W.ort.geschichte)||'Keine Aufzeichnungen.';
+    inhalt.textContent=((W.ort&&W.ort.geschichte)||'Keine Aufzeichnungen.')+
+      (S.szeneGlobal?'\n\nKulisse: '+S.szeneGlobal:'');
+    inhalt.style.whiteSpace='pre-wrap';
   }else if(ziel==='handlung'){
     kopf.textContent='📖 HANDLUNG';
     var t=(S.handlung||'Noch nichts geschehen.');
@@ -2160,8 +2199,6 @@ var STIL_NAMEN={manga:'Manga / Anime',comic:'Westlicher Comic',aquarell:'Aquarel
                 illustrious:'Illustrious / Anime-Tags'};
 function oeffneSzeneMenu(){
   if(!S.imSpiel)return;
-  el('szeneFeld').value=S.szeneGlobal||'';
-
   var sel=el('szeneStil');
   sel.innerHTML='';
   Object.keys(STILE).forEach(function(k){
@@ -2195,7 +2232,6 @@ function szeneStilGewechselt(){
   eigen.style.display=(el('szeneStil').value==='eigen')?'block':'none';
 }
 function speichereSzene(){
-  S.szeneGlobal=el('szeneFeld').value.trim();
   var wahl=el('szeneStil').value;
   if(wahl==='eigen'){
     var t=el('szeneStilEigen').value.trim();
@@ -2204,9 +2240,94 @@ function speichereSzene(){
     S.stil=STILE[wahl];S.stilLabel=wahl;
   }
   schliesseModal();
-  sysZeile('✦ Stil: '+(S.stilLabel||'unverändert')+(S.szeneGlobal?' · Kulisse gesetzt':'')+' ✦');
+  sysZeile('✦ Stil: '+(S.stilLabel||'unverändert')+' ✦');
   autosave();
   zeichneBild({});
+}
+
+// ── ORT ───────────────────────────────────────
+function zeigeRaumtitel(){
+  var e=el('raumtitel');
+  if(e)e.textContent=((W.ort&&W.ort.name)||'Ort').toUpperCase();
+}
+function oeffneOrtMenu(){
+  if(!S.imSpiel)return;
+  el('ortName').value=(W.ort&&W.ort.name)||'';
+  el('ortGeschichte').value=(W.ort&&W.ort.geschichte)||'';
+  el('ortKulisse').value=S.szeneGlobal||'';
+  el('ortWechselFeld').value='';
+  el('ortHinweis').textContent=S.eigenerPrompt
+    ? 'Ein eigener Bildprompt ist aktiv — die Kulisse wirkt erst nach „AUS SZENE" im Bildmenü.'
+    : 'Beschreibt die Handlung einen Ortswechsel, geschieht er von selbst. Hier kannst du ihn auch auslösen.';
+  oeffneModal('mOrt');
+}
+function speichereOrt(){
+  if(!W.ort)W.ort={name:'',geschichte:'',bildPrompt:''};
+  W.ort.name=el('ortName').value.trim()||W.ort.name;
+  W.ort.geschichte=el('ortGeschichte').value.trim()||W.ort.geschichte;
+  S.szeneGlobal=el('ortKulisse').value.trim();
+  schliesseModal();
+  zeigeRaumtitel();
+  baueChronikNav();
+  autosave();
+  zeichneBild({});
+}
+function ortWechselAusMenu(){
+  var t=el('ortWechselFeld').value.trim();
+  if(!t){ el('ortHinweis').textContent='Beschreibe zuerst, wohin es gehen soll.'; return; }
+  schliesseModal();
+  ortWechseln(t);
+}
+// Ortswechsel: neuen Ort von der KI ausformulieren lassen, damit Beschreibung
+// und Bildkulisse zusammenpassen. Die alte Besetzung regelt die Regie ueber
+// das Feld "abgang" - wer nicht mitkommt, bleibt zurueck.
+async function ortWechseln(beschreibung){
+  if(!S.imSpiel)return;
+  beschreibung=entkleide(beschreibung);
+  if(!beschreibung||S.ortLaeuft)return;
+  S.ortLaeuft=true;
+  sysZeile('— Ortswechsel: ' + beschreibung + ' —');
+  try{
+    var text=await frageKI(
+      'Der Schauplatz eines deutschen Dialog-Adventures wechselt. Formuliere den NEUEN Ort aus.\n\n'+
+      weltKontext()+
+      'BISHERIGER ORT: '+((W.ort&&W.ort.name)||'?')+' — '+((W.ort&&W.ort.geschichte)||'')+'\n'+
+      'NEUER ORT laut Handlung: '+beschreibung+'\n'+
+      'ANWESEND: '+W.npcs.map(function(n){return n.name;}).join(', ')+'\n\n'+
+      'Antworte NUR mit einem JSON-Objekt, ohne Codeblock:\n'+
+      '{"name":"Name des neuen Ortes","geschichte":"atmosphaerische deutsche Beschreibung, 3 bis 6 Saetze",'+
+      '"kulisse":"english description of the surroundings for image generation: architecture, objects, light, weather",'+
+      '"bild":"one English sentence: what is seen the moment the characters arrive"}',
+      120000);
+    var j=jsonAus(text), z=j?null:felderAus(text);
+    var f=function(k,flach,ersatz){ return j?hole(j,[k],ersatz):((z&&z[flach])||ersatz); };
+    if(!W.ort)W.ort={};
+    W.ort.name=f('name','NAME',beschreibung.substring(0,40));
+    W.ort.geschichte=f('geschichte','GESCHICHTE',beschreibung);
+    W.ort.bildPrompt=f('bild','BILD',W.ort.bildPrompt||'');
+    S.szeneGlobal=f('kulisse','KULISSE',S.szeneGlobal||'');
+    S.szeneText=W.ort.bildPrompt;
+    merkeFakt('Der Ort wechselte zu '+W.ort.name+'.');
+    zeigeRaumtitel();
+    baueChronikNav();
+    S.bildZaehler=0;
+    autosave();
+    zeichneBild({});
+  }catch(e){
+    zeigeFehler('Ortswechsel',e);
+  }
+  S.ortLaeuft=false;
+}
+// Der Ort veraendert sich, ohne dass gewechselt wird (Licht geht aus, Regen setzt ein).
+function ortNotiz(satz){
+  satz=entkleide(satz);
+  if(!satz||!W.ort)return;
+  var g=String(W.ort.geschichte||'');
+  if(g.indexOf(satz)>=0)return;
+  W.ort.geschichte=(g+' '+satz).trim();
+  if(W.ort.geschichte.length>1400)W.ort.geschichte=W.ort.geschichte.substring(W.ort.geschichte.length-1400);
+  merkeFakt('Am Ort: '+satz);
+  sysZeile('— '+satz+' —');
 }
 
 // ── EINSTELLUNGEN ─────────────────────────────
@@ -2503,7 +2624,7 @@ function migriere(d){
   s.wartet=false;s.bildLaeuft=false;s.bildAusstehend=null;s.npcErscheint=false;
   s.bildGeneriert=false;s.bildZaehler=0;s.imSpiel=true;
   s.autoAktiv=false;s.autoLaeuft=false;s.autoForceIdx=null;
-  s.letzteBildUrl='';s.bildPauseBis=0;
+  s.letzteBildUrl='';s.bildPauseBis=0;s.ortLaeuft=false;
   return d;
 }
 function oeffneSpeicher(){

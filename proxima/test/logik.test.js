@@ -307,6 +307,53 @@ const laufen = async () => {
   pruefe('abgeschaltet passiert nichts', ctx.W.npcs.length === besetzungVorher);
   ctx.CFG.autoBesetzung = true;
 
+  console.log('\n— Ort folgt der Handlung —');
+  // Genau der gemeldete Fall: die Regie schickt die Figuren in den naechsten
+  // Raum. Vorher blieb der Schauplatz stehen und die Erzaehlung lief davon.
+  ctx.W.ort = { name: 'Die Taverne', geschichte: 'Ein enger Schankraum.', bildPrompt: 'alt' };
+  ctx.S.szeneGlobal = 'a dim tavern';
+  ctx.W.npcs = [{ name: 'Ida', rolle: 'Wirtin', aussehen: 'a', kleidung: 'b', person: 'c', grundstimmung: 'heiter' }];
+  ctx.S.stimmung = ['heiter']; ctx.S.kleidung = ['b']; ctx.S.regieAnweisung = [''];
+  ctx.S.imSpiel = true; ctx.S.ortLaeuft = false; ctx.CFG.autoBesetzung = true;
+
+  ctx.ai = () => JSON.stringify({ name: 'Der Innenhof', geschichte: 'Wilder Wein rankt an den Mauern.',
+    kulisse: 'an overgrown courtyard at night, ivy, wet cobblestones', bild: 'they step out into the cool air' });
+  await ctx.folgeHandlung({ ortwechsel: 'der verwilderte Innenhof hinter der Küche', abgang: '', auftritt: '' });
+  pruefe('Ortsname übernommen', ctx.W.ort.name === 'Der Innenhof', ctx.W.ort.name);
+  pruefe('Beschreibung übernommen', /Wilder Wein/.test(ctx.W.ort.geschichte), ctx.W.ort.geschichte);
+  pruefe('Kulisse für Bilder mitgewechselt', /overgrown courtyard/.test(ctx.S.szeneGlobal), ctx.S.szeneGlobal);
+  pruefe('Ankunftsszene gesetzt', /step out/.test(ctx.S.szeneText), ctx.S.szeneText);
+  pruefe('Ortswechsel steht im Gedächtnis', ctx.S.fakten.some(f => /Innenhof/.test(f)));
+
+  // Der gemeldete Ablauf komplett: Ort wechseln, Alte bleibt zurück, Neue kommt dazu
+  ctx.W.npcs.push({ name: 'Marcelle', rolle: 'Gast', aussehen: 'd', kleidung: 'e', person: 'f', grundstimmung: 'müde' });
+  ctx.S.stimmung.push('müde'); ctx.S.kleidung.push('e'); ctx.S.regieAnweisung.push('');
+  let ruf = 0;
+  ctx.ai = () => {
+    ruf++;
+    return ruf === 1
+      ? JSON.stringify({ name: 'Die Bibliothek', geschichte: 'Staub auf den Rücken.', kulisse: 'a dusty library', bild: 'a door swings open' })
+      : JSON.stringify({ name: 'Konrad', rolle: 'Archivar', aussehen: 'x', kleidung: 'y', person: 'z', stimmung: 'neugierig', eroeffnung: 'Sie sind spät dran.' });
+  };
+  await ctx.folgeHandlung({ ortwechsel: 'die Bibliothek nebenan', abgang: 'Ida', auftritt: 'ein Archivar' });
+  pruefe('neuer Ort gesetzt', ctx.W.ort.name === 'Die Bibliothek', ctx.W.ort.name);
+  pruefe('Zurückbleibende ist weg', !ctx.W.npcs.some(n => n.name === 'Ida'), ctx.W.npcs.map(n => n.name).join(','));
+  pruefe('neue Figur ist da', ctx.W.npcs.some(n => n.name === 'Konrad'), ctx.W.npcs.map(n => n.name).join(','));
+  pruefe('Mitgekommene bleibt', ctx.W.npcs.some(n => n.name === 'Marcelle'));
+
+  // Veränderung ohne Wechsel
+  const vorText = ctx.W.ort.geschichte;
+  await ctx.folgeHandlung({ ortaenderung: 'Die Kerzen erlöschen eine nach der anderen.', ortwechsel: '', abgang: '', auftritt: '' });
+  pruefe('Veränderung wird in den Ort geschrieben', ctx.W.ort.geschichte.length > vorText.length && /Kerzen/.test(ctx.W.ort.geschichte));
+  pruefe('Ortsname bleibt dabei', ctx.W.ort.name === 'Die Bibliothek');
+  const nochmalGleich = ctx.W.ort.geschichte;
+  await ctx.folgeHandlung({ ortaenderung: 'Die Kerzen erlöschen eine nach der anderen.', ortwechsel: '', abgang: '', auftritt: '' });
+  pruefe('dieselbe Veränderung nicht doppelt', ctx.W.ort.geschichte === nochmalGleich);
+
+  const ortVorher = ctx.W.ort.name;
+  await ctx.folgeHandlung({ ortwechsel: 'keine', ortaenderung: '-', abgang: '', auftritt: '' });
+  pruefe('Leerangaben lassen den Ort in Ruhe', ctx.W.ort.name === ortVorher);
+
   console.log('\n— Drosselung (HTTP 429) —');
   // 429 heißt: zu viele Anfragen. Weiter anzuklopfen macht es schlimmer, also
   // muss der Generator eine Pause einlegen statt im Takt weiterzufragen.
