@@ -506,6 +506,25 @@ ctx.W.perspektive = 'er';
 const kEr = ctx.weltKontext();
 pruefe('Kontext nennt in der Er-Form den Namen', /Julian greift/.test(kEr), kEr.split('\n').filter(z => /ERZAEHLWEISE/.test(z))[0]);
 
+console.log('\n— Reihenfolge der Antwortfelder —');
+// Bricht eine Antwort ab, faellt weg was hinten steht. Die Felder, die den
+// Spielzustand aendern, muessen deshalb VOR den langen Fliesstextfeldern stehen.
+const spec = src.match(/Antworte NUR mit einem gueltigen JSON-Objekt[\s\S]*?FELD "wer"/);
+pruefe('Feldliste gefunden', !!spec);
+const pos = f => spec[0].indexOf('"' + f + '"');
+['auftritt', 'abgang', 'ortwechsel', 'kleidung', 'ortaenderung'].forEach(f => {
+  pruefe(`"${f}" steht vor "bild" und "handlung"`, pos(f) > 0 && pos(f) < pos('bild') && pos(f) < pos('handlung'),
+    `${f} bei ${pos(f)}, bild bei ${pos('bild')}`);
+});
+pruefe('"antwort" steht ganz vorn', pos('antwort') < pos('auftritt'));
+pruefe('Nachdruck auf den Zustandsfeldern vorhanden', /MUSST du "auftritt" ausfuellen/.test(src));
+
+console.log('\n— Befehl /roh —');
+const treffRoh = t => { for (const b of ctx.BEFEHLE) { const m = t.match(b.muster); if (m) return b; } return null; };
+pruefe('/roh erkannt', treffRoh('/roh') && treffRoh('/roh').hilfe[0] === '/roh');
+pruefe('kollidiert nicht mit /regie', treffRoh('/regie: x').hilfe[0] === '/regie: …');
+pruefe('kollidiert nicht mit /ort', treffRoh('/ort: x').hilfe[0] === '/ort: …');
+
 console.log('\n— Befehl /perspektive —');
 const treff = t => { for (const b of ctx.BEFEHLE) { const m = t.match(b.muster); if (m) return { b, m }; } return null; };
 pruefe('/perspektive: ich erkannt', treff('/perspektive: ich').m[1] === 'ich');

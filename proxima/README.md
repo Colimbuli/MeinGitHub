@@ -258,6 +258,16 @@ Unveraenderte Angaben werden verworfen, damit nicht bei jedem Zug dasselbe Bild 
 Der Held kann sich ebenso umziehen. Von Hand geht es weiter mit `/kleidungN: …` oder im
 Figurenmenue.
 
+### Wenn eine Aenderung nicht ankommt
+
+Die Regie antwortet mit einem JSON-Objekt, in dem `auftritt`, `abgang`, `ortwechsel` und
+`kleidung` den Spielzustand aendern. Bleibt eine Aenderung aus, zeigt **`/roh`**, was
+tatsaechlich zurueckkam: ob das Feld fehlte, leer war oder die Antwort abgebrochen ist.
+
+Die Feldreihenfolge ist deshalb kein Zufall -- die kurzen Zustandsfelder stehen **vor** den langen
+Fliesstextfeldern `bild`, `handlung` und `fakt`. Wird eine Antwort abgeschnitten, faellt weg was
+hinten steht, und das sollen nicht die Felder sein, die das Spiel weiterbewegen.
+
 ### Besetzung folgt der Handlung
 
 Erzaehlt die Regie, dass jemand hereinkommt oder den Ort verlaesst, zieht die Besetzung nach: die
@@ -300,6 +310,7 @@ Ist der Schalter aus, verhaelt sich der Auto-Modus wie bisher: nur die uebrigen 
 | `/stil: …` | Bildstil wechseln (`manga`, `comic`, `aquarell`, `oel`, `realistisch`, `pixel` oder freier Text) — dasselbe geht im Menü 🎬 |
 | `/ort: …` | an einen anderen Ort wechseln (ohne Angabe: Ort-Menü) |
 | `/perspektive: ich\|er` | Erzählweise wechseln (ohne Angabe: aktuelle anzeigen) |
+| `/roh` | zeigt die letzte Antwort der Regie im Original — zur Fehlersuche |
 | `/quelle` | Bildquelle wechseln |
 | `/undo` | letzten Zug zurücknehmen |
 | `/nochmal` | letzten Zug verwerfen und die Antwort neu würfeln |

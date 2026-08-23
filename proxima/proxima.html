@@ -160,7 +160,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.22</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.23</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -1026,6 +1026,7 @@ var S = {
   handlung:'', fakten:[],           // Kurzzeit-Zusammenfassung + Langzeitgedaechtnis
   seed:0,                           // fest, damit Figuren wiedererkennbar bleiben
   bildGeneriert:false, bildZaehler:0, bildLaeuft:false, bildAusstehend:null, bildPauseBis:0,
+  letzteRohantwort:'', letzteJsonOk:false,
   szeneText:'', szeneGlobal:'', letzterPrompt:'', letzterNegativ:'', letzteBildUrl:'',
   // Von Hand geschriebener Prompt. Solange gesetzt, gilt er statt des aus der
   // Szene gebauten — auch ueber einen Wechsel der Bildquelle hinweg.
@@ -1339,23 +1340,29 @@ async function naechsterZug(erzwinge,autoModus){
     '  "antwort": "die gesprochene Reaktion dieser Figur auf Deutsch, 1 bis 3 Saetze, Handlungen in eckigen Klammern",\n'+
     '  "stimmung": "Stimmung DIESER Figur nach dem Moment, EIN deutsches Wort",\n'+
     '  "weiter": false,\n'+
+    '  "auftritt": "Name und Rolle einer Person, die in DIESEM Moment dazustoesst, sonst leer",\n'+
+    '  "abgang": "Name einer anwesenden Person, die in DIESEM Moment weggeht, sonst leer",\n'+
+    '  "ortwechsel": "Name und kurze Beschreibung des neuen Ortes, wenn der Schauplatz JETZT gewechselt wird, sonst leer",\n'+
+    '  "kleidung": "Name, Doppelpunkt, neues Outfit auf ENGLISCH, wenn eine Figur sich JETZT umzieht, sonst leer",\n'+
+    '  "ortaenderung": "kurzer deutscher Satz, wenn sich am Ort etwas dauerhaft aendert, sonst leer",\n'+
     '  "bild": "one English sentence describing this moment PURELY VISUALLY: what the character(s) are doing, posture, gesture, facial expression, gaze, plus setting, objects, lighting and camera framing (close-up / medium shot / wide shot). No names, no art style, no dialogue.",\n'+
     '  "handlung": "1 bis 2 deutsche Saetze, die die bisherige Handlung logisch fortschreiben",\n'+
-    '  "fakt": "hoechstens ein kurzer neuer harter Fakt aus diesem Zug, der spaeter gelten soll, sonst leer",\n'+
-    '  "auftritt": "nur wenn in DIESEM Moment eine NEUE Person dazustoesst: Name und Rolle in wenigen Worten, sonst leer",\n'+
-    '  "abgang": "nur wenn eine ANWESENDE Person in diesem Moment weggeht: ihr Name, sonst leer",\n'+
-    '  "ortwechsel": "nur wenn der Schauplatz JETZT gewechselt wird: Name und kurze Beschreibung des neuen Ortes, sonst leer",\n'+
-    '  "ortaenderung": "nur wenn sich am Ort etwas dauerhaft aendert (Licht erlischt, Regen setzt ein): ein kurzer deutscher Satz, sonst leer",\n'+
-    '  "kleidung": "nur wenn eine Figur ihre Kleidung in diesem Moment DAUERHAFT aendert: Name, Doppelpunkt, neues Outfit auf ENGLISCH. Mehrere mit Semikolon trennen. Sonst leer."\n'+
+    '  "fakt": "hoechstens ein kurzer neuer harter Fakt aus diesem Zug, der spaeter gelten soll, sonst leer"\n'+
     '}\n\n'+
+    'WICHTIG: Die Felder auftritt, abgang, ortwechsel und kleidung sind KEINE Verzierung - sie veraendern das Spiel wirklich. Was dort nicht steht, geschieht nicht.\n'+
+    'Kommt in deiner ANTWORT jemand herein, MUSST du "auftritt" ausfuellen, sonst bleibt die Person unsichtbar. Geht jemand, MUSST du "abgang" ausfuellen. Wechselt der Schauplatz, MUSST du "ortwechsel" ausfuellen.\n'+
     'FELD "kleidung": Beispiel "'+((W.npcs[0]&&W.npcs[0].name)||'Name')+': a dark green velvet coat over a white shirt". Nur bei einer bleibenden Aenderung - Ablegen, Anziehen, Umziehen. Kein Eintrag, wenn die Kleidung nur erwaehnt oder beschrieben wird.\n'+
     'FELD "ortwechsel": Nur wenn die Figuren den Schauplatz in diesem Moment WIRKLICH verlassen. Wer dabei NICHT mitkommt, gehoert unter "abgang" - wer am neuen Ort dazustoesst, unter "auftritt".\n'+
-    'FELDER "auftritt" und "abgang": Nur ausfuellen, wenn es WIRKLICH geschieht - jemand tritt ein, jemand verlaesst den Ort. Eine blosse Erwaehnung ("der Wirt kommt sicher gleich") gehoert NICHT hinein. Anwesend sind derzeit: '+W.npcs.map(function(n){return n.name;}).join(', ')+'.\n'+
+    'FELDER "auftritt" und "abgang": Eine blosse Ankuendigung ("der Wirt kommt sicher gleich") gehoert nicht hinein - der Auftritt selbst schon. Anwesend sind derzeit: '+W.npcs.map(function(n){return n.name;}).join(', ')+'.\n'+
     'FELD "wer": '+(autoModus?'Es MUSS eine Figur sprechen, niemals STOP.':'STOP bedeutet, dass niemand mehr spricht und der Held wieder dran ist.')+'\n'+
     'FELD "weiter": true, wenn unmittelbar noch eine ANDERE Figur reagieren sollte, sonst false.';
 
   var text=await frageKI(instruction);
   var j2=jsonAus(text), z=j2?null:felderAus(text);
+  // Fuer /roh aufheben: ohne Blick auf die Rohantwort ist nicht zu erkennen,
+  // ob ein Feld fehlte, leer war oder die Antwort abgeschnitten wurde.
+  S.letzteRohantwort=String(text||'');
+  S.letzteJsonOk=!!j2;
   var wer      = j2?hole(j2,['wer'],''):(z['WER']||'');
   var antwort  = entkleide(j2?hole(j2,['antwort'],''):(z['ANTWORT']||''));
   var stimmung = einWort(j2?hole(j2,['stimmung'],''):(z['STIMMUNG']||''));
@@ -1690,6 +1697,8 @@ var BEFEHLE=[
    fn:function(m){ stilBefehl(m[1]); }},
   {muster:/^\/quelle\b\s*:?\s*([\s\S]*)$/i,     hilfe:['/quelle','Bildquelle wechseln (öffnet die Einstellungen)'],
    fn:function(m){ quelleBefehl(m[1]); }},
+  {muster:/^\/roh\b/i,                          hilfe:['/roh','zeigt die letzte Antwort der Regie im Original — zur Fehlersuche'],
+   fn:function(){ zeigeRohantwort(); }},
   {muster:/^\/ort\s*:?\s*([\s\S]*)$/i,          hilfe:['/ort: …','an einen anderen Ort wechseln (ohne Angabe: Ort-Menü)'],
    fn:function(m){ var t=entkleide(m[1]); if(!t){oeffneOrtMenu();return;} if(S.wartet){sysZeile('— Bitte kurz warten —');return;} ortWechseln(t); }},
   {muster:/^\/perspektive\s*:?\s*([\s\S]*)$/i,   hilfe:['/perspektive: ich|er','Erzählweise wechseln (ohne Angabe: aktuelle anzeigen)'],
@@ -1707,6 +1716,29 @@ function befehlVerarbeitet(txt){
     if(m){ BEFEHLE[i].fn(m); return true; }
   }
   return false;
+}
+// Zeigt, was die Regie zuletzt wirklich geantwortet hat, und was davon
+// angekommen ist. Damit laesst sich unterscheiden: Feld fehlte, Feld war leer,
+// oder die Antwort brach ab.
+function zeigeRohantwort(){
+  var roh=S.letzteRohantwort||'';
+  if(!roh){ sysZeile('Noch keine Antwort der Regie da.'); return; }
+  var j=jsonAus(roh);
+  var felder=['wer','antwort','stimmung','weiter','auftritt','abgang','ortwechsel','kleidung','ortaenderung','bild','handlung','fakt'];
+  var zeilen=felder.map(function(f){
+    var wert=j?j[f]:undefined;
+    var da=(wert!==undefined&&wert!==null&&String(wert).trim()!=='');
+    return (da?'✓ ':(wert===undefined?'— ':'· '))+f+(da?': '+String(wert).substring(0,60):'');
+  });
+  var g=el('gespraech');
+  var z=document.createElement('div');
+  z.className='zeile hilfe';
+  z.innerHTML='<div class="txt"><b>LETZTE ANTWORT DER REGIE</b><br>'+
+    'Als JSON lesbar: '+(S.letzteJsonOk?'ja':'nein — der Zeilenparser hat übernommen')+'<br>'+
+    'Länge: '+roh.length+' Zeichen'+(/\}\s*$/.test(roh.trim())?'':' · <b>endet nicht mit }</b> — vermutlich abgeschnitten')+'<br><br>'+
+    zeilen.map(escapeHtml).join('<br>')+
+    '<br><br><b>ORIGINAL</b><br>'+escapeHtml(roh.substring(0,900))+(roh.length>900?' …':'')+'</div>';
+  g.appendChild(z);scrolle();
 }
 function zeigeHilfe(){
   var g=el('gespraech');
@@ -2664,7 +2696,7 @@ function migriere(d){
   s.wartet=false;s.bildLaeuft=false;s.bildAusstehend=null;s.npcErscheint=false;
   s.bildGeneriert=false;s.bildZaehler=0;s.imSpiel=true;
   s.autoAktiv=false;s.autoLaeuft=false;s.autoForceIdx=null;
-  s.letzteBildUrl='';s.bildPauseBis=0;s.ortLaeuft=false;
+  s.letzteBildUrl='';s.bildPauseBis=0;s.ortLaeuft=false;s.letzteRohantwort='';
   return d;
 }
 function oeffneSpeicher(){
