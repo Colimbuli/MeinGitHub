@@ -506,6 +506,51 @@ ctx.W.perspektive = 'er';
 const kEr = ctx.weltKontext();
 pruefe('Kontext nennt in der Er-Form den Namen', /Julian greift/.test(kEr), kEr.split('\n').filter(z => /ERZAEHLWEISE/.test(z))[0]);
 
+console.log('\n— Welterschaffung —');
+// Alle Antwortformen, die in der Praxis vorkommen, muessen zu einer
+// spielbaren Welt fuehren - und eine unvollstaendige darf nicht stillschweigend
+// zu Platzhaltern werden.
+const frischeWelt = () => {
+  ctx.W = { protagonist: { name: '', herkunft: '', beruf: '', eigenart: '', aussehen: '', kleidung: '' },
+            stadt: '', rahmenhandlung: '', rahmenhandlungOriginal: '', perspektive: 'er', ort: null, npcs: [] };
+};
+const weltJson = JSON.stringify({
+  held: { name: 'Julian Voss', herkunft: 'Graz', beruf: 'Apotheker', eigenart: 'summt' },
+  stadt: 'Wien', rahmenhandlung: 'Julian kommt nach Wien.',
+  ort: { name: 'Das Kabinett', geschichte: 'Spiegel und Staub.', bild: 'she looks up' },
+  npc: { name: 'Marcelle', rolle: 'Gastgeberin', aussehen: 'dark hair', kleidung: 'a silk robe',
+         person: 'Elegant.', stimmung: 'verspielt', eroeffnung: 'Sie sind spät.' }
+});
+
+frischeWelt(); ctx.verarbeiteWelt(weltJson);
+pruefe('JSON: Held übernommen', ctx.W.protagonist.name === 'Julian Voss');
+pruefe('JSON: Ort übernommen', ctx.W.ort.name === 'Das Kabinett');
+pruefe('JSON: Person übernommen', ctx.W.npcs[0].name === 'Marcelle');
+pruefe('JSON: Stimmung und Kleidung gesetzt', ctx.S.stimmung[0] === 'verspielt' && ctx.S.kleidung[0] === 'a silk robe');
+pruefe('JSON: Seed gesetzt', ctx.S.seed >= 1);
+pruefe('JSON: Verlauf und Gedächtnis leer', ctx.S.verlauf.length === 0 && ctx.S.fakten.length === 0);
+
+frischeWelt(); ctx.verarbeiteWelt('```json\n' + weltJson + '\n```');
+pruefe('JSON im Codeblock geht auch', ctx.W.npcs[0].name === 'Marcelle');
+
+frischeWelt();
+ctx.verarbeiteWelt('NAME: Egon\nSTADT: Prag\nORT_NAME: Der Hof\nNPC_NAME: Ida\nNPC_EROEFFNUNG: Hallo!');
+pruefe('altes KEY-Format wird noch verstanden', ctx.W.protagonist.name === 'Egon' && ctx.W.npcs[0].name === 'Ida');
+
+// Abgeschnittene Antwort: Platzhalter, aber sichtbar gemacht
+frischeWelt();
+ctx.verarbeiteWelt(weltJson.substring(0, 150));
+pruefe('abgeschnittene Antwort ergibt trotzdem eine spielbare Welt',
+  !!ctx.W.ort && ctx.W.npcs.length === 1);
+pruefe('und sie fällt auf Platzhalter zurück', ctx.W.npcs[0].name === 'Ein Fremder', ctx.W.npcs[0].name);
+
+// Die angeforderte Textmenge bestimmt die Erzeugungsdauer
+pruefe('Welt-Prompt fordert keine überlangen Texte mehr',
+  !/mindestens 8 vollstaendige|5 bis 10 Saetze/.test(src));
+const zeitgrenzen = [...src.matchAll(/frageKI\([^,)]*,\s*(\d{4,6})\)/g)].map(m => Number(m[1]));
+pruefe('kein Textaufruf wartet länger als 150s', Math.max(...zeitgrenzen) <= 150000, zeitgrenzen.join(', '));
+pruefe('Welterschaffung meldet vergangene Sekunden', /Erfinde Welt… '\+Math\.round/.test(src));
+
 console.log('\n— Größe der Anweisung —');
 // Die Anweisung an die KI wuchs mit jedem gespielten Zug, bis der Dienst in
 // die Zeitueberschreitung lief. Verlauf und Gedaechtnis sind jetzt gedeckelt.

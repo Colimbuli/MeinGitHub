@@ -168,7 +168,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.25</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.26</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -1113,10 +1113,10 @@ async function weltErstellen(){
     '{\n'+
     '  "held": {"name":"Vor- und Nachname","herkunft":"Geburtsstadt","beruf":"Beruf","eigenart":"schrullige Eigenart"},\n'+
     '  "stadt": "europaeische Stadt",\n'+
-    '  "rahmenhandlung": "Ausfuehrliche deutsche Einfuehrung, mindestens 8 vollstaendige Saetze.",\n'+
+    '  "rahmenhandlung": "deutsche Einfuehrung, 5 bis 7 Saetze",\n'+
     '  "ort": {\n'+
     '    "name": "Name des Ortes",\n'+
-    '    "geschichte": "Atmosphaerische deutsche Geschichte des Ortes und seiner Person, 5 bis 10 Saetze.",\n'+
+    '    "geschichte": "atmosphaerische deutsche Beschreibung des Ortes, 3 bis 5 Saetze",\n'+
     '    "bild": "english description of the OPENING scene when the hero arrives - what the person is DOING, plus setting, objects and lighting. An action, NOT the appearance. No art style."\n'+
     '  },\n'+
     '  "npc": {\n'+
@@ -1130,12 +1130,28 @@ async function weltErstellen(){
     '  }\n'+
     '}';
 
+  // Ohne Rueckmeldung sieht ein langer Aufruf aus wie ein Absturz.
+  var seit=Date.now();
+  var ticker=setInterval(function(){
+    setStatus('Erfinde Welt… '+Math.round((Date.now()-seit)/1000)+'s');
+  },1000);
   try{
-    var text=await frageKI(p,300000);
+    var text=await frageKI(p,150000);
+    clearInterval(ticker);
     verarbeiteWelt(text);
   }catch(e){
+    clearInterval(ticker);
+    var m=String((e&&e.message)||e);
     setStatus('Fehler bei der Welt-Generierung.');
-    zeigeFehler('Welt erschaffen',e);
+    if(/Timeout|Zeitüberschreitung/i.test(m)){
+      var box=el('fehlerbox');
+      box.textContent='⏱ Der Textdienst von Perchance hat nicht rechtzeitig geantwortet ('+
+        Math.round((Date.now()-seit)/1000)+'s). Das liegt nicht an deiner Eingabe. '+
+        'Einfach noch einmal auf ✦ WELT ERSCHAFFEN ✦ drücken — meist klappt der zweite Versuch.';
+      box.style.display='block';
+    }else{
+      zeigeFehler('Welt erschaffen',e);
+    }
     freigebenErstellen();
   }
 }
@@ -1143,11 +1159,14 @@ async function weltErstellen(){
 function verarbeiteWelt(text){
   if(!text){setStatus('KI-Antwort leer.');freigebenErstellen();return;}
   var j=jsonAus(text), z=j?null:felderAus(text);
-  function f(pfad,flach,ersatz){
-    return j?hole(j,pfad,ersatz):(z[flach]||ersatz);
+  var luecken=[];
+  function f(pfad,flach,ersatz,label){
+    var v=j?hole(j,pfad,''):((z&&z[flach])||'');
+    if(!v){ if(label)luecken.push(label); return ersatz; }
+    return v;
   }
 
-  W.protagonist.name     = f(['held','name'],'NAME','Egon Pfifferling');
+  W.protagonist.name     = f(['held','name'],'NAME','Egon Pfifferling','Name des Helden');
   W.protagonist.herkunft = f(['held','herkunft'],'HERKUNFT','Hameln');
   W.protagonist.beruf    = f(['held','beruf'],'BERUF','Reisender');
   W.protagonist.eigenart = f(['held','eigenart'],'EIGENART','spricht in Sprichwoertern');
@@ -1157,19 +1176,19 @@ function verarbeiteWelt(text){
   W.rahmenhandlung       = f(['rahmenhandlung'],'RAHMENHANDLUNG','');
 
   W.ort={
-    name:       f(['ort','name'],'ORT_NAME','Ein Ort'),
+    name:       f(['ort','name'],'ORT_NAME','Ein Ort','Name des Ortes'),
     geschichte: f(['ort','geschichte'],'ORT_GESCHICHTE','Dieser Ort birgt Geschichten.'),
     bildPrompt: f(['ort','bild'],'ORT_BILD','the person stands quietly in the foreground, european setting behind them')
   };
 
   var npc={
-    name:         f(['npc','name'],'NPC_NAME','Ein Fremder'),
+    name:         f(['npc','name'],'NPC_NAME','Ein Fremder','Name der Person'),
     rolle:        f(['npc','rolle'],'NPC_ROLLE','Bewohner'),
     aussehen:     f(['npc','aussehen'],'NPC_AUSSEHEN','an adult with an ordinary but memorable face'),
     kleidung:     f(['npc','kleidung'],'NPC_KLEIDUNG','simple everyday clothing'),
     person:       f(['npc','person'],'NPC_PERSON','zurueckhaltend, aber vielschichtig'),
     grundstimmung:einWort(f(['npc','stimmung'],'NPC_STIMMUNG','neugierig')),
-    eroeffnung:   f(['npc','eroeffnung'],'NPC_EROEFFNUNG','Oh – Besuch. Das passiert hier selten.')
+    eroeffnung:   f(['npc','eroeffnung'],'NPC_EROEFFNUNG','Oh – Besuch. Das passiert hier selten.','Eröffnungssatz')
   };
   setzeNpcs([npc]);
 
@@ -1188,7 +1207,14 @@ function verarbeiteWelt(text){
   el('storyEdit').value=rahmen;
   sb.style.display='block';
 
-  setStatus('✦ Welt bereit ✦');
+  if(luecken.length){
+    var fb=el('fehlerbox');
+    fb.textContent='⚠ Die Antwort kam unvollständig zurück — es fehlten: '+luecken.join(', ')+
+      '. Dafür stehen jetzt Platzhalter. Du kannst so spielen, aber ✦ WELT ERSCHAFFEN ✦ noch einmal '+
+      'zu drücken bringt meist eine vollständige Welt.';
+    fb.style.display='block';
+  }
+  setStatus(luecken.length?'✦ Welt bereit (mit Lücken) ✦':'✦ Welt bereit ✦');
   el('ladebar').classList.remove('scan');
   el('ladefill').style.width='100%';
   el('spielbtn').style.display='inline-block';

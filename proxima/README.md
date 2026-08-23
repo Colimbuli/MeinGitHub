@@ -268,6 +268,17 @@ Die Feldreihenfolge ist deshalb kein Zufall -- die kurzen Zustandsfelder stehen 
 Fliesstextfeldern `bild`, `handlung` und `fakt`. Wird eine Antwort abgeschnitten, faellt weg was
 hinten steht, und das sollen nicht die Felder sein, die das Spiel weiterbewegen.
 
+### Wenn die Welterschaffung haengt
+
+Sie ist der Aufruf mit der laengsten angeforderten Ausgabe und damit der anfaelligste. Die
+Wartezeit lag bei fuenf Minuten ohne jede Rueckmeldung -- das sah aus wie ein Absturz. Jetzt:
+hoechstens 150 Sekunden, mit laufendem Sekundenzaehler im Statustext, und die angeforderten Texte
+sind kuerzer (5 bis 7 statt mindestens 8 Saetze, 3 bis 5 statt 5 bis 10).
+
+Laeuft sie trotzdem in die Zeitueberschreitung, sagt die Meldung ausdruecklich, dass es nicht an
+der Eingabe liegt, und rät zum zweiten Versuch. Kommt die Antwort unvollstaendig zurueck, nennt
+der Generator die fehlenden Felder, statt stillschweigend Platzhalter einzusetzen.
+
 ### Wenn die KI nicht rechtzeitig antwortet
 
 Die Anweisung an die Regie wuchs mit jedem gespielten Zug: Verlauf, Gedaechtnis und
