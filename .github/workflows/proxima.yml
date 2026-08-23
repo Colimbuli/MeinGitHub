@@ -1,0 +1,27 @@
+# Der Generator zieht seinen Quelltext bei jedem Seitenaufruf aus dem Zweig
+# main. Ein Fehler dort ist deshalb sofort im laufenden Generator sichtbar —
+# darum läuft der Test bei jedem Push und in jedem Pull Request.
+name: PROXIMA
+
+on:
+  push:
+    paths:
+      - 'proxima/**'
+      - '.github/workflows/proxima.yml'
+  pull_request:
+    paths:
+      - 'proxima/**'
+      - '.github/workflows/proxima.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Logik- und Ladeschalen-Test
+        run: node test/logik.test.js
+        working-directory: proxima

@@ -1,12 +1,17 @@
-// Prüft die reine Logik von proxima.html (Parser, Prompt-Bau, Befehle,
-// Speicherstände) gegen einen minimalen DOM-Stub. Aufruf: node test/logik.test.js
-// Das Skript wird direkt aus der HTML-Datei gezogen, damit der Test nicht
+// Prüft die Logik von proxima.app.html (Parser, Prompt-Bau, Befehle,
+// Speicherstände) und die Ladeschale proxima.html gegen einen minimalen
+// DOM-Stub. Aufruf: node test/logik.test.js
+// Beide Skripte werden direkt aus den HTML-Dateien gezogen, damit der Test nie
 // gegen eine veraltete Kopie läuft.
 const fs = require('fs'), vm = require('vm'), path = require('path');
-const html = fs.readFileSync(path.join(__dirname, '..', 'proxima.html'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, '..', 'proxima.app.html'), 'utf8');
+const laderHtml = fs.readFileSync(path.join(__dirname, '..', 'proxima.html'), 'utf8');
 const block = html.match(/<script>([\s\S]*)<\/script>/);
-if (!block) { console.error('Kein <script>-Block in proxima.html gefunden.'); process.exit(1); }
+if (!block) { console.error('Kein <script>-Block in proxima.app.html gefunden.'); process.exit(1); }
 const src = block[1];
+const laderBlock = laderHtml.match(/<script>([\s\S]*)<\/script>/);
+if (!laderBlock) { console.error('Kein <script>-Block in proxima.html gefunden.'); process.exit(1); }
+const laderSrc = laderBlock[1];
 
 function fakeEl(id) {
   return {
@@ -48,14 +53,18 @@ function pruefe(name, bedingung, extra) {
   else { bad++; console.log('  FAIL ' + name + (extra ? '  → ' + extra : '')); }
 }
 
-console.log('\n— Perchance-Syntax im Markup —');
-// Perchance wertet den HTML-Bereich als Vorlage aus: ein eingeklammertes Wort
-// gilt dort als Listenverweis und lässt den Generator mit Syntaxfehler abbrechen.
-// Das betrifft Attribute, Text UND Kommentare — nur <script> und <style> sind frei.
+console.log('\n— Perchance-Syntax in der Ladeschale —');
+// Beim Laden steht nur proxima.html im HTML-Bereich. Diesen Bereich wertet
+// Perchance als Vorlage aus: ein eingeklammertes Wort gilt dort als
+// Listenverweis und lässt den Generator mit Syntaxfehler abbrechen. Das
+// betrifft Attribute, Text UND Kommentare — nur <script> und <style> sind frei.
+// proxima.app.html kommt erst zur Laufzeit ins DOM und wird nicht mehr
+// abgetastet; dort sind eckige Klammern wieder erlaubt.
 const markup = html.replace(/<script>[\s\S]*?<\/script>/g, '').replace(/<style>[\s\S]*?<\/style>/g, '');
+const laderMarkup = laderHtml.replace(/<script>[\s\S]*?<\/script>/g, '').replace(/<style>[\s\S]*?<\/style>/g, '');
 // Entities wie der Browser auflösen: &#91; wird zu [, BEVOR Perchance abtastet.
 // Ein Escape im Quelltext hilft hier also nicht — nur der Verzicht auf Klammern.
-const dekodiert = markup
+const dekodiert = laderMarkup
   .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
   .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)))
   .replace(/&lsqb;|&lbrack;/g, '[').replace(/&rsqb;|&rbrack;/g, ']');
@@ -63,16 +72,25 @@ const listenVerweise = dekodiert.match(/\[[A-Za-zÄÖÜäöüß_][^\]]*\]/g) || 
 pruefe('keine eckigen Klammern im Start-Markup, auch nicht als Entity', listenVerweise.length === 0, listenVerweise.join(' '));
 const inlineWahl = dekodiert.match(/\{[^}]*\}/g) || [];
 pruefe('keine geschweiften Klammern im Start-Markup', inlineWahl.length === 0, inlineWahl.join(' '));
-pruefe('Hinweis auf eckige Klammern bleibt als Wortlaut erhalten', markup.includes('in eckigen Klammern'));
 
 // Perchance liest den Klammerinhalt als JS-Ausdruck — auch im <script>-Block.
 // ['a','b'] und [i] sind gültiges JavaScript und stören nicht; zwei nackte
 // Wörter wie [eckigen Klammern] sind ein Syntaxfehler und legen den
 // Generator lahm. In Zeichenketten deshalb \x5B und \x5D schreiben.
-const nackteWorte = (html.match(/\[[^\]\n]*\]/g) || []).filter(k =>
+const nackteWorte = (laderHtml.match(/\[[^\]\n]*\]/g) || []).filter(k =>
   /^\[\s*[A-Za-zÄÖÜäöüß_][A-Za-zÄÖÜäöüß0-9_]*(\s+[A-Za-zÄÖÜäöüß_][A-Za-zÄÖÜäöüß0-9_]*)+\s*\]$/.test(k));
-pruefe('keine nackten Wortfolgen in eckigen Klammern (ganze Datei)', nackteWorte.length === 0, nackteWorte.join(' '));
+pruefe('keine nackten Wortfolgen in eckigen Klammern (Ladeschale)', nackteWorte.length === 0, nackteWorte.join(' '));
+pruefe('Ladeschale zeigt auf proxima.app.html', laderHtml.includes("pfad: 'proxima/proxima.app.html'"));
+pruefe('Hinweis auf eckige Klammern bleibt als Wortlaut erhalten', markup.includes('in eckigen Klammern'));
 pruefe('Version im Startbildschirm ablesbar', /V\d+\.\d+/.test(markup));
+
+// Schriften von fremden Servern schicken die IP jedes Besuchers dorthin; das
+// soll nicht unbemerkt zurueckkommen.
+const externeSchrift = /@import\s+url\(\s*['"]?https?:|<link[^>]+fonts\./i;
+pruefe('Generator laedt keine externe Schrift', !externeSchrift.test(html), (html.match(externeSchrift) || [''])[0]);
+pruefe('Ladeschale laedt keine externe Schrift', !externeSchrift.test(laderHtml), (laderHtml.match(externeSchrift) || [''])[0]);
+pruefe('Datenschutzblock steht in den Einstellungen',
+  /function datenschutzHtml/.test(html) && /datenschutzHtml\(\);/.test(html));
 
 console.log('\n— Stapelreihenfolge —');
 // Modale müssen über dem Startbildschirm liegen, sonst öffnen sich
@@ -852,8 +870,128 @@ pruefe('Stimmungen aus NPCs abgeleitet', neu.stand.stimmung[0] === 'heiter');
 pruefe('transiente Flags zurückgesetzt', neu.stand.bildLaeuft === false && neu.stand.autoAktiv === false && neu.stand.imSpiel === true);
 pruefe('Held-Aussehen ergänzt', neu.welt.protagonist.aussehen === '');
 
-// Der asynchrone Teil (Quellenwechsel) laeuft zum Schluss, danach die Auswertung.
-laufen().then(() => {
+// ── Ladeschale ────────────────────────────────────────────────────────────
+// Die Schale wird im selben Verfahren geprüft wie der Generator: Skript aus
+// der HTML-Datei ziehen, in einen DOM-Stub setzen, Netz durch einen Stummel
+// ersetzen. Sie startet beim Auswerten von selbst — deshalb erst warten,
+// dann prüfen.
+function netzStummel(routen) {
+  const rufe = [];
+  const f = async (adresse) => {
+    rufe.push(String(adresse));
+    for (const r of routen) {
+      if (String(adresse).includes(r.wenn)) {
+        if (r.fehler) throw new Error(r.fehler);
+        if (r.status && r.status >= 400) return { ok: false, status: r.status, text: async () => '' };
+        return { ok: true, status: 200, text: async () => r.text };
+      }
+    }
+    return { ok: false, status: 404, text: async () => '' };
+  };
+  f.rufe = rufe;
+  return f;
+}
+
+function ladeUmgebung(fetchStummel, opt) {
+  opt = opt || {};
+  const elemente = {}, angehaengt = [];
+  const mk = id => (elemente[id] = elemente[id] || {
+    id, tag: '', textContent: '', innerHTML: '', className: '', style: {}, parentNode: null,
+    addEventListener(_, f) { this.klick = f; },
+    appendChild(kind) { angehaengt.push(kind); return kind; },
+    removeChild() {}
+  });
+  ['prx-app', 'prx-lade', 'prx-status', 'prx-hinweis', 'prx-knopf', 'prx-balken', 'prx-quelle', 'head', 'body'].forEach(mk);
+  const speicher = Object.assign({}, opt.speicher || {});
+  const ctx = {
+    console: { log() {}, warn() {}, error() {} },
+    setTimeout, clearTimeout, Date, Math, JSON, Object, Array, String, Number, Boolean, RegExp, Promise, Error,
+    encodeURIComponent, decodeURIComponent, isNaN, parseInt, parseFloat,
+    fetch: fetchStummel,
+    location: { search: opt.search || '', hash: opt.hash || '' },
+    localStorage: {
+      getItem: k => (k in speicher ? speicher[k] : null),
+      setItem: (k, v) => { speicher[k] = String(v); },
+      removeItem: k => { delete speicher[k]; }
+    },
+    document: {
+      getElementById: id => elemente[id] || null,
+      createElement: tag => { const e = mk('neu-' + tag + '-' + angehaengt.length); e.tag = tag; return e; },
+      get head() { return elemente.head; },
+      get body() { return elemente.body; }
+    }
+  };
+  ctx.window = ctx; ctx.globalThis = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(laderSrc, ctx);
+  return { ctx, elemente, angehaengt, speicher, rufe: fetchStummel.rufe };
+}
+
+const warte = () => new Promise(r => setTimeout(r, 20));
+const eingehaengt = (angehaengt, tag) => angehaengt.filter(e => e.tag === tag);
+
+async function ladeschalePruefen() {
+  console.log('\n— Ladeschale: Aufteilen —');
+  const nur = ladeUmgebung(netzStummel([]), {});
+  await warte();
+  const teile = nur.ctx.PROXIMA_LADER.teile(html);
+  pruefe('Stil, Markup und Skript werden getrennt', !!teile.stil.trim() && !!teile.markup.trim() && !!teile.skript.trim());
+  pruefe('Markup enthält keine Blöcke mehr', !/<script|<style/i.test(teile.markup));
+  pruefe('Skript ist der Generator', teile.skript.includes('function weltErstellen'));
+  pruefe('Stil ist das Stylesheet', teile.stil.includes('#start'));
+
+  console.log('\n— Ladeschale: Normalfall —');
+  const gut = ladeUmgebung(netzStummel([{ wenn: 'raw.githubusercontent.com', text: html }]), {});
+  await warte();
+  pruefe('holt von raw.githubusercontent.com',
+    gut.rufe[0].startsWith('https://raw.githubusercontent.com/Colimbuli/MeinGitHub/main/proxima/proxima.app.html?v='), gut.rufe[0]);
+  pruefe('genau ein Netzaufruf', gut.rufe.length === 1, gut.rufe.join(' '));
+  pruefe('Markup eingebaut', gut.elemente['prx-app'].innerHTML.includes('id="start"'));
+  pruefe('Stil eingehängt', eingehaengt(gut.angehaengt, 'style').some(e => e.textContent.includes('#start')));
+  pruefe('Generator als script-Element eingehängt, nicht per eval',
+    eingehaengt(gut.angehaengt, 'script').some(e => e.textContent.includes('function weltErstellen')));
+  pruefe('Ladeschirm verschwindet', gut.elemente['prx-lade'].className === 'aus');
+  pruefe('Fassung wird gemerkt', JSON.parse(gut.speicher['proxima.quelltext']).text.includes('weltErstellen'));
+
+  console.log('\n— Ladeschale: Zweig umschalten —');
+  const zweig = ladeUmgebung(netzStummel([{ wenn: 'raw.githubusercontent.com', text: html }]), { hash: '#prx-zweig=probe' });
+  await warte();
+  pruefe('Zweig aus der Adresszeile wird benutzt', zweig.rufe[0].includes('/MeinGitHub/probe/'), zweig.rufe[0]);
+  pruefe('Zweig bleibt gemerkt', zweig.speicher['proxima.zweig'] === 'probe');
+  const zurueck = ladeUmgebung(netzStummel([{ wenn: 'raw.githubusercontent.com', text: html }]),
+    { hash: '#prx-zweig=standard', speicher: { 'proxima.zweig': 'probe' } });
+  await warte();
+  pruefe('standard schaltet zurück', zurueck.rufe[0].includes('/MeinGitHub/main/'), zurueck.rufe[0]);
+
+  console.log('\n— Ladeschale: Rückfallebenen —');
+  const spiegel = ladeUmgebung(netzStummel([
+    { wenn: 'raw.githubusercontent.com', fehler: 'Netzfehler' },
+    { wenn: 'cdn.jsdelivr.net', text: html }
+  ]), {});
+  await warte();
+  pruefe('fällt auf jsDelivr zurück', spiegel.rufe.length === 2 && spiegel.rufe[1].includes('cdn.jsdelivr.net'), spiegel.rufe.join(' '));
+  pruefe('Generator läuft trotzdem', eingehaengt(spiegel.angehaengt, 'script').length === 1);
+
+  const gemerkt = ladeUmgebung(netzStummel([{ wenn: 'http', fehler: 'kein Netz' }]),
+    { speicher: { 'proxima.quelltext': JSON.stringify({ zweig: 'main', zeit: Date.now(), text: html }) } });
+  await warte();
+  pruefe('ohne Netz läuft die gemerkte Fassung', eingehaengt(gemerkt.angehaengt, 'script').length === 1);
+  pruefe('Ladeschirm verschwindet auch dann', gemerkt.elemente['prx-lade'].className === 'aus');
+
+  console.log('\n— Ladeschale: Fehlerfall —');
+  const weg = ladeUmgebung(netzStummel([{ wenn: 'http', status: 404 }]), {});
+  await warte();
+  pruefe('nichts wird eingebaut', eingehaengt(weg.angehaengt, 'script').length === 0);
+  pruefe('Hinweis wird sichtbar', weg.elemente['prx-hinweis'].style.display === 'block');
+  pruefe('404 erklärt das private Repository', weg.elemente['prx-hinweis'].textContent.includes('privat'),
+    weg.elemente['prx-hinweis'].textContent);
+  pruefe('Knopf zum erneuten Versuch erscheint', weg.elemente['prx-knopf'].style.display === 'inline-block');
+
+}
+
+// Der asynchrone Teil (Quellenwechsel, dann die Ladeschale) laeuft zum Schluss,
+// danach die Auswertung.
+laufen().then(ladeschalePruefen).then(() => {
   console.log('\n' + (bad ? '✗ ' + bad + ' Fehler, ' : '✓ alles grün — ') + ok + ' Prüfungen bestanden');
   process.exit(bad ? 1 : 0);
 }).catch(e => {
