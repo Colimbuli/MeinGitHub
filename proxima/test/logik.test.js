@@ -519,6 +519,29 @@ const pos = f => spec[0].indexOf('"' + f + '"');
 pruefe('"antwort" steht ganz vorn', pos('antwort') < pos('auftritt'));
 pruefe('Nachdruck auf den Zustandsfeldern vorhanden', /MUSST du "auftritt" ausfuellen/.test(src));
 
+console.log('\n— Hilfe-Fenster —');
+// Die Hilfe baut sich aus der Registry auf: ein neuer Befehl steht damit
+// automatisch drin, ohne dass jemand die Hilfe nachpflegen muss.
+let hilfeHtml = '';
+const echterInhalt = ctx.document.getElementById;
+ctx.document.getElementById = (id) => {
+  const e = echterInhalt(id);
+  if (id === 'hilfeInhalt') { Object.defineProperty(e, 'innerHTML', { set(v) { hilfeHtml = v; }, get() { return hilfeHtml; } }); }
+  return e;
+};
+ctx.oeffneHilfe();
+ctx.document.getElementById = echterInhalt;
+
+pruefe('Hilfe wird gefüllt', hilfeHtml.length > 200, String(hilfeHtml.length));
+const fehlend = ctx.BEFEHLE.map(b => b.hilfe[0]).filter(n => hilfeHtml.indexOf(n.split(' ')[0].replace(/…/g, '')) < 0);
+pruefe('jeder Befehl aus der Registry steht drin', fehlend.length === 0, fehlend.join(' '));
+pruefe('auch die Beschreibungen', ctx.BEFEHLE.every(b => hilfeHtml.indexOf(b.hilfe[1].substring(0, 20)) >= 0));
+pruefe('erklärt Sprechen und Handeln', /sagt deine Figur/.test(hilfeHtml) && /Handlung/.test(hilfeHtml));
+pruefe('erklärt den Auto-Modus', /stehenden? Regie/i.test(hilfeHtml) && /\/sag:/.test(hilfeHtml));
+pruefe('nennt die Knöpfe der Kopfleiste', /Chronik/.test(hilfeHtml) && /Spielstände/.test(hilfeHtml));
+pruefe('eckige Klammern erscheinen als Zeichen, nicht als Perchance-Ausdruck',
+  hilfeHtml.indexOf('[eckigen Klammern]') >= 0);
+
 console.log('\n— Befehl /roh —');
 const treffRoh = t => { for (const b of ctx.BEFEHLE) { const m = t.match(b.muster); if (m) return b; } return null; };
 pruefe('/roh erkannt', treffRoh('/roh') && treffRoh('/roh').hilfe[0] === '/roh');

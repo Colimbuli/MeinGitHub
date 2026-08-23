@@ -298,6 +298,10 @@ Ist der Schalter aus, verhaelt sich der Auto-Modus wie bisher: nur die uebrigen 
 
 ## Befehle im Spiel
 
+Im Spiel steht die vollstaendige Liste hinter dem Knopf **?** in der Kopfleiste, ebenso ueber
+`/hilfe`. Sie baut sich aus derselben Registry auf, aus der die Befehle auch ausgefuehrt werden --
+ein neuer Befehl steht damit automatisch in der Hilfe, ohne Nachpflege. Ein Test prueft das mit.
+
 | Befehl | Wirkung |
 |---|---|
 | *(einfach schreiben)* | Der Held spricht. Text in `[eckigen Klammern]` ist eine Handlung. |

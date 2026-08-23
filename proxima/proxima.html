@@ -131,6 +131,14 @@ html,body{width:100%;height:var(--hoehe);background:var(--bg);font-family:'EB Ga
 select.feld{cursor:pointer;}
 select.feld option{background:var(--panel);}
 .figblock{border:1px solid rgba(107,76,42,0.4);border-radius:3px;padding:8px 10px;margin-bottom:8px;}
+.hilfeabschnitt{font-family:'Cinzel',serif;font-size:0.62rem;letter-spacing:0.14em;color:var(--gold2);margin:12px 0 6px;}
+.hilfeabschnitt:first-child{margin-top:0;}
+.hilfezeile{display:flex;gap:10px;align-items:baseline;padding:3px 0;border-bottom:1px solid rgba(107,76,42,0.22);}
+.hilfezeile:last-child{border-bottom:none;}
+.hilfebefehl{flex:0 0 40%;color:var(--gold2);font-size:0.82rem;word-break:break-word;}
+.hilfetext{flex:1;color:var(--cream);font-size:0.8rem;line-height:1.45;}
+.hilfeabsatz{font-size:0.82rem;line-height:1.6;color:var(--cream);}
+.hilfeabsatz b{color:var(--gold2);}
 .figtitel{font-family:'Cinzel',serif;font-size:0.66rem;letter-spacing:0.14em;color:var(--gold2);margin-bottom:5px;}
 .reihe{display:flex;gap:7px;}
 .reihe .feld{flex:1;}
@@ -160,7 +168,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.23</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.24</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -218,6 +226,7 @@ select.feld option{background:var(--panel);}
       <button id="bildbtn" onclick="oeffneBildModal()" title="Bild bearbeiten">🖼</button>
       <button id="einstellbtn" onclick="oeffneEinstellungen()" title="Einstellungen">⚙</button>
       <button id="speicherbtn" onclick="oeffneSpeicher()" title="Speichern / Laden">💾</button>
+      <button id="hilfebtn" onclick="oeffneHilfe()" title="Befehle und Hilfe">?</button>
       <button id="undobtn" onclick="undo()" title="Letzten Zug zurücknehmen">⟲</button>
       <button id="npcbtn" onclick="erscheineNPC('')" title="Weitere Person auftreten lassen">+ NPC</button>
       <button id="autobtn" onclick="autoUmschalten()" title="Figuren spielen allein weiter">▶ AUTO</button>
@@ -324,6 +333,16 @@ select.feld option{background:var(--panel);}
       <button onclick="schliesseModal()">SCHLIESSEN</button>
       <button onclick="ortWechselAusMenu()">✦ DORTHIN</button>
       <button class="haupt" onclick="speichereOrt()">✦ ÜBERNEHMEN</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="mHilfe">
+  <div class="modalBox">
+    <div class="modalKopf"><span>? BEFEHLE</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalInhalt" id="hilfeInhalt"></div>
+    <div class="modalNav">
+      <button class="haupt" onclick="schliesseModal()">SCHLIESSEN</button>
     </div>
   </div>
 </div>
@@ -1681,8 +1700,8 @@ async function zeichneBild(opts){
 
 // ── BEFEHLE ───────────────────────────────────
 var BEFEHLE=[
-  {muster:/^\/hilfe\b/i,                        hilfe:['/hilfe','zeigt diese Liste'],
-   fn:function(){ zeigeHilfe(); }},
+  {muster:/^\/hilfe\b/i,                        hilfe:['/hilfe','öffnet dieses Fenster'],
+   fn:function(){ oeffneHilfe(); }},
   {muster:/^\/sag\s*:?\s*([\s\S]*)$/i,          hilfe:['/sag: …','sprich selbst — auch wenn der Auto-Modus läuft'],
    fn:function(m){ var t=entkleide(m[1]); if(!t){sysZeile('/sag: gib an, was du sagen willst.');return;} if(S.wartet){sysZeile('— Bitte kurz warten —');return;} spielerSagt(t); }},
   {muster:/^\/npc\s*(\d+)\s*:?\s*([\s\S]*)$/i,  hilfe:['/npcN: …','verdeckte Regie an Figur N (neue Nummer = neue Figur tritt auf)'],
@@ -1740,15 +1759,43 @@ function zeigeRohantwort(){
     '<br><br><b>ORIGINAL</b><br>'+escapeHtml(roh.substring(0,900))+(roh.length>900?' …':'')+'</div>';
   g.appendChild(z);scrolle();
 }
-function zeigeHilfe(){
-  var g=el('gespraech');
-  var z=document.createElement('div');
-  z.className='zeile hilfe';
-  var html='<div class="txt"><b>BEFEHLE</b><br>';
-  BEFEHLE.forEach(function(b){ html+='<b>'+escapeHtml(b.hilfe[0])+'</b> — '+escapeHtml(b.hilfe[1])+'<br>'; });
-  html+='<br>Alles ohne Schrägstrich sprichst du selbst. Text in \x5Beckigen Klammern\x5D ist eine Handlung.</div>';
-  z.innerHTML=html;
-  g.appendChild(z);scrolle();
+// Die Liste baut sich aus der Befehls-Registry auf: ein neuer Befehl steht
+// damit automatisch in der Hilfe, ohne dass sie nachgepflegt werden muss.
+function oeffneHilfe(){
+  var h='<div class="hilfeabschnitt">SO SPRICHST UND HANDELST DU</div>'+
+    '<div class="hilfeabsatz">Was du ohne Schrägstrich schreibst, <b>sagt deine Figur</b>. '+
+    'Text in \x5Beckigen Klammern\x5D ist eine <b>Handlung</b> statt einer Rede — '+
+    'zum Beispiel <i>\x5Bich lege die Hand auf den Tisch\x5D Und jetzt?</i><br><br>'+
+    'Läuft der <b>Auto-Modus</b>, wird jede Eingabe ohne Schrägstrich zur <b>stehenden Regie</b> '+
+    'für die ganze Szene. Selbst sprechen kannst du dann mit <b>/sag:</b>.</div>'+
+    '<div class="hilfeabschnitt">BEFEHLE</div>';
+  BEFEHLE.forEach(function(b){
+    h+='<div class="hilfezeile"><div class="hilfebefehl">'+escapeHtml(b.hilfe[0])+'</div>'+
+       '<div class="hilfetext">'+escapeHtml(b.hilfe[1])+'</div></div>';
+  });
+  h+='<div class="hilfeabschnitt">WAS DIE HANDLUNG VON SELBST TUT</div>'+
+    '<div class="hilfeabsatz">Erzählt die Regie, dass jemand <b>hereinkommt oder geht</b>, dass der '+
+    '<b>Ort wechselt</b> oder sich jemand <b>umzieht</b>, geschieht das wirklich — die Besetzung, der '+
+    'Raumtitel, das Figurenmenü und das Bild ziehen nach. Abschaltbar in ⚙.<br><br>'+
+    'Bleibt eine solche Änderung aus, zeigt <b>/roh</b>, was die Regie tatsächlich geantwortet hat.</div>'+
+    '<div class="hilfeabschnitt">DIE KNÖPFE OBEN</div>';
+  [['📖','Chronik: Ort, Handlung und die Figuren'],
+   ['👤','Figuren bearbeiten — Name, Aussehen, Kleidung, Stimmung'],
+   ['📍','Ort: Name, Beschreibung, Bildkulisse, Ortswechsel'],
+   ['🎬','Bildstil'],
+   ['🖼','Bild: Prompt, Negativprompt, Seed, neu zeichnen'],
+   ['⚙','Einstellungen: Bildquelle, Bildgröße, Takt, Schreibtempo'],
+   ['💾','Spielstände: vier Plätze, Export und Import'],
+   ['⟲','letzten Zug zurücknehmen'],
+   ['+ NPC','eine weitere Person auftreten lassen'],
+   ['▶ AUTO','die Figuren spielen selbstständig weiter'],
+   ['⌃','Kopfleiste ein- und ausklappen']
+  ].forEach(function(k){
+    h+='<div class="hilfezeile"><div class="hilfebefehl">'+escapeHtml(k[0])+'</div>'+
+       '<div class="hilfetext">'+escapeHtml(k[1])+'</div></div>';
+  });
+  el('hilfeInhalt').innerHTML=h;
+  oeffneModal('mHilfe');
 }
 function sendeFreitext(){
   var feld=el('freitext');
