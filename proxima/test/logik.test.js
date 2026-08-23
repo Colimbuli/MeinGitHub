@@ -506,10 +506,46 @@ ctx.W.perspektive = 'er';
 const kEr = ctx.weltKontext();
 pruefe('Kontext nennt in der Er-Form den Namen', /Julian greift/.test(kEr), kEr.split('\n').filter(z => /ERZAEHLWEISE/.test(z))[0]);
 
+console.log('\n— Größe der Anweisung —');
+// Die Anweisung an die KI wuchs mit jedem gespielten Zug, bis der Dienst in
+// die Zeitueberschreitung lief. Verlauf und Gedaechtnis sind jetzt gedeckelt.
+ctx.W.protagonist = { name: 'Julian', herkunft: 'Wien', beruf: 'Apotheker', eigenart: 'summt', aussehen: '', kleidung: '' };
+ctx.W.npcs = [{ name: 'Ida', rolle: 'Wirtin', aussehen: 'a', kleidung: 'b', person: 'c', grundstimmung: 'heiter' }];
+ctx.S.verlauf = Array.from({ length: 60 }, (_, i) => ({ rolle: 'npc', idx: 0, name: 'Ida', text: 'x'.repeat(900) }));
+ctx.S.kurzKontext = false;
+const vLang = ctx.verlaufText(10);
+pruefe('lange Zeilen werden gekappt', vLang.split('\n').every(z => z.length < 300), String(Math.max(...vLang.split('\n').map(z => z.length))));
+pruefe('nur die angeforderten Zeilen', vLang.split('\n').length === 10);
+ctx.S.kurzKontext = true;
+const vKurz = ctx.verlaufText(10);
+pruefe('im gekürzten Modus noch knapper', vKurz.length < vLang.length, `${vKurz.length} statt ${vLang.length}`);
+
+ctx.S.fakten = Array.from({ length: 24 }, (_, i) => 'Fakt ' + i + ' ' + 'y'.repeat(300));
+ctx.W.rahmenhandlung = 'z'.repeat(3000);
+ctx.W.stadt = 'Wien'; ctx.W.perspektive = 'er';
+ctx.S.handlung = 'h'.repeat(2000);
+const kKurz = ctx.weltKontext();
+ctx.S.kurzKontext = false;
+const kLang = ctx.weltKontext();
+pruefe('Weltkontext ist gedeckelt', kLang.length < 3500, String(kLang.length));
+pruefe('gekürzt ist er kleiner', kKurz.length < kLang.length, `${kKurz.length} statt ${kLang.length}`);
+pruefe('nicht alle 24 Fakten wandern mit', (kLang.match(/Fakt \d+/g) || []).length <= 14,
+  String((kLang.match(/Fakt \d+/g) || []).length));
+pruefe('die jüngsten Fakten sind dabei', kLang.indexOf('Fakt 23') >= 0);
+pruefe('kappe kürzt und markiert', ctx.kappe('abcdefghij', 4) === 'abcd…' && ctx.kappe('ab', 4) === 'ab');
+
+console.log('\n— Zeitüberschreitung heilt sich selbst —');
+ctx.S.kurzKontext = false;
+pruefe('KI-Timeout wird erkannt', ctx.pruefeZeitueberschreitung(new Error('KI-Timeout (90s)')) === true);
+pruefe('und schaltet den kurzen Kontext ein', ctx.S.kurzKontext === true);
+pruefe('ein zweiter Timeout bleibt dabei', ctx.pruefeZeitueberschreitung(new Error('KI-Timeout (150s)')) === true && ctx.S.kurzKontext === true);
+ctx.S.kurzKontext = false;
+pruefe('andere Fehler lösen das nicht aus', ctx.pruefeZeitueberschreitung(new Error('Dienst antwortete HTTP 500')) === false && ctx.S.kurzKontext === false);
+
 console.log('\n— Reihenfolge der Antwortfelder —');
 // Bricht eine Antwort ab, faellt weg was hinten steht. Die Felder, die den
 // Spielzustand aendern, muessen deshalb VOR den langen Fliesstextfeldern stehen.
-const spec = src.match(/Antworte NUR mit einem gueltigen JSON-Objekt[\s\S]*?FELD "wer"/);
+const spec = src.match(/Antworte NUR mit einem gueltigen JSON-Objekt[\s\S]*?veraendern das Spiel wirklich/);
 pruefe('Feldliste gefunden', !!spec);
 const pos = f => spec[0].indexOf('"' + f + '"');
 ['auftritt', 'abgang', 'ortwechsel', 'kleidung', 'ortaenderung'].forEach(f => {

@@ -268,6 +268,21 @@ Die Feldreihenfolge ist deshalb kein Zufall -- die kurzen Zustandsfelder stehen 
 Fliesstextfeldern `bild`, `handlung` und `fakt`. Wird eine Antwort abgeschnitten, faellt weg was
 hinten steht, und das sollen nicht die Felder sein, die das Spiel weiterbewegen.
 
+### Wenn die KI nicht rechtzeitig antwortet
+
+Die Anweisung an die Regie wuchs mit jedem gespielten Zug: Verlauf, Gedaechtnis und
+Ortsbeschreibung waren ungedeckelt. Gemessen an einer laufenden Partie mit zwei Figuren waren das
+rund 10.500 Zeichen pro Zug -- genug fuer eine Zeitueberschreitung.
+
+Alle Bloecke sind jetzt gedeckelt: zehn Verlaufszeilen zu hoechstens 240 Zeichen, die juengsten
+vierzehn Fakten, Vorgeschichte, Handlung und Ortsbeschreibung auf feste Laengen. Dieselbe Partie
+kommt damit auf rund 7.700 Zeichen.
+
+Laeuft trotzdem eine Anfrage in die Zeitueberschreitung, schaltet der Generator selbst auf einen
+**kuerzeren Kontext** um (sechs Zeilen, acht Fakten, knappere Texte -- rund 6.000 Zeichen) und sagt
+es im Dialog. Mit `/nochmal` laesst sich der Zug dann wiederholen. `/roh` zeigt an, welcher Modus
+gerade gilt.
+
 ### Besetzung folgt der Handlung
 
 Erzaehlt die Regie, dass jemand hereinkommt oder den Ort verlaesst, zieht die Besetzung nach: die
