@@ -160,7 +160,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.21</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.22</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -1292,7 +1292,9 @@ function verlaufText(n){
 async function naechsterZug(erzwinge,autoModus){
   var mehrere=W.npcs.length>1;
   var liste=W.npcs.map(function(n,i){
-    return '- NPC'+(i+1)+' = '+n.name+' ('+n.rolle+'). Persoenlichkeit: '+n.person+'. Aktuelle Stimmung: '+S.stimmung[i]+'.';
+    return '- NPC'+(i+1)+' = '+n.name+' ('+n.rolle+'). Persoenlichkeit: '+n.person+
+           '. Aktuelle Stimmung: '+S.stimmung[i]+
+           '. Traegt gerade: '+(S.kleidung[i]||n.kleidung||'unbestimmt')+'.';
   }).join('\n');
   var regieZeilen='';
   for(var i=0;i<W.npcs.length;i++){
@@ -1343,8 +1345,10 @@ async function naechsterZug(erzwinge,autoModus){
     '  "auftritt": "nur wenn in DIESEM Moment eine NEUE Person dazustoesst: Name und Rolle in wenigen Worten, sonst leer",\n'+
     '  "abgang": "nur wenn eine ANWESENDE Person in diesem Moment weggeht: ihr Name, sonst leer",\n'+
     '  "ortwechsel": "nur wenn der Schauplatz JETZT gewechselt wird: Name und kurze Beschreibung des neuen Ortes, sonst leer",\n'+
-    '  "ortaenderung": "nur wenn sich am Ort etwas dauerhaft aendert (Licht erlischt, Regen setzt ein): ein kurzer deutscher Satz, sonst leer"\n'+
+    '  "ortaenderung": "nur wenn sich am Ort etwas dauerhaft aendert (Licht erlischt, Regen setzt ein): ein kurzer deutscher Satz, sonst leer",\n'+
+    '  "kleidung": "nur wenn eine Figur ihre Kleidung in diesem Moment DAUERHAFT aendert: Name, Doppelpunkt, neues Outfit auf ENGLISCH. Mehrere mit Semikolon trennen. Sonst leer."\n'+
     '}\n\n'+
+    'FELD "kleidung": Beispiel "'+((W.npcs[0]&&W.npcs[0].name)||'Name')+': a dark green velvet coat over a white shirt". Nur bei einer bleibenden Aenderung - Ablegen, Anziehen, Umziehen. Kein Eintrag, wenn die Kleidung nur erwaehnt oder beschrieben wird.\n'+
     'FELD "ortwechsel": Nur wenn die Figuren den Schauplatz in diesem Moment WIRKLICH verlassen. Wer dabei NICHT mitkommt, gehoert unter "abgang" - wer am neuen Ort dazustoesst, unter "auftritt".\n'+
     'FELDER "auftritt" und "abgang": Nur ausfuellen, wenn es WIRKLICH geschieht - jemand tritt ein, jemand verlaesst den Ort. Eine blosse Erwaehnung ("der Wirt kommt sicher gleich") gehoert NICHT hinein. Anwesend sind derzeit: '+W.npcs.map(function(n){return n.name;}).join(', ')+'.\n'+
     'FELD "wer": '+(autoModus?'Es MUSS eine Figur sprechen, niemals STOP.':'STOP bedeutet, dass niemand mehr spricht und der Held wieder dran ist.')+'\n'+
@@ -1360,6 +1364,7 @@ async function naechsterZug(erzwinge,autoModus){
   var fakt     = entkleide(j2?hole(j2,['fakt'],''):(z['FAKT']||''));
   var ortwechsel  = entkleide(j2?hole(j2,['ortwechsel'],''):(z['ORTWECHSEL']||''));
   var ortaenderung= entkleide(j2?hole(j2,['ortaenderung'],''):(z['ORTAENDERUNG']||''));
+  var kleidungNeu = entkleide(j2?hole(j2,['kleidung'],''):(z['KLEIDUNG']||''));
   var auftritt = entkleide(j2?hole(j2,['auftritt'],''):(z['AUFTRITT']||''));
   var abgang   = entkleide(j2?hole(j2,['abgang'],''):(z['ABGANG']||''));
   var weiterRoh= j2?j2.weiter:(z['WEITER']||'');
@@ -1371,7 +1376,7 @@ async function naechsterZug(erzwinge,autoModus){
     if(fakt)merkeFakt(fakt);
     if(bild)S.szeneText=bild;
     return {stop:false,held:true,text:antwort,weiter:false,auftritt:auftritt,abgang:abgang,
-            ortwechsel:ortwechsel,ortaenderung:ortaenderung};
+            ortwechsel:ortwechsel,ortaenderung:ortaenderung,kleidung:kleidungNeu};
   }
   var idx=0;
   var m=String(wer).match(/(\d+)/);
@@ -1384,7 +1389,8 @@ async function naechsterZug(erzwinge,autoModus){
   if(bild)S.szeneText=bild;
 
   return {stop:false,idx:idx,text:antwort,stimmung:stimmung,weiter:(weiter&&W.npcs.length>1),
-          auftritt:auftritt,abgang:abgang,ortwechsel:ortwechsel,ortaenderung:ortaenderung};
+          auftritt:auftritt,abgang:abgang,ortwechsel:ortwechsel,ortaenderung:ortaenderung,
+          kleidung:kleidungNeu};
 }
 
 // Leere Angaben kommen in vielen Verkleidungen zurueck.
@@ -1406,6 +1412,33 @@ function findeNpc(name){
 }
 // Die Handlung entscheidet mit, wer am Ort ist: kuendigt sie jemanden an oder
 // laesst jemanden gehen, zieht die Besetzung nach.
+// "Ida: a red silk dress" - auch mehrere, mit Semikolon getrennt. Gilt fuer
+// die Figuren wie fuer den Helden. Unveraenderte Angaben werden verworfen,
+// damit nicht bei jedem Zug dasselbe Bild neu entsteht.
+function kleidungAendern(eintrag){
+  var geaendert=false;
+  String(eintrag||'').split(/\s*;\s*/).forEach(function(teil){
+    var m=teil.match(/^([^:]{1,48}):\s*([\s\S]+)$/);
+    if(!m)return;
+    var name=entkleide(m[1]), outfit=entkleide(m[2]);
+    if(leerAngabe(outfit)||outfit.length<3)return;
+    var pn=String(W.protagonist.name||'').toLowerCase().split(/\s+/)[0];
+    if(pn&&name.toLowerCase().indexOf(pn)>=0){
+      if(String(W.protagonist.kleidung||'').toLowerCase()===outfit.toLowerCase())return;
+      W.protagonist.kleidung=outfit;
+      sysZeile('✦ '+W.protagonist.name+' trägt jetzt: '+outfit+' ✦');
+      geaendert=true;return;
+    }
+    var i=findeNpc(name);
+    if(i<0)return;
+    if(String(S.kleidung[i]||'').toLowerCase()===outfit.toLowerCase())return;
+    S.kleidung[i]=outfit;
+    W.npcs[i].kleidung=outfit;   // damit es auch im Figurenmenü steht
+    sysZeile('✦ '+W.npcs[i].name+' trägt jetzt: '+outfit+' ✦');
+    geaendert=true;
+  });
+  return geaendert;
+}
 // Reihenfolge: erst der Ort, dann wer bleibt und wer dazukommt. Sonst
 // tritt die neue Person noch am alten Schauplatz auf.
 async function folgeHandlung(res){
@@ -1413,6 +1446,13 @@ async function folgeHandlung(res){
   if(CFG.autoBesetzung&&!leerAngabe(res.ortaenderung))ortNotiz(res.ortaenderung);
   if(CFG.autoBesetzung&&!leerAngabe(res.ortwechsel)&&!S.ortLaeuft)await ortWechseln(res.ortwechsel);
   await besetzungAendern(res);
+  // Ein Kleiderwechsel ist sichtbar - deshalb sofort neu zeichnen, nicht erst
+  // beim naechsten Bildtakt.
+  if(CFG.autoBesetzung&&!leerAngabe(res.kleidung)&&kleidungAendern(res.kleidung)){
+    S.bildZaehler=0;
+    autosave();
+    zeichneBild({});
+  }
 }
 async function besetzungAendern(res){
   if(!CFG.autoBesetzung||!res)return;
@@ -2347,7 +2387,7 @@ function oeffneEinstellungen(){
     '<label class="feldlabel"><input type="checkbox" id="cfgAutoHeld"'+(CFG.autoHeld?' checked':'')+
     '> Im Auto-Modus handelt der Held selbst mit</label>'+
     '<label class="feldlabel"><input type="checkbox" id="cfgAutoBesetzung"'+(CFG.autoBesetzung?' checked':'')+
-    '> Figuren treten auf und ab, wenn die Handlung es erzählt</label>'+
+    '> Handlung verändert Ort, Besetzung und Kleidung</label>'+
     '<label class="feldlabel" for="cfgTempo">SCHREIBTEMPO in ms pro Zeichen (0 = sofort)</label>'+
     '<input id="cfgTempo" class="feld" type="number" min="0" max="120" value="'+(Number(CFG.tempo)||0)+'">';
   el('einstellInhalt').innerHTML=html;

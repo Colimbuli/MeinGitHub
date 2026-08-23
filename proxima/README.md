@@ -244,6 +244,20 @@ angehaengt, statt den Ort zu wechseln. Dieselbe Veraenderung wird nicht doppelt 
 Von Hand: im Menue 📍 einen neuen Ort beschreiben und **✦ DORTHIN** druecken, oder `/ort: …`
 schreiben. `/ort` ohne Angabe oeffnet das Menue.
 
+### Kleidung folgt der Handlung
+
+Zieht sich jemand im Verlauf um, legt etwas ab oder wirft sich etwas ueber, traegt die Regie das
+neue Outfit ein: es steht danach im Figurenmenue 👤, in der Chronik und im naechsten Bild -- das
+sofort neu gezeichnet wird, weil ein Kleiderwechsel sichtbar ist.
+
+Damit das ueberhaupt moeglich ist, kennt die Regie jetzt auch, **was jede Figur gerade traegt**.
+Vorher stand das nirgends in ihrem Kontext; sie konnte weder konsistent erzaehlen noch einen
+Wechsel melden.
+
+Unveraenderte Angaben werden verworfen, damit nicht bei jedem Zug dasselbe Bild neu entsteht.
+Der Held kann sich ebenso umziehen. Von Hand geht es weiter mit `/kleidungN: …` oder im
+Figurenmenue.
+
 ### Besetzung folgt der Handlung
 
 Erzaehlt die Regie, dass jemand hereinkommt oder den Ort verlaesst, zieht die Besetzung nach: die

@@ -307,6 +307,45 @@ const laufen = async () => {
   pruefe('abgeschaltet passiert nichts', ctx.W.npcs.length === besetzungVorher);
   ctx.CFG.autoBesetzung = true;
 
+  console.log('\n— Kleidung folgt der Handlung —');
+  // Bisher blieb ein in der Handlung erzaehlter Kleiderwechsel ohne Wirkung:
+  // Figurenmenue, Chronik und Bild zeigten weiter das alte Outfit.
+  ctx.W.protagonist = { name: 'Julian Voss', herkunft: 'Wien', beruf: 'Apotheker', eigenart: 'summt',
+                        aussehen: 'a tall man', kleidung: 'a grey suit' };
+  ctx.W.npcs = [
+    { name: 'Ida Berger', rolle: 'Wirtin', aussehen: 'a', kleidung: 'a linen apron', person: 'c', grundstimmung: 'heiter' },
+    { name: 'Marcelle', rolle: 'Gast', aussehen: 'd', kleidung: 'a travelling coat', person: 'f', grundstimmung: 'müde' }
+  ];
+  ctx.S.kleidung = ['a linen apron', 'a travelling coat'];
+  ctx.S.stimmung = ['heiter', 'müde']; ctx.S.regieAnweisung = ['', ''];
+
+  pruefe('Wechsel wird übernommen', ctx.kleidungAendern('Ida: a red silk dress') === true);
+  pruefe('S.kleidung aktualisiert', ctx.S.kleidung[0] === 'a red silk dress', ctx.S.kleidung[0]);
+  pruefe('auch am NPC selbst — dadurch im Figurenmenü sichtbar', ctx.W.npcs[0].kleidung === 'a red silk dress', ctx.W.npcs[0].kleidung);
+  pruefe('die andere Figur bleibt unberührt', ctx.S.kleidung[1] === 'a travelling coat');
+
+  pruefe('unveränderte Angabe ändert nichts', ctx.kleidungAendern('Ida: a red silk dress') === false);
+  pruefe('Groß- und Kleinschreibung zählt dabei nicht', ctx.kleidungAendern('Ida: A RED SILK DRESS') === false);
+
+  pruefe('mehrere auf einmal', ctx.kleidungAendern('Ida: a black cloak; Marcelle: a wet shawl') === true);
+  pruefe('beide übernommen', ctx.S.kleidung[0] === 'a black cloak' && ctx.S.kleidung[1] === 'a wet shawl',
+    ctx.S.kleidung.join(' | '));
+
+  pruefe('der Held kann sich auch umziehen', ctx.kleidungAendern('Julian: a borrowed evening coat') === true);
+  pruefe('beim Helden gespeichert', ctx.W.protagonist.kleidung === 'a borrowed evening coat', ctx.W.protagonist.kleidung);
+
+  pruefe('unbekannter Name wird verworfen', ctx.kleidungAendern('Konrad: a hat') === false);
+  pruefe('ohne Doppelpunkt wird verworfen', ctx.kleidungAendern('irgendein Fließtext ohne Trenner') === false);
+  pruefe('Leerangabe wird verworfen', ctx.kleidungAendern('Ida: keine') === false);
+  pruefe('zu kurze Angabe wird verworfen', ctx.kleidungAendern('Ida: x') === false);
+
+  // Das neue Outfit muss im Bildprompt landen
+  ctx.S.szeneGlobal = 'a tavern'; ctx.S.stil = ctx.STILE.manga; ctx.S.stilLabel = 'manga';
+  ctx.W.perspektive = 'er';
+  const pK = ctx.bauePrompt({ szene: 'they stand together' });
+  pruefe('neues Outfit steht im Bildprompt', pK.includes('a black cloak'), pK.slice(0, 120));
+  pruefe('altes Outfit ist verschwunden', !pK.includes('a linen apron'));
+
   console.log('\n— Ort folgt der Handlung —');
   // Genau der gemeldete Fall: die Regie schickt die Figuren in den naechsten
   // Raum. Vorher blieb der Schauplatz stehen und die Erzaehlung lief davon.
