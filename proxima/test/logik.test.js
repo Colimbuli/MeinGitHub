@@ -778,6 +778,38 @@ pruefe('alter Stand bekommt ein leeres Register', altStand.stand.beziehungen && 
 pruefe('alter Stand bekommt Mission und Stand als Text',
   altStand.welt.mission === '' && altStand.stand.missionStand === '');
 
+console.log('\n— Mission von Hand —');
+// Das Ziel gehoert dem Spieler: per Befehl und ueber ein eigenes Fenster,
+// erreichbar aus der Chronik.
+// Eigener Sucher: die Befehlstabelle wird weiter unten noch einmal geprueft.
+const befehlZu = t => { for (const b of ctx.BEFEHLE) { const m = t.match(b.muster); if (m) return { b, m }; } return null; };
+pruefe('/mission ist ein eigener Befehl', !!befehlZu('/mission: Den Brief finden'));
+pruefe('/mission kollidiert nicht mit anderen Befehlen',
+  befehlZu('/mission: x').b.hilfe[0] === '/mission: …' && befehlZu('/mission').b.hilfe[0] === '/mission: …');
+ctx.S.imSpiel = true;
+ctx.W.mission = '';
+ctx.S.missionStand = 'alter Stand';
+ctx.missionBefehl('Den Brief vor Mitternacht finden');
+pruefe('Text setzt das Ziel', ctx.W.mission === 'Den Brief vor Mitternacht finden');
+pruefe('ein neues Ziel setzt den Stand zurueck', ctx.S.missionStand === '');
+pruefe('das neue Ziel steht im Gedaechtnis', ctx.S.fakten.some(f => /Das Ziel lautet jetzt/.test(f)), ctx.S.fakten.join(' | '));
+pruefe('das Ziel steht danach im Weltkontext', /Den Brief vor Mitternacht/.test(ctx.weltKontext()));
+ctx.missionBefehl('weg');
+pruefe('„weg" streicht das Ziel', ctx.W.mission === '' && ctx.S.missionStand === '');
+pruefe('ohne Ziel steht keine Mission im Weltkontext', !/MISSION \(das uebergeordnete/.test(ctx.weltKontext()));
+ctx.W.mission = 'Vorheriges Ziel';
+ctx.missionBefehl('');
+pruefe('ohne Text bleibt das Ziel stehen (das Fenster oeffnet sich)', ctx.W.mission === 'Vorheriges Ziel');
+// kappe() haengt ein Auslassungszeichen an, deshalb 401 statt 400.
+pruefe('ein sehr langes Ziel wird gekappt',
+  (ctx.missionBefehl('x'.repeat(900)), ctx.W.mission.length === 401 && ctx.W.mission.endsWith('…')),
+  String(ctx.W.mission.length));
+pruefe('das Missions-Fenster steht im Markup',
+  html.includes('id="mMission"') && html.includes('id="missionZiel"') && html.includes('id="missionStandFeld"'));
+pruefe('die Chronik fuehrt ins Bearbeiten', /ZIEL SETZEN|BEARBEITEN/.test(html) && /oeffneMissionMenu\(\)/.test(html));
+ctx.W.mission = '';
+ctx.S.missionStand = '';
+
 console.log('\n— Werkzeugleiste und Bildmenue —');
 // Bildstil und Bildbearbeitung sind ein Fenster. Zwei Untermenues fuer dieselbe
 // Sache waren einmal zu viel.

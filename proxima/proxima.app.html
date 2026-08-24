@@ -178,7 +178,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.31</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.32</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -307,6 +307,24 @@ select.feld option{background:var(--panel);}
     <div class="modalNav">
       <button onclick="schliesseModal()">SCHLIESSEN</button>
       <button class="haupt" onclick="speichereFiguren()">✦ ÜBERNEHMEN</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="mMission">
+  <div class="modalBox">
+    <div class="modalKopf"><span>✦ MISSION</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalInhalt">
+      <label class="feldlabel" for="missionZiel">ZIEL — worauf die Geschichte zuläuft. Ein Satz, an dem man scheitern kann.</label>
+      <textarea id="missionZiel" class="feld" rows="3"></textarea>
+      <label class="feldlabel" for="missionStandFeld">STAND — wie weit es gediehen ist. Die Regie schreibt hier von selbst fort.</label>
+      <textarea id="missionStandFeld" class="feld" rows="3"></textarea>
+      <div class="hinweis" id="missionHinweis"></div>
+    </div>
+    <div class="modalNav">
+      <button onclick="schliesseModal()">SCHLIESSEN</button>
+      <button onclick="missionLoeschen()" title="Ohne Ziel verfolgen die Figuren eigene Absichten">✕ OHNE ZIEL</button>
+      <button class="haupt" onclick="speichereMission()">✦ ÜBERNEHMEN</button>
     </div>
   </div>
 </div>
@@ -1981,6 +1999,8 @@ var BEFEHLE=[
    fn:function(m){ quelleBefehl(m[1]); }},
   {muster:/^\/roh\b/i,                          hilfe:['/roh','zeigt die letzte Antwort der Regie im Original — zur Fehlersuche'],
    fn:function(){ zeigeRohantwort(); }},
+  {muster:/^\/mission\s*:?\s*([\s\S]*)$/i,      hilfe:['/mission: …','das Ziel der Geschichte setzen (ohne Angabe: Missions-Menü, „weg" streicht es)'],
+   fn:function(m){ missionBefehl(m[1]); }},
   {muster:/^\/ort\s*:?\s*([\s\S]*)$/i,          hilfe:['/ort: …','an einen anderen Ort wechseln (ohne Angabe: Ort-Menü)'],
    fn:function(m){ var t=entkleide(m[1]); if(!t){oeffneOrtMenu();return;} if(S.wartet){sysZeile('— Bitte kurz warten —');return;} ortWechseln(t); }},
   {muster:/^\/perspektive\s*:?\s*([\s\S]*)$/i,   hilfe:['/perspektive: ich|er','Erzählweise wechseln (ohne Angabe: aktuelle anzeigen)'],
@@ -2448,10 +2468,8 @@ function baueChronikNav(){
   b0.onclick=function(){zeigeChronik('ort');};nav.appendChild(b0);
   var b1=document.createElement('button');b1.textContent='HANDLUNG';
   b1.onclick=function(){zeigeChronik('handlung');};nav.appendChild(b1);
-  if(W.mission){
-    var bm=document.createElement('button');bm.textContent='MISSION';
-    bm.onclick=function(){zeigeChronik('mission');};nav.appendChild(bm);
-  }
+  var bm=document.createElement('button');bm.textContent='MISSION';
+  bm.onclick=function(){zeigeChronik('mission');};nav.appendChild(bm);
   var bb=document.createElement('button');bb.textContent='BEZIEHUNGEN';
   bb.onclick=function(){zeigeChronik('beziehungen');};nav.appendChild(bb);
   W.npcs.forEach(function(n,i){
@@ -2479,6 +2497,11 @@ function zeigeChronik(ziel){
     inhalt.style.whiteSpace='pre-wrap';
     inhalt.textContent=(W.mission||'Für diese Geschichte wurde kein Ziel gesetzt.')+
       (S.missionStand?'\n\nStand: '+S.missionStand:'\n\nNoch nichts geschehen.');
+    var bearbeiten=document.createElement('button');
+    bearbeiten.className='haupt';
+    bearbeiten.textContent=W.mission?'✎ BEARBEITEN':'✦ ZIEL SETZEN';
+    bearbeiten.onclick=function(){ schliesseModal(); oeffneMissionMenu(); };
+    el('chronikNav').appendChild(bearbeiten);
   }else if(ziel==='beziehungen'){
     kopf.textContent='📖 BEZIEHUNGEN';
     inhalt.style.whiteSpace='pre-wrap';
@@ -2671,6 +2694,57 @@ function zeigeRaumtitel(){
   var e=el('raumtitel');
   if(e)e.textContent=((W.ort&&W.ort.name)||'Ort').toUpperCase();
 }
+// ── MISSION VON HAND ──────────────────────────
+// Die Regie schreibt den Stand fort, das Ziel selbst gehoert aber dem Spieler:
+// er soll es jederzeit setzen, umschreiben oder ganz streichen koennen.
+function oeffneMissionMenu(){
+  if(!S.imSpiel)return;
+  el('missionZiel').value=W.mission||'';
+  el('missionStandFeld').value=S.missionStand||'';
+  el('missionHinweis').textContent=W.mission
+    ? 'Das Ziel steht in jeder Anweisung an die KI. Änderst du es, zieht die nächste Antwort nach.'
+    : 'Ohne Ziel verfolgt jede Figur eigene Absichten am Ort — die Szene läuft dann auf nichts Bestimmtes zu.';
+  oeffneModal('mMission');
+}
+function speichereMission(){
+  if(!S.imSpiel)return;
+  var vorher=W.mission;
+  W.mission=kappe(el('missionZiel').value.trim(),400);
+  S.missionStand=kappe(el('missionStandFeld').value.trim(),400);
+  schliesseModal();
+  if(W.mission&&W.mission!==vorher){
+    sysZeile('✦ Mission: '+W.mission);
+    merkeFakt('Das Ziel lautet jetzt: '+W.mission);
+  }else if(!W.mission&&vorher){
+    sysZeile('✦ Ohne Ziel — die Figuren verfolgen eigene Absichten.');
+  }
+  aktualisiereUI();
+  autosave();
+}
+function missionLoeschen(){
+  if(!S.imSpiel)return;
+  el('missionZiel').value='';
+  el('missionStandFeld').value='';
+  speichereMission();
+}
+// Ueber den Befehl: mit Text sofort setzen, ohne Text das Fenster oeffnen.
+function missionBefehl(text){
+  var t=entkleide(String(text||'')).trim();
+  if(!t){ oeffneMissionMenu(); return; }
+  if(/^(weg|keine|loeschen|löschen|aus|nichts)$/i.test(t)){
+    var hatte=!!W.mission;
+    W.mission='';S.missionStand='';
+    sysZeile(hatte?'✦ Ohne Ziel — die Figuren verfolgen eigene Absichten.':'Es gab kein Ziel.');
+    aktualisiereUI();autosave();
+    return;
+  }
+  W.mission=kappe(t,400);
+  S.missionStand='';
+  sysZeile('✦ Mission: '+W.mission);
+  merkeFakt('Das Ziel lautet jetzt: '+W.mission);
+  aktualisiereUI();
+  autosave();
+}
 function oeffneOrtMenu(){
   if(!S.imSpiel)return;
   el('ortName').value=(W.ort&&W.ort.name)||'';
@@ -2786,7 +2860,7 @@ function oeffneEinstellungen(){
 // Seit der Umstellung auf die Ladeschale ist die Frage berechtigt, welcher Stand
 // gerade laeuft. Die Schale legt den geholten Quelltext samt Zweig und Zeitpunkt
 // im localStorage ab; hier wird er nur abgelesen.
-var VERSION = 'V7.31';
+var VERSION = 'V7.32';
 // Ohne Browserkonsole — etwa am Handy — muss der Generator selbst sagen koennen,
 // woran es liegt, wenn ein Plugin von Perchance fehlt.
 function pluginLage(){

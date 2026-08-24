@@ -244,6 +244,11 @@ Erobern und Verführen sind ausdrücklich **keine** Mission. Das Ziel steht in j
 KI, und jeder Zug soll es voranbringen, verzögern oder zeigen, was ihm im Weg steht. Der Stand
 wandert mit; nachzulesen in der Chronik unter **MISSION**.
 
+Das Ziel gehört dem Spieler, nicht der KI: **`/mission: …`** setzt es jederzeit neu, **`/mission: weg`**
+streicht es (dann verfolgt jede Figur eigene Absichten), und **`/mission`** ohne Text öffnet ein
+eigenes Fenster mit Ziel und Stand. Dorthin führt auch die Chronik: 📖 → **MISSION** → *✎ BEARBEITEN*.
+Ein neu gesetztes Ziel landet zugleich im Langzeitgedächtnis, damit die Figuren es nicht übersehen.
+
 **Die Beziehungen.** Jede Figur führt eine eigene Haltung zu jeder anderen und zum Helden:
 
 ```
@@ -461,6 +466,7 @@ ein neuer Befehl steht damit automatisch in der Hilfe, ohne Nachpflege. Ein Test
 | `/kleidungN: …` | dauerhaftes Outfit für Figur N (englisch) |
 | `/regie: …` | stehende Regie für die ganze Szene, leer = löschen |
 | `/bild: …` | neues Bild aus eigener Beschreibung |
+| `/mission: …` | das Ziel der Geschichte setzen; `weg` streicht es, ohne Angabe öffnet sich das Missions-Menü |
 | `/stil: …` | Bildstil wechseln (`manga`, `comic`, `aquarell`, `oel`, `realistisch`, `pixel` oder freier Text) — dasselbe geht oben im Bildmenü 🖼 |
 | `/ort: …` | an einen anderen Ort wechseln (ohne Angabe: Ort-Menü) |
 | `/perspektive: ich\|er` | Erzählweise wechseln (ohne Angabe: aktuelle anzeigen) |
