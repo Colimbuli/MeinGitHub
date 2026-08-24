@@ -234,6 +234,24 @@ Zwei Unterschiede sind dagegen hausgemacht und behoben:
 Eine weitere Quelle hinzufügen heißt: einen Eintrag in `BILDQUELLEN` ergänzen. Jede Quelle bekommt
 `{prompt, negativ, seed, breite, hoehe}` und gibt eine Bildadresse zurück — mehr ist der Vertrag nicht.
 
+### Woher die Bildbeschreibung kommt
+
+In den Einstellungen steht ein Schalter: **Bildregie — eigener KI-Aufruf sucht das Bild zum Moment.**
+
+| | aus (Standard) | an |
+|---|---|---|
+| Wer beschreibt das Bild | die Dialog-KI nebenbei, im Feld `bild` desselben Aufrufs | ein eigener Aufruf, der nur nach dem Bild fragt |
+| Kosten | keine zusätzlichen | ein KI-Aufruf je Bild |
+| Trifft den Moment | meist gut | meist genauer, weil die KI beim Antworten nur an das Bild denkt |
+
+Der Bot bekommt Schauplatz, anwesende Figuren mit Stimmung, die bisherige Handlung und die letzten
+vier Züge. Zurück kommt **ein englischer Satz**: Handlung, Körperhaltung, Blickrichtung,
+Kameraeinstellung, Licht. Aussehen, Kleidung, Bildstil und Seed liefert weiterhin `bauePrompt()` —
+sonst würde der Bot die Figuren bei jedem Bild neu erfinden.
+
+Antwortet der Bot nicht oder zu knapp, zeichnet der Generator wie bisher aus der Dialogregie. Ein
+Ausfall kostet also kein Bild. Ein von Hand gesetzter Prompt (`/bild: …`) hat immer Vorrang.
+
 ## Fallstrick beim Bearbeiten
 
 Perchance tastet den HTML-Bereich **einmal beim Laden** ab und liest jeden Klammerinhalt als

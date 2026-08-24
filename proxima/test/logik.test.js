@@ -680,6 +680,34 @@ pruefe('/perspektive: ich erkannt', treff('/perspektive: ich').m[1] === 'ich');
 pruefe('/perspektive ohne Angabe erkannt', !!treff('/perspektive'));
 pruefe('kollidiert nicht mit anderen Befehlen', treff('/perspektive: er').b.hilfe[0].indexOf('/perspektive') === 0);
 
+console.log('\n— Bildregie-Bot —');
+// Der Bot ist ein zweiter KI-Aufruf, der nur nach dem Bild fragt. Er darf die
+// Figuren nicht neu erfinden und muss ausfallen koennen, ohne das Bild zu
+// verhindern.
+pruefe('ist ab Werk aus', ctx.CFG.bildBot === false);
+pruefe('Schalter steht in den Einstellungen', html.includes('id="cfgBildBot"') && html.includes("CFG.bildBot=!!bb.checked"));
+ctx.W.ort = { name: 'Taverne', geschichte: '…', bildPrompt: 'a candlelit tavern' };
+ctx.W.npcs = [{ name: 'Ida', rolle: 'Wirtin', aussehen: 'a woman', kleidung: 'an apron' }];
+ctx.S.stimmung = ['heiter'];
+ctx.S.szeneGlobal = 'a candlelit tavern';
+ctx.S.handlung = 'Ida hat dem Helden Wein eingeschenkt.';
+ctx.S.verlauf = [
+  { rolle: 'npc', idx: 0, text: 'Setz dich, Fremder.', name: 'Ida' },
+  { rolle: 'ich', text: 'Ich setze mich ans Feuer.' }
+];
+const anweisung = ctx.baueBildRegieAnweisung();
+pruefe('nennt den Schauplatz', anweisung.includes('a candlelit tavern'));
+pruefe('nennt die anwesenden Figuren mit Stimmung', anweisung.includes('Ida') && anweisung.includes('heiter'), anweisung.slice(0, 200));
+pruefe('gibt die letzten Zuege mit', anweisung.includes('Setz dich, Fremder.') && anweisung.includes('ans Feuer'));
+pruefe('verbietet Aussehen und Stil', /KEINE Namen/.test(anweisung) && /Kein Bildstil/.test(anweisung));
+pruefe('verlangt einen englischen Satz', /englischen Satz/.test(anweisung));
+
+pruefe('Anfuehrungszeichen fallen weg', ctx.saeubereBildIdee('"she leans over the table, medium shot"') === 'she leans over the table, medium shot');
+pruefe('Codeblock faellt weg', ctx.saeubereBildIdee('```\nwide shot of the tavern\n```') === 'wide shot of the tavern');
+pruefe('Vorrede faellt weg', ctx.saeubereBildIdee('Sure! Here it is:\nScene: close-up of her hands') === 'close-up of her hands');
+pruefe('leere Antwort bleibt leer', ctx.saeubereBildIdee('') === '' && ctx.saeubereBildIdee(null) === '');
+pruefe('zu lange Antwort wird gekuerzt', ctx.saeubereBildIdee('x'.repeat(600)).length <= ctx.BILDBOT_MAX);
+
 console.log('\n— Negativprompt —');
 ctx.S.stilLabel = 'realistisch'; ctx.S.stil = ctx.STILE.realistisch;
 pruefe('Stil-Negativ ergänzt', ctx.baueNegativ().includes('airbrushed skin'));
@@ -957,6 +985,24 @@ function ladeUmgebung(fetchStummel, opt) {
 const warte = () => new Promise(r => setTimeout(r, 20));
 const eingehaengt = (angehaengt, tag) => angehaengt.filter(e => e.tag === tag);
 
+// Der Bot haengt an frageKI und ist damit asynchron: Faellt der Aufruf aus,
+// muss null herauskommen — dann zeichnet der Generator wie bisher aus der
+// Dialogregie weiter.
+async function bildRegiePruefen() {
+  console.log('\n— Bildregie-Bot: Aufruf —');
+  const echteFrage = ctx.frageKI, echteWarnung = ctx.console.warn;
+  ctx.console.warn = function(){};   // der erwartete Ausfall soll den Bericht nicht zumuellen
+  ctx.frageKI = () => Promise.reject(new Error('kein Text-Plugin'));
+  pruefe('Ausfall des Bots gibt null zurueck, statt zu werfen', (await ctx.bildRegie()) === null);
+  ctx.frageKI = () => Promise.resolve('  "a wide shot of the smoky tavern, warm firelight"  ');
+  pruefe('Antwort wird sauber uebernommen',
+    (await ctx.bildRegie()) === 'a wide shot of the smoky tavern, warm firelight');
+  ctx.frageKI = () => Promise.resolve('ok');
+  pruefe('zu kurze Antwort gilt als nichts', (await ctx.bildRegie()) === null);
+  ctx.frageKI = echteFrage;
+  ctx.console.warn = echteWarnung;
+}
+
 async function ladeschalePruefen() {
   console.log('\n— Ladeschale: Aufteilen —');
   const nur = ladeUmgebung(netzStummel([]), {});
@@ -1051,7 +1097,7 @@ async function ladeschalePruefen() {
 
 // Der asynchrone Teil (Quellenwechsel, dann die Ladeschale) laeuft zum Schluss,
 // danach die Auswertung.
-laufen().then(ladeschalePruefen).then(() => {
+laufen().then(bildRegiePruefen).then(ladeschalePruefen).then(() => {
   console.log('\n' + (bad ? '✗ ' + bad + ' Fehler, ' : '✓ alles grün — ') + ok + ' Prüfungen bestanden');
   process.exit(bad ? 1 : 0);
 }).catch(e => {
