@@ -109,6 +109,54 @@
     return { stil: stil, markup: markup, skript: skript };
   }
 
+  // ── Plugin-Bruecke ──────────────────────────────────────────────────────
+  // Perchance stellt die Plugin-Funktionen ai() und image() im Geltungsbereich
+  // des HTML-Bereichs bereit — nicht zwingend als Eigenschaft von window.
+  // Diese Schale steht selbst in diesem Bereich und kann die Namen deshalb
+  // ablesen; der als script-Element eingehaengte Generator laeuft dagegen im
+  // globalen Geltungsbereich und saehe sie dort nicht. Also hier nachreichen,
+  // bevor der Generator startet.
+  var PLUGINS = ['ai', 'image'];
+  var pluginBericht = {};
+
+  function ausUmgebung(name) {
+    // Direkter eval liest den Namen aus der Perchance-Umgebung dieser Schale.
+    // Eigene Platzhalter werden dabei uebersprungen, sonst rufe sich die
+    // Bruecke selbst auf.
+    try { var f = eval(name); if (typeof f === 'function' && !f.prxBruecke) return f; } catch (e) {}
+    try {
+      var r = (typeof root !== 'undefined') ? root : null;
+      if (r && typeof r[name] === 'function' && !r[name].prxBruecke) {
+        return function () { return r[name].apply(r, arguments); };
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  function pluginsBruecken() {
+    PLUGINS.forEach(function (name) {
+      var da = window[name];
+      if (typeof da === 'function' && !da.prxBruecke) { pluginBericht[name] = 'global vorhanden'; return; }
+      var f = ausUmgebung(name);
+      if (f) { window[name] = f; pluginBericht[name] = 'aus der Perchance-Umgebung gebrueckt'; return; }
+      if (typeof da === 'function') { pluginBericht[name] = 'Platzhalter steht, Plugin noch nicht geladen'; return; }
+      // Plugins melden sich manchmal erst spaeter. Der Platzhalter sieht beim
+      // ersten Aufruf noch einmal nach und tauscht sich dann selbst aus.
+      var platz = function () {
+        var spaet = ausUmgebung(name);
+        if (typeof spaet !== 'function') {
+          throw new Error(name + '() ist nicht verfuegbar — Plugin im Generator eingebunden?');
+        }
+        window[name] = spaet;
+        return spaet.apply(this, arguments);
+      };
+      platz.prxBruecke = true;
+      window[name] = platz;
+      pluginBericht[name] = 'Platzhalter gesetzt, Plugin noch nicht geladen';
+    });
+    return pluginBericht;
+  }
+
   var eingebaut = false;
 
   function einbauen(text) {
@@ -116,6 +164,7 @@
     var t = teile(text);
     if (!t.skript.trim()) throw new Error('Die geladene Datei enthält keinen Generator-Code.');
     eingebaut = true;
+    pluginsBruecken();
 
     el('prx-app').innerHTML = t.markup;
 
@@ -215,6 +264,7 @@
   // Zum Nachsehen und Nachhelfen aus der Konsole.
   window.PROXIMA_LADER = {
     cfg: CFG, teile: teile, zweig: zweig, rohUrl: rohUrl, spiegelUrl: spiegelUrl, start: start,
+    plugins: function () { return pluginsBruecken(); },
     neu: function () { return start(true); },
     vergiss: function () { try { localStorage.removeItem(K_TEXT); } catch (e) {} return true; }
   };

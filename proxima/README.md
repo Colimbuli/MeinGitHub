@@ -27,7 +27,15 @@ Funktionen wieder im globalen Namensraum, wo die `onclick`-Attribute des Markups
 Perchance-Plugins `ai()` und `image()` sie erwarten. Für den laufenden Generator ist das
 ununterscheidbar von der früheren Fassung aus einer Datei.
 
-Vier Dinge, die dabei mitgedacht sind:
+**Die Plugin-Brücke.** Perchance stellt `ai()` und `image()` im Geltungsbereich des HTML-Bereichs
+bereit — nicht zwingend als Eigenschaft von `window`. Die Ladeschale steht selbst in diesem
+Bereich und sieht die Namen; der eingehängte Generator läuft im globalen Geltungsbereich und sähe
+sie dort nicht. Deshalb reicht die Schale beide Namen vor dem Start nach `window` durch. Ist ein
+Plugin noch nicht geladen, setzt sie einen Platzhalter, der beim ersten Aufruf noch einmal
+nachsieht und sich dann selbst austauscht. `PROXIMA_LADER.plugins()` in der Browserkonsole sagt,
+was gefunden wurde — steht dort *„Platzhalter gesetzt"*, fehlt das Plugin wirklich im Generator.
+
+Vier weitere Dinge, die mitgedacht sind:
 
 * **Wie schnell eine Änderung ankommt.** `raw.githubusercontent.com` erlaubt fünf Minuten Cache.
   Die Ladeschale hängt einen Zeitstempel im Minutentakt an die Adresse, damit es bei einer Minute

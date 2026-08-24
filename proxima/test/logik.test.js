@@ -978,6 +978,32 @@ async function ladeschalePruefen() {
   pruefe('ohne Netz läuft die gemerkte Fassung', eingehaengt(gemerkt.angehaengt, 'script').length === 1);
   pruefe('Ladeschirm verschwindet auch dann', gemerkt.elemente['prx-lade'].className === 'aus');
 
+  console.log('\n— Ladeschale: Plugin-Bruecke —');
+  // Perchance reicht ai() und image() im Geltungsbereich des HTML-Bereichs
+  // durch. Der als script-Element eingehaengte Generator sieht nur window —
+  // die Schale muss die Namen also dorthin nachreichen.
+  const echtesImage = () => 'bild';
+  const schon = ladeUmgebung(netzStummel([{ wenn: 'raw.githubusercontent.com', text: html }]), {});
+  schon.ctx.image = echtesImage;
+  await warte();
+  pruefe('vorhandenes window.image bleibt unangetastet', schon.ctx.image === echtesImage);
+
+  const ausRoot = ladeUmgebung(netzStummel([{ wenn: 'raw.githubusercontent.com', text: html }]), {});
+  ausRoot.ctx.root = { image: echtesImage };
+  await warte();
+  pruefe('image aus root wird nach window gebrueckt', typeof ausRoot.ctx.image === 'function');
+  pruefe('die Bruecke ruft die echte Funktion', ausRoot.ctx.image && ausRoot.ctx.image({}) === 'bild');
+
+  const ohne = ladeUmgebung(netzStummel([{ wenn: 'raw.githubusercontent.com', text: html }]), {});
+  await warte();
+  pruefe('fehlendes Plugin bekommt einen Platzhalter', typeof ohne.ctx.image === 'function');
+  let gemeldet = '';
+  try { ohne.ctx.image({}); } catch (e) { gemeldet = String(e.message || e); }
+  pruefe('der Platzhalter meldet das fehlende Plugin, statt sich selbst aufzurufen',
+    gemeldet.includes('nicht verfuegbar'), gemeldet);
+  ohne.ctx.root = { image: echtesImage };
+  pruefe('nachgeladenes Plugin wird beim naechsten Aufruf uebernommen', ohne.ctx.image({}) === 'bild');
+
   console.log('\n— Ladeschale: Fehlerfall —');
   const weg = ladeUmgebung(netzStummel([{ wenn: 'http', status: 404 }]), {});
   await warte();
