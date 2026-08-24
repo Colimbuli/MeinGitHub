@@ -1,0 +1,2903 @@
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+
+:root{
+  --panel:#2a1c0e; --border:#6b4c2a; --gold:#d4a033; --gold2:#f0c060;
+  --cream:#f5e8cc; --dim:#9a7a50; --bg:#0e0906; --rot:#9b2020;
+  --hoehe:100vh;
+  /* Schriften aus dem System statt von fonts.googleapis.com: Das Einbinden
+     von dort schickt die IP-Adresse jedes Besuchers an Google — dafuer gab es
+     in Deutschland Abmahnungen. Wer Cinzel und EB Garamond zurueckwill, legt
+     sie selbst gehostet daneben; ein Link zu Google gehoert nicht hierher. */
+  --schrift-titel:'Palatino Linotype','Book Antiqua',Palatino,'Iowan Old Style','URW Palladio L',Georgia,serif;
+  --schrift-text:Garamond,Baskerville,'Hoefler Text','Times New Roman',Georgia,serif;
+}
+@supports(height:100dvh){:root{--hoehe:100dvh;}}
+
+html,body{width:100%;height:var(--hoehe);background:var(--bg);font-family:var(--schrift-text);color:var(--cream);overflow:hidden;}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
+
+/* ── STARTSCREEN ── */
+#start{position:fixed;inset:0;height:var(--hoehe);background:radial-gradient(ellipse at center,#2a1c0e 0%,#0e0906 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:12px;padding:24px 20px 40px;text-align:center;z-index:200;
+  overflow-y:auto;overscroll-behavior:contain;transition:opacity 0.5s;}
+#start::before{content:'';display:block;flex:1 0 12px;}
+#start::after{content:'';display:block;flex:1 0 12px;}
+#start.aus{opacity:0;pointer-events:none;}
+#start h1{font-family:var(--schrift-titel);font-size:clamp(2.5rem,10vw,5rem);font-weight:700;color:var(--gold2);text-shadow:0 0 40px rgba(212,160,51,0.5);letter-spacing:0.22em;}
+.sub{font-family:var(--schrift-titel);font-size:clamp(0.55rem,1.6vw,0.75rem);color:var(--dim);letter-spacing:0.22em;}
+#eingabe-wrap{display:flex;gap:8px;align-items:stretch;max-width:480px;width:100%;}
+#begriffe{flex:1;background:rgba(42,28,14,0.8);border:1px solid var(--border);color:var(--cream);font-family:var(--schrift-text);font-size:0.95rem;padding:8px 12px;outline:none;resize:none;line-height:1.5;}
+#begriffe::placeholder{color:var(--dim);}
+#wuerfelBtn{background:none;border:1px solid var(--border);color:var(--gold2);font-size:1.4rem;padding:6px 12px;cursor:pointer;flex-shrink:0;}
+#wuerfelBtn:hover{background:rgba(212,160,51,0.1);}
+#wuerfelStatus{font-family:var(--schrift-titel);font-size:0.62rem;letter-spacing:0.14em;color:var(--dim);min-height:1em;}
+.startreihe{display:flex;gap:8px;align-items:center;max-width:480px;width:100%;flex-wrap:wrap;}
+.startreihe label{font-family:var(--schrift-titel);font-size:0.62rem;letter-spacing:0.14em;color:var(--dim);flex-shrink:0;}
+#stilwahl,#quelleKurz{background:rgba(42,28,14,0.8);border:1px solid var(--border);color:var(--cream);font-family:var(--schrift-text);font-size:0.88rem;padding:6px 10px;outline:none;cursor:pointer;flex:1;min-width:150px;}
+#stilwahl option,#quelleKurz option{background:var(--panel);}
+#stilEigen{background:rgba(42,28,14,0.8);border:1px solid var(--border);color:var(--cream);font-family:var(--schrift-text);font-size:0.88rem;padding:6px 10px;outline:none;width:100%;}
+#stilEigen:focus,#stilwahl:focus{border-color:var(--gold);}
+.klein{background:none;border:1px solid var(--border);color:var(--dim);font-family:var(--schrift-titel);font-size:0.6rem;letter-spacing:0.1em;padding:6px 10px;cursor:pointer;flex-shrink:0;}
+.klein:hover{color:var(--gold2);border-color:var(--gold);}
+.gbtn{background:none;border:2px solid var(--gold);color:var(--gold2);font-family:var(--schrift-titel);font-size:clamp(0.82rem,2.4vw,0.98rem);letter-spacing:0.16em;padding:12px 30px;cursor:pointer;transition:all 0.2s;}
+.gbtn:hover{background:rgba(212,160,51,0.1);}
+.gbtn:disabled{opacity:0.5;cursor:default;}
+#ladebereich{display:none;flex-direction:column;align-items:center;gap:8px;width:100%;max-width:480px;}
+#ladelabel{font-family:var(--schrift-titel);font-size:0.68rem;letter-spacing:0.18em;color:var(--dim);min-height:1.2em;}
+#ladebar{width:100%;height:4px;background:rgba(107,76,42,0.3);overflow:hidden;position:relative;}
+#ladefill{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));width:0%;transition:width 0.5s;}
+#ladebar.scan::after{content:'';position:absolute;left:-50%;top:0;bottom:0;width:50%;background:linear-gradient(90deg,transparent,var(--gold2),transparent);animation:scan 1.3s linear infinite;}
+@keyframes scan{to{left:150%;}}
+#storybox{background:rgba(42,28,14,0.88);border:1px solid var(--border);padding:12px 16px;max-width:520px;width:100%;font-size:0.84rem;line-height:1.7;font-style:italic;display:none;text-align:left;}
+#storybox strong{font-style:normal;color:var(--gold2);font-family:var(--schrift-titel);font-size:0.8em;letter-spacing:0.1em;}
+#storybox .storyhinweis{font-style:normal;color:var(--dim);font-size:0.68rem;margin:6px 0;letter-spacing:0.02em;}
+#storybox .storyedit{width:100%;min-height:9rem;background:rgba(0,0,0,0.28);border:1px solid var(--border);color:var(--cream);font-family:var(--schrift-text);font-style:italic;font-size:0.84rem;line-height:1.6;padding:8px 10px;outline:none;resize:vertical;}
+#storybox .storyedit:focus{border-color:var(--gold);}
+#fehlerbox{display:none;background:rgba(155,32,32,0.15);border:1px solid var(--rot);color:#e0a0a0;padding:8px 12px;max-width:480px;width:100%;font-size:0.78rem;text-align:left;}
+
+/* ── BÜHNE ── */
+#buehne{position:fixed;inset:0;height:var(--hoehe);z-index:0;}
+#buehne img{width:100%;height:100%;object-fit:contain;object-position:center top;display:block;cursor:zoom-in;transition:opacity 0.6s;}
+#szenelade{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:2;font-family:var(--schrift-titel);font-size:0.7rem;letter-spacing:0.2em;color:var(--dim);display:none;pointer-events:none;text-shadow:0 2px 8px #000;}
+#szenelade.an{display:block;animation:pulse 1.5s infinite;}
+@keyframes pulse{0%,100%{opacity:0.4;}50%{opacity:1;}}
+#vignette{position:fixed;inset:0;height:var(--hoehe);z-index:1;pointer-events:none;background:linear-gradient(to bottom,rgba(14,9,6,0.5) 0%,transparent 20%,transparent 60%,rgba(14,9,6,0.45) 100%),radial-gradient(ellipse at center,transparent 45%,rgba(6,4,2,0.45) 100%);}
+
+/* ── SPIEL ── */
+#spiel{position:fixed;inset:0;height:var(--hoehe);z-index:10;display:none;flex-direction:column;pointer-events:none;}
+#spiel.aktiv{display:flex;}
+#oben{flex:1;position:relative;pointer-events:none;min-height:0;}
+/* Kopfbereich als echte Reihenfolge statt uebereinandergelegter Ebenen:
+   Werkzeuge und NPC-Anzeige teilen sich die erste Zeile, der Titel steht
+   darunter. Sonst laeuft der Titel auf schmalen Displays hinter die Knoepfe. */
+#kopf{position:absolute;top:0;left:0;right:0;z-index:6;pointer-events:none;padding:6px 8px 0;display:flex;flex-direction:column;}
+#kopfInhalt{max-height:70vh;overflow:hidden;transition:max-height 0.3s ease,opacity 0.22s ease;}
+#kopf.zu #kopfInhalt{max-height:0;opacity:0;}
+#kopfschalter{align-self:center;margin-top:3px;pointer-events:all;background:rgba(42,28,14,0.86);border:1px solid var(--border);color:var(--gold2);font-family:var(--schrift-titel);font-size:0.72rem;line-height:1;padding:3px 18px;cursor:pointer;border-radius:0 0 4px 4px;opacity:0.8;transition:all 0.15s;}
+#kopfschalter:hover{background:rgba(212,160,51,0.14);border-color:var(--gold);opacity:1;}
+#kopfreihe{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+#raumtitel{font-family:var(--schrift-titel);font-size:clamp(0.75rem,1.9vw,1.05rem);font-weight:700;letter-spacing:0.18em;color:var(--gold2);text-shadow:0 0 14px rgba(212,160,51,0.6),0 2px 6px rgba(0,0,0,0.9);text-align:center;padding:8px 4px 0;pointer-events:none;}
+#werkzeuge{flex:0 0 auto;pointer-events:all;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;max-width:62%;}
+#werkzeuge button{background:rgba(42,28,14,0.82);border:1px solid var(--border);color:var(--gold2);font-family:var(--schrift-titel);font-size:0.65rem;letter-spacing:0.08em;padding:4px 8px;cursor:pointer;transition:background 0.15s,border-color 0.15s;}
+#werkzeuge button:hover{background:rgba(212,160,51,0.12);border-color:var(--gold);}
+#werkzeuge button:disabled{opacity:0.3;cursor:default;}
+#autobtn.an{background:var(--gold);color:#2a1c0e;border-color:var(--gold2);}
+#npcstatus{flex:1 1 auto;min-width:0;pointer-events:auto;background:rgba(6,4,2,0.7);border:1px solid var(--border);border-radius:3px;padding:4px 8px;font-family:var(--schrift-titel);font-size:0.6rem;letter-spacing:0.06em;color:var(--dim);display:flex;flex-wrap:wrap;gap:4px 8px;align-self:flex-start;}
+#npcstatus .npcchip{display:inline-flex;align-items:center;gap:5px;}
+#npcstatus .npcweg{cursor:pointer;color:var(--dim);border:1px solid var(--border);border-radius:50%;width:14px;height:14px;line-height:12px;text-align:center;font-size:0.62rem;transition:all 0.15s;}
+#npcstatus .npcweg:hover{color:#e08080;border-color:var(--rot);}
+
+/* ── DIALOG ── */
+#unten{background:rgba(42,28,14,0.68);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);border-top:2px solid var(--border);flex-shrink:0;pointer-events:all;display:flex;flex-direction:column;max-height:52vh;}
+#gespraech{padding:10px 14px;overflow-y:auto;flex:1;min-height:120px;max-height:32vh;display:flex;flex-direction:column;gap:8px;}
+.zeile{display:flex;flex-direction:column;gap:2px;}
+.zeile .wer{font-family:var(--schrift-titel);font-size:0.6rem;letter-spacing:0.12em;}
+.zeile.npc .wer{color:var(--gold);}
+.zeile.ich .wer{color:var(--dim);text-align:right;}
+.zeile .txt{font-size:clamp(0.82rem,1.6vw,0.96rem);line-height:1.55;}
+.zeile.npc .txt{color:var(--cream);font-style:italic;}
+.zeile.ich .txt{color:var(--gold2);text-align:right;}
+.zeile .txt .aktion{color:var(--dim);font-style:italic;}
+.zeile.sys .txt{color:var(--dim);font-style:italic;text-align:center;font-size:0.78rem;}
+.zeile.err .txt{color:#e08080;font-style:italic;text-align:center;font-size:0.78rem;}
+.zeile.hilfe .txt{color:var(--dim);font-style:normal;font-size:0.76rem;line-height:1.7;text-align:left;}
+.zeile.hilfe b{color:var(--gold2);font-family:var(--schrift-titel);font-size:0.72rem;letter-spacing:0.06em;}
+#tippt{color:var(--dim);font-style:italic;font-size:0.8rem;padding:2px 0;}
+#interakt{border-top:1px solid var(--border);background:rgba(0,0,0,0.15);padding:8px 10px;display:flex;flex-direction:column;gap:7px;}
+#freitext-wrap{display:flex;gap:7px;}
+#freitext{flex:1;background:rgba(0,0,0,0.4);border:1px solid var(--border);color:var(--cream);font-family:var(--schrift-text);font-size:0.9rem;padding:8px 11px;outline:none;min-width:0;}
+#freitext:focus{border-color:var(--gold);}
+#freitext::placeholder{color:var(--dim);}
+#sendBtn{background:none;border:1px solid var(--gold);color:var(--gold2);font-family:var(--schrift-titel);font-size:0.72rem;letter-spacing:0.08em;padding:6px 16px;cursor:pointer;flex-shrink:0;transition:all 0.13s;}
+#sendBtn:hover{background:rgba(212,160,51,0.12);}
+#sendBtn:disabled{opacity:0.4;cursor:default;}
+
+/* ── MODALE (ein Bauplan für alle) ── */
+/* Muss ueber dem Startbildschirm liegen (z-index 200), sonst oeffnen sich
+   Spielstand- und Einstellungsmenue unsichtbar dahinter. */
+.modal{display:none;position:fixed;inset:0;height:var(--hoehe);background:rgba(6,4,2,0.9);align-items:center;justify-content:center;z-index:300;pointer-events:all;padding:12px;}
+.modal.an{display:flex;}
+.modalBox{background:var(--panel);border:1px solid var(--gold);box-shadow:0 0 80px rgba(212,160,51,0.15);max-width:min(520px,94vw);width:100%;max-height:86vh;display:flex;flex-direction:column;}
+.modalKopf{font-family:var(--schrift-titel);font-size:0.72rem;letter-spacing:0.18em;color:var(--gold);padding:10px 14px 8px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;}
+.modalKopf button{background:none;border:none;color:var(--dim);font-size:1rem;cursor:pointer;transition:color 0.14s;}
+.modalKopf button:hover{color:var(--gold2);}
+.modalInhalt{padding:14px 16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:6px;}
+.modalInhalt.fliess{font-size:0.88rem;line-height:1.7;font-style:italic;color:var(--cream);display:block;}
+.modalNav{display:flex;border-top:1px solid var(--border);flex-wrap:wrap;}
+.modalNav button{flex:1 1 40%;background:none;border:none;border-right:1px solid rgba(107,76,42,0.3);color:var(--dim);font-family:var(--schrift-titel);font-size:0.62rem;letter-spacing:0.1em;padding:10px 6px;cursor:pointer;transition:all 0.14s;}
+.modalNav button:last-child{border-right:none;}
+.modalNav button.haupt{color:var(--gold2);}
+.modalNav button:hover{color:var(--gold2);background:rgba(212,160,51,0.06);}
+.feldlabel{display:block;font-family:var(--schrift-titel);font-size:0.55rem;letter-spacing:0.1em;color:var(--dim);margin:6px 0 2px;}
+.feld{width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);color:var(--cream);font-family:var(--schrift-text);font-size:0.88rem;padding:7px 9px;outline:none;resize:vertical;line-height:1.45;}
+.feld:focus{border-color:var(--gold);}
+select.feld{cursor:pointer;}
+select.feld option{background:var(--panel);}
+.figblock{border:1px solid rgba(107,76,42,0.4);border-radius:3px;padding:8px 10px;margin-bottom:8px;}
+.hilfeabschnitt{font-family:var(--schrift-titel);font-size:0.62rem;letter-spacing:0.14em;color:var(--gold2);margin:12px 0 6px;}
+.hilfeabschnitt:first-child{margin-top:0;}
+.hilfezeile{display:flex;gap:10px;align-items:baseline;padding:3px 0;border-bottom:1px solid rgba(107,76,42,0.22);}
+.hilfezeile:last-child{border-bottom:none;}
+.hilfebefehl{flex:0 0 40%;color:var(--gold2);font-size:0.82rem;word-break:break-word;}
+.hilfetext{flex:1;color:var(--cream);font-size:0.8rem;line-height:1.45;}
+.hilfeabsatz{font-size:0.82rem;line-height:1.6;color:var(--cream);}
+.hilfeabsatz b{color:var(--gold2);}
+.figtitel{font-family:var(--schrift-titel);font-size:0.66rem;letter-spacing:0.14em;color:var(--gold2);margin-bottom:5px;}
+.reihe{display:flex;gap:7px;}
+.reihe .feld{flex:1;}
+.reihe button{background:none;border:1px solid var(--border);color:var(--gold2);font-size:1.05rem;padding:4px 11px;cursor:pointer;flex-shrink:0;}
+.reihe button:hover{background:rgba(212,160,51,0.1);}
+.hinweis{font-size:0.72rem;line-height:1.55;color:var(--dim);font-style:italic;}
+.warnung{font-size:0.72rem;line-height:1.55;color:#d8a86a;border-left:2px solid var(--border);padding-left:8px;}
+.pruefzeile{font-family:var(--schrift-titel);font-size:0.62rem;letter-spacing:0.08em;color:var(--dim);min-height:1.1em;}
+.pruefzeile.ok{color:#8fbf6a;}
+.pruefzeile.fehler{color:#e08080;}
+.slot{display:flex;gap:6px;align-items:center;border:1px solid rgba(107,76,42,0.4);padding:7px 9px;}
+.slot .slotinfo{flex:1;min-width:0;font-size:0.78rem;line-height:1.35;}
+.slot .slotinfo small{display:block;color:var(--dim);font-size:0.66rem;}
+.slot button{background:none;border:1px solid var(--border);color:var(--gold2);font-family:var(--schrift-titel);font-size:0.58rem;letter-spacing:0.08em;padding:5px 8px;cursor:pointer;}
+.slot button:hover{background:rgba(212,160,51,0.1);}
+.slot button:disabled{opacity:0.3;cursor:default;}
+
+::-webkit-scrollbar{width:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+</style>
+
+<!-- BÜHNE -->
+<div id="buehne"><img id="img0" src="" alt="Szenenbild" onclick="oeffneBildModal()"></div>
+<div id="szenelade">✦ SZENE ENTSTEHT… ✦</div>
+<div id="vignette"></div>
+
+<!-- STARTSCREEN -->
+<div id="start">
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.26</div>
+  <h1>PROXIMA</h1>
+  <div id="eingabe-wrap">
+    <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
+    <button id="wuerfelBtn" onclick="wuerfeln()" title="KI-Vorschlag würfeln">⚄</button>
+  </div>
+  <div id="wuerfelStatus"></div>
+  <div class="startreihe">
+    <label for="stilwahl">BILDSTIL</label>
+    <select id="stilwahl" onchange="stilGewechselt()">
+      <option value="manga" selected>Manga / Anime</option>
+      <option value="comic">Westlicher Comic</option>
+      <option value="aquarell">Aquarell</option>
+      <option value="oel">Ölgemälde</option>
+      <option value="realistisch">Fotorealistisch</option>
+      <option value="pixel">Pixel-Art</option>
+      <option value="eigen">Eigener Stil…</option>
+    </select>
+    <input id="stilEigen" type="text" placeholder="z.B. noir ink sketch, high contrast" style="display:none">
+  </div>
+  <div class="startreihe">
+    <label for="perspektive">ERZÄHLWEISE</label>
+    <select id="perspektive" class="feld" style="flex:1;min-width:150px">
+      <option value="er" selected>Er-Perspektive — dein Held ist im Bild zu sehen</option>
+      <option value="ich">Ich-Perspektive — du siehst durch seine Augen</option>
+    </select>
+  </div>
+  <div class="startreihe">
+    <label for="quelleKurz">BILDQUELLE</label>
+    <select id="quelleKurz" onchange="quelleKurzGewechselt()"></select>
+    <button class="klein" onclick="oeffneEinstellungen()">EINSTELLEN…</button>
+  </div>
+  <button class="gbtn" id="erstellbtn" onclick="weltErstellen()">✦ WELT ERSCHAFFEN ✦</button>
+  <button class="gbtn" id="ladebtn" onclick="oeffneSpeicher()" style="display:none">⟳ SPIELSTAND LADEN</button>
+  <div id="ladebereich">
+    <div id="ladelabel">ERSCHAFFE…</div>
+    <div id="ladebar" class="scan"><div id="ladefill"></div></div>
+  </div>
+  <div id="fehlerbox"></div>
+  <div id="storybox"></div>
+  <button class="gbtn" id="spielbtn" onclick="spielStarten()" style="display:none">▶ ABENTEUER BEGINNEN</button>
+</div>
+
+<!-- SPIEL -->
+<div id="spiel">
+  <div id="oben">
+   <div id="kopf">
+    <div id="kopfInhalt">
+    <div id="kopfreihe">
+    <div id="npcstatus"></div>
+    <div id="werkzeuge">
+      <button id="chronikbtn" onclick="zeigeChronik('ort')" title="Chronik">📖</button>
+      <button id="figurbtn" onclick="oeffneFigurMenu()" title="Figuren bearbeiten">👤</button>
+      <button id="ortbtn" onclick="oeffneOrtMenu()" title="Ort bearbeiten">📍</button>
+      <button id="szenebtn" onclick="oeffneSzeneMenu()" title="Bildstil">🎬</button>
+      <button id="bildbtn" onclick="oeffneBildModal()" title="Bild bearbeiten">🖼</button>
+      <button id="einstellbtn" onclick="oeffneEinstellungen()" title="Einstellungen">⚙</button>
+      <button id="speicherbtn" onclick="oeffneSpeicher()" title="Speichern / Laden">💾</button>
+      <button id="hilfebtn" onclick="oeffneHilfe()" title="Befehle und Hilfe">?</button>
+      <button id="undobtn" onclick="undo()" title="Letzten Zug zurücknehmen">⟲</button>
+      <button id="npcbtn" onclick="erscheineNPC('')" title="Weitere Person auftreten lassen">+ NPC</button>
+      <button id="autobtn" onclick="autoUmschalten()" title="Figuren spielen allein weiter">▶ AUTO</button>
+    </div>
+    </div>
+    <div id="raumtitel"></div>
+    </div>
+    <button id="kopfschalter" onclick="kopfUmschalten()" aria-expanded="true" title="Kopfleiste einklappen">⌃</button>
+   </div>
+  </div>
+  <div id="unten">
+    <div id="gespraech" aria-live="polite" onclick="tippenFertig()"></div>
+    <div id="interakt">
+      <div id="freitext-wrap">
+        <!-- Im Start-Markup NIE eine eckige Klammer um Woerter, auch nicht als
+             HTML-Entity: der Browser dekodiert Entities beim Parsen, danach
+             tastet Perchance den Bereich ab und liest den Klammerinhalt als
+             Ausdruck. Den ausfuehrlichen Platzhalter setzt aktualisiereUI()
+             spaeter zur Laufzeit, da ist die Pruefung laengst durch. -->
+        <input id="freitext" type="text" placeholder="Sprich oder handle in eckigen Klammern   ·   /hilfe" onkeydown="if(event.key==='Enter')sendeFreitext()">
+        <button id="sendBtn" onclick="sendeFreitext()">SAGEN</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODALE -->
+<div class="modal" id="mChronik">
+  <div class="modalBox">
+    <div class="modalKopf"><span id="chronikTitel">📖 CHRONIK</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalInhalt fliess" id="chronikInhalt"></div>
+    <div class="modalNav" id="chronikNav"></div>
+  </div>
+</div>
+
+<div class="modal" id="mBild">
+  <div class="modalBox">
+    <div class="modalKopf"><span>🖼 BILD BEARBEITEN</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalInhalt">
+      <label class="feldlabel" for="bildPromptFeld">PROMPT</label>
+      <textarea id="bildPromptFeld" class="feld" rows="6"></textarea>
+      <label class="feldlabel" for="bildNegativFeld">NEGATIVPROMPT</label>
+      <textarea id="bildNegativFeld" class="feld" rows="2"></textarea>
+      <label class="feldlabel"><input type="checkbox" id="bildFest"> Prompt festhalten — Bild folgt dann nicht mehr der Handlung</label>
+      <label class="feldlabel" for="bildSeedFeld">SEED — bleibt fest, damit die Figuren sich ähnlich bleiben</label>
+      <div class="reihe">
+        <input id="bildSeedFeld" class="feld" type="text" inputmode="numeric">
+        <button onclick="wuerfelSeed()" title="Zufalls-Seed">🎲</button>
+      </div>
+      <div class="hinweis" id="bildQuelleInfo"></div>
+    </div>
+    <div class="modalNav">
+      <button onclick="schliesseModal()">SCHLIESSEN</button>
+      <button onclick="bildOeffnen()">↗ ÖFFNEN</button>
+      <button onclick="bildAusSzene()" title="Prompt wieder automatisch aus der Szene bauen">↺ AUS SZENE</button>
+      <button class="haupt" onclick="bildNeuZeichnen()">✦ NEU ZEICHNEN</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="mFigur">
+  <div class="modalBox">
+    <div class="modalKopf"><span>👤 FIGUREN</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalInhalt" id="figurInhalt"></div>
+    <div class="modalNav">
+      <button onclick="schliesseModal()">SCHLIESSEN</button>
+      <button class="haupt" onclick="speichereFiguren()">✦ ÜBERNEHMEN</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="mSzene">
+  <div class="modalBox">
+    <div class="modalKopf"><span>🎬 BILDSTIL</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalInhalt">
+      <label class="feldlabel" for="szeneStil">BILDSTIL — gilt für alle weiteren Bilder</label>
+      <select id="szeneStil" class="feld" onchange="szeneStilGewechselt()"></select>
+      <input id="szeneStilEigen" class="feld" type="text" placeholder="z.B. noir ink sketch, high contrast" style="display:none">
+      <div class="hinweis">Die Kulisse steht jetzt im Ort-Menü 📍, weil sie zum Ort gehört.</div>
+      <div class="hinweis" id="szeneStilHinweis"></div>
+    </div>
+    <div class="modalNav">
+      <button onclick="schliesseModal()">SCHLIESSEN</button>
+      <button class="haupt" onclick="speichereSzene()">✦ ÜBERNEHMEN</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="mOrt">
+  <div class="modalBox">
+    <div class="modalKopf"><span>📍 ORT</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalInhalt">
+      <label class="feldlabel" for="ortName">NAME DES ORTES</label>
+      <input id="ortName" class="feld" type="text">
+      <label class="feldlabel" for="ortGeschichte">BESCHREIBUNG — geht in Chronik und Regie ein</label>
+      <textarea id="ortGeschichte" class="feld" rows="5"></textarea>
+      <label class="feldlabel" for="ortKulisse">KULISSE FÜR BILDER (englisch) — gilt dauerhaft</label>
+      <textarea id="ortKulisse" class="feld" rows="3" placeholder="a dim candlelit tavern, wooden beams, rain against the windows"></textarea>
+      <label class="feldlabel" for="ortWechselFeld">ORTSWECHSEL — neuen Ort beschreiben, dann „✦ DORTHIN"</label>
+      <input id="ortWechselFeld" class="feld" type="text" placeholder="z.B. der verwilderte Innenhof hinter der Küche">
+      <div class="hinweis" id="ortHinweis"></div>
+    </div>
+    <div class="modalNav">
+      <button onclick="schliesseModal()">SCHLIESSEN</button>
+      <button onclick="ortWechselAusMenu()">✦ DORTHIN</button>
+      <button class="haupt" onclick="speichereOrt()">✦ ÜBERNEHMEN</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="mHilfe">
+  <div class="modalBox">
+    <div class="modalKopf"><span>? BEFEHLE</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalInhalt" id="hilfeInhalt"></div>
+    <div class="modalNav">
+      <button class="haupt" onclick="schliesseModal()">SCHLIESSEN</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="mEinstellungen">
+  <div class="modalBox">
+    <div class="modalKopf"><span>⚙ EINSTELLUNGEN</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalInhalt" id="einstellInhalt"></div>
+    <div class="modalNav">
+      <button onclick="schliesseModal()">SCHLIESSEN</button>
+      <button onclick="quellePruefen()">◆ QUELLE TESTEN</button>
+      <button class="haupt" onclick="speichereEinstellungen()">✦ ÜBERNEHMEN</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="mSpeicher">
+  <div class="modalBox">
+    <div class="modalKopf"><span>💾 SPIELSTÄNDE</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalInhalt" id="speicherInhalt"></div>
+    <div class="modalNav">
+      <button onclick="schliesseModal()">SCHLIESSEN</button>
+      <button onclick="exportAnzeigen()">↧ EXPORT</button>
+      <button class="haupt" onclick="importStand()">↥ IMPORT</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  PROXIMA V7 — Ein Ort, mehrere autonome Figuren
+//  Freitext-Dialog, Schlagabtausch, Stimmung, Kleidung,
+//  austauschbare Bildquellen, Spielstände, Undo
+// ═══════════════════════════════════════════════
+
+var MAX_NPCS   = 4;    // wie viele Figuren gleichzeitig am Ort sein duerfen
+var MAX_ZUEGE  = 3;    // max. NPC-Zeilen pro Spielereingabe
+var MAX_FAKTEN = 24;   // Groesse des Langzeitgedaechtnisses
+var MAX_UNDO   = 12;   // wie viele Zuege zuruecknehmbar sind
+
+var WOERTER1 = ['Venedig','Prag','Edinburgh','Lissabon','Budapest','Wien','Sevilla','Dubrovnik','Athen','Istanbul'];
+var WOERTER2 = ['Detektiv','Kammerjäger','Bibliothekar','Uhrmacher','Alchemist','Schreiner','Apotheker','Kartograph','Seemann','Puppenmacher'];
+var WOERTER3 = ['Verschwörung','Diebstahl','Fluch','Geheimnis','Entführung','Prophezeiung','Intrige','Ritual'];
+
+// ── STILE ─────────────────────────────────────
+// Kurz halten: lange Stiltexte verwaessern Identitaet und Szene.
+// Was ein Bild NICHT haben soll, gehoert in den Negativprompt (CFG.negativ), nicht hierher.
+var STILE = {
+  manga:       'anime manga style, cel shaded, clean bold linework, vibrant colors, expressive face',
+  comic:       'western comic book style, bold ink outlines, dynamic shading, saturated colors',
+  aquarell:    'watercolor painting, soft washes, delicate brushwork, muted colors, textured paper',
+  oel:         'classical oil painting, rich texture, dramatic chiaroscuro lighting, painterly brushstrokes',
+  realistisch: 'candid 35mm film photograph, Fujifilm Provia, natural light, fine film grain, documentary realism',
+  pixel:       'detailed pixel art, 16-bit retro game style, limited palette, crisp pixels',
+  // Illustrious- und Pony-Ableger reagieren auf Tag-Ketten deutlich besser als
+  // auf Prosa; die Qualitaets-Tags am Anfang sind dort ueblich.
+  illustrious: 'masterpiece, best quality, amazing quality, very aesthetic, absurdres, highly detailed, anime style'
+};
+var STIL_NEGATIV = {
+  realistisch: 'illustration, painting, drawing, 3d render, cgi, airbrushed skin, retouched, plastic skin, over-sharpened, hdr'
+};
+
+function aktuellerStil(){
+  if(S.stil)return S.stil;   // im Chat per /stil: gesetzt
+  var wahl=el('stilwahl')?el('stilwahl').value:'manga';
+  if(wahl==='eigen'){
+    var eigen=el('stilEigen')?el('stilEigen').value.trim():'';
+    return eigen||STILE.manga;
+  }
+  return STILE[wahl]||STILE.manga;
+}
+function aktuellerStilSchluessel(){
+  if(S.stilLabel && STILE[S.stilLabel])return S.stilLabel;
+  var wahl=el('stilwahl')?el('stilwahl').value:'manga';
+  return STILE[wahl]?wahl:'';
+}
+function stilGewechselt(){
+  var e=el('stilEigen');
+  e.style.display=el('stilwahl').value==='eigen'?'block':'none';
+  if(e.style.display==='block')e.focus();
+}
+
+// ── KONFIGURATION (gilt generatorweit, nicht pro Spielstand) ──
+var CFG_KEY='proxima_cfg_v1';
+var CFG={
+  quelle:'perchance',
+  breite:1024, hoehe:1024,
+  negativ:'low quality, worst quality, blurry, deformed, bad anatomy, extra limbs, extra fingers, text, watermark, signature',
+  kopfOffen:true,  // Kopfleiste aus- oder eingeklappt
+  autoHeld:true,   // im Auto-Modus handelt der Held selbst mit
+  autoBesetzung:true, // Figuren treten auf und ab, wenn die Handlung es erzaehlt
+  tempo:16,        // ms pro Zeichen im Schreibmaschinen-Effekt (0 = sofort)
+  bildTakt:2,      // alle N Zuege ein neues Bild (0 = nur auf Zuruf)
+  pollModell:'',
+  hordeKey:'0000000000', hordeModell:'', hordeSchritte:25,
+  apiUrl:'https://api.openai.com/v1', apiKey:'', apiModell:'gpt-image-1',
+  urlVorlage:'https://example.org/bild?p={prompt}&seed={seed}&w={breite}&h={hoehe}',
+  gradioHost:'https://ibarakidouji-wai-nsfw-illustrious-sdxl.hf.space',
+  gradioApi:'/generate', gradioFnIndex:'', gradioToken:'', gradioBreite:1024, gradioHoehe:1024,
+  gradioVorlage:'["{prompt}", "{negativ}", {seed}, false, {breite}, {hoehe}, 7, 28]'
+};
+function ladeCfg(){
+  try{
+    var roh=localStorage.getItem(CFG_KEY);
+    if(!roh)return;
+    var d=JSON.parse(roh);
+    Object.keys(CFG).forEach(function(k){ if(d[k]!==undefined&&d[k]!==null)CFG[k]=d[k]; });
+  }catch(e){}
+}
+function speichereCfg(){
+  try{ localStorage.setItem(CFG_KEY,JSON.stringify(CFG)); }catch(e){}
+}
+
+// ── BILDQUELLEN ───────────────────────────────
+// Jede Quelle bekommt {prompt, negativ, seed, breite, hoehe} und liefert eine
+// Bildadresse zurueck (data:-URL oder http-URL). Neue Quelle = ein Eintrag hier.
+var BILDQUELLEN={
+  perchance:{
+    label:'Perchance (Standard, ohne Schlüssel)',
+    info:'Nutzt das eingebaute Bild-Plugin des Generators. Kein Schlüssel, keine Fremdserver.',
+    felder:[],
+    zeichne:async function(a){
+      if(typeof image!=='function')throw new Error('image() ist nicht verfügbar — Bild-Plugin im Generator eingebunden?');
+      var p=a.prompt+(a.negativ?' (negativePrompt:::'+a.negativ+')':'')+' (seed:::'+a.seed+')';
+      var r=await image({prompt:p});
+      var src=r&&(r.dataUrl||r.url||r.imageUrl||r.src);
+      if(!src)throw new Error('Bild-Plugin lieferte keine Bilddaten.');
+      return src;
+    }
+  },
+  pollinations:{
+    label:'Pollinations (frei, ohne Schlüssel)',
+    maxPrompt:550,
+    info:'Offener Dienst, die Beschreibung steckt in der Adresse — deshalb wird der Prompt gekürzt. Kein Negativprompt. Bei HTTP 500 hilft meist: Modellfeld leeren, Bildgröße auf 512×512, oder im Bildmenü einen neuen Seed würfeln.',
+    felder:[{k:'pollModell',l:'Modell (leer = Standard des Dienstes)',typ:'text'}],
+    modellSchluessel:'pollModell',
+    modelle:async function(){
+      var r=await fetch('https://image.pollinations.ai/models');
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      var j=await r.json();
+      // Der Dienst liefert mal eine Liste von Namen, mal von Objekten.
+      return (Array.isArray(j)?j:[]).map(function(m){
+        var name=(typeof m==='string')?m:(m&&(m.name||m.id)||'');
+        var zusatz=(m&&typeof m==='object'&&m.description)?(' — '+m.description):'';
+        return {wert:name,label:name+zusatz};
+      }).filter(function(m){return m.wert;});
+    },
+    zeichne:async function(a){
+      // Die Beschreibung steckt bei diesem Dienst im Pfad. Lange Adressen sind
+      // ein bekannter Stolperstein, deshalb: knapp halten, den Negativprompt nur
+      // anhaengen, wenn danach noch Luft ist, und die Laenge im Fehlerfall nennen.
+      var GRENZE=1300;
+      var bau=function(seed,mitNegativ){
+        var u='https://image.pollinations.ai/prompt/'+encodeURIComponent(a.prompt)+
+              '?width='+a.breite+'&height='+a.hoehe+'&seed='+seed+
+              (CFG.pollModell?'&model='+encodeURIComponent(CFG.pollModell):'');
+        if(mitNegativ&&a.negativ){
+          var mitNeg=u+'&negative_prompt='+encodeURIComponent(a.negativ);
+          if(mitNeg.length<=GRENZE)u=mitNeg;
+        }
+        return u;
+      };
+      var seed=seedFuerDienst(a.seed);
+      var ersteUrl=bau(seed,true);
+      try{
+        return await ladeBildUrl(ersteUrl,120000);
+      }catch(e){
+        var meldung=String((e&&e.message)||e);
+        // 429 heisst: zu viele Anfragen. Ein sofortiger zweiter Versuch macht es
+        // schlimmer, also gar nicht erst nachfassen.
+        if(/HTTP 429/.test(meldung))throw e;
+        // Zweiter Anlauf: ohne Negativprompt, benachbarter Seed. Hilft bei
+        // seed-abhaengigen 500ern und bei Modellen, die den Parameter nicht kennen.
+        try{
+          await warte(2500);
+          return await ladeBildUrl(bau((seed+1)%2147483647||1,false),120000);
+        }catch(e2){
+          throw new Error(String((e2&&e2.message)||e2)+
+            ' [Adresse war '+ersteUrl.length+' Zeichen lang, Prompt '+a.prompt.length+
+            '. Falls „QUELLE TESTEN" mit kurzem Prompt gelingt, liegt es an der Länge.]');
+        }
+      }
+    }
+  },
+  horde:{
+    label:'AI Horde (frei, freiwillige Rechner)',
+    info:'Gratis und anonym mit dem Schlüssel 0000000000 — dann aber langsam (Warteschlange). Ein eigener Schlüssel von aihorde.net ist deutlich schneller. Bei hoher Auslastung sperrt die Horde alles über 907×907 und über 50 Schritte; die Bildgröße wird deshalb automatisch darunter gehalten.',
+    felder:[
+      {k:'hordeKey',l:'API-Schlüssel (0000000000 = anonym)',typ:'passwort'},
+      {k:'hordeModell',l:'Modell (leer = beliebig)',typ:'text'},
+      {k:'hordeSchritte',l:'Schritte',typ:'zahl'}
+    ],
+    modellSchluessel:'hordeModell',
+    modelle:async function(){
+      var r=await fetch('https://stablehorde.net/api/v2/status/models?type=image',
+                        {headers:{'Client-Agent':'PROXIMA:7:perchance'}});
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      var j=await r.json();
+      // Nach Anzahl der Rechner sortieren: je mehr, desto kuerzer die Wartezeit.
+      return (Array.isArray(j)?j:[]).slice().sort(function(a,b){return (b.count||0)-(a.count||0);})
+        .map(function(m){
+          return {wert:m.name,
+                  label:m.name+' — '+(m.count||0)+' Rechner'+(m.queued?', '+Math.round(m.queued)+' wartend':'')};
+        }).filter(function(m){return m.wert;});
+    },
+    zeichne:async function(a){
+      var kopf={'Content-Type':'application/json','apikey':(CFG.hordeKey||'0000000000'),'Client-Agent':'PROXIMA:7:perchance'};
+      var m=hordeMasse(a.breite,a.hoehe);
+      var koerper={
+        prompt:a.prompt+(a.negativ?' ### '+a.negativ:''),
+        params:{n:1,width:m.breite,height:m.hoehe,seed:String(seedFuerDienst(a.seed)),
+                steps:Math.max(1,Math.min(50,Number(CFG.hordeSchritte)||25)),sampler_name:'k_euler_a'},
+        nsfw:true, censor_nsfw:false
+      };
+      if(CFG.hordeModell)koerper.models=[CFG.hordeModell];
+      var r=await fetch('https://stablehorde.net/api/v2/generate/async',{method:'POST',headers:kopf,body:JSON.stringify(koerper)});
+      if(!r.ok){
+        var roh=await r.text(), text=roh;
+        try{ var jj=JSON.parse(roh); if(jj&&jj.message)text=jj.message; }catch(e0){}
+        throw new Error('AI Horde lehnte den Auftrag ab ('+r.status+'): '+String(text).substring(0,220)+
+          ' [angefragt: '+m.breite+'x'+m.hoehe+', '+koerper.params.steps+' Schritte]');
+      }
+      var j=await r.json();
+      if(!j.id)throw new Error('AI Horde lieferte keine Auftragsnummer.');
+      for(var i=0;i<90;i++){
+        await warte(4000);
+        var s=await fetch('https://stablehorde.net/api/v2/generate/status/'+j.id,{headers:{'Client-Agent':'PROXIMA:7:perchance'}});
+        if(!s.ok)continue;
+        var st=await s.json();
+        if(st.faulted)throw new Error('AI Horde: Auftrag fehlgeschlagen.');
+        if(st.done&&st.generations&&st.generations.length){
+          var g=st.generations[0];
+          if(g.img&&g.img.indexOf('http')===0)return await ladeBildUrl(g.img,60000);
+          if(g.img)return 'data:image/webp;base64,'+g.img;
+          throw new Error('AI Horde lieferte kein Bild.');
+        }
+      }
+      throw new Error('AI Horde: Zeitüberschreitung in der Warteschlange.');
+    }
+  },
+  api:{
+    label:'OpenAI-kompatible API (eigener Schlüssel)',
+    info:'Passt für api.openai.com und alles, was denselben /images/generations-Aufruf versteht. Der Schlüssel liegt unverschlüsselt im Browser — nur eigene, begrenzte Schlüssel verwenden.',
+    felder:[
+      {k:'apiUrl',l:'Basis-URL (ohne /images/generations)',typ:'text'},
+      {k:'apiKey',l:'API-Schlüssel',typ:'passwort'},
+      {k:'apiModell',l:'Modell',typ:'text'}
+    ],
+    zeichne:async function(a){
+      if(!CFG.apiKey)throw new Error('Kein API-Schlüssel hinterlegt.');
+      var basis=String(CFG.apiUrl||'').replace(/\/+$/,'');
+      var r=await fetch(basis+'/images/generations',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+CFG.apiKey},
+        body:JSON.stringify({model:CFG.apiModell||'gpt-image-1',prompt:a.prompt,n:1,size:auf64(a.breite)+'x'+auf64(a.hoehe)})
+      });
+      if(!r.ok)throw new Error('API antwortete '+r.status+': '+(await r.text()).substring(0,140));
+      var j=await r.json();
+      var d=j&&j.data&&j.data[0];
+      if(!d)throw new Error('API lieferte keine Bilddaten.');
+      if(d.b64_json)return 'data:image/png;base64,'+d.b64_json;
+      if(d.url)return await ladeBildUrl(d.url,60000);
+      throw new Error('API-Antwort ohne Bild.');
+    }
+  },
+  gradio:{
+    label:'Hugging-Face-Space (Gradio)',
+    info:'Spricht einen Gradio-Space über seine HTTP-Schnittstelle an. Die genaue Reihenfolge der Parameter steht auf der Space-Seite unten unter „Use via API" — von dort in die Vorlage übertragen. ZeroGPU-Spaces brauchen meist ein Token und haben ein Kontingent.',
+    felder:[
+      {k:'gradioHost',l:'Space-Adresse (…hf.space, ohne Schrägstrich am Ende)',typ:'text'},
+      {k:'gradioApi',l:'API-Name (z.B. /generate) - leer lassen, dann wird er gesucht',typ:'text'},
+      {k:'gradioFnIndex',l:'fn_index (leer = automatisch aus /config)',typ:'text'},
+      {k:'gradioToken',l:'Hugging-Face-Token (nur bei ZeroGPU oder privat)',typ:'passwort'},
+      {k:'gradioBreite',l:'Breite für diesen Space (viele SDXL-Spaces verlangen mindestens 1024)',typ:'zahl'},
+      {k:'gradioHoehe',l:'Höhe für diesen Space',typ:'zahl'},
+      {k:'gradioVorlage',l:'Parameter-Vorlage — Platzhalter: "{prompt}" "{negativ}" {seed} {breite} {hoehe}',typ:'text'}
+    ],
+    zeichne:async function(a){
+      var host=String(CFG.gradioHost||'').replace(/\/+$/,'');
+      if(!host)throw new Error('Keine Space-Adresse hinterlegt.');
+      var api=String(CFG.gradioApi||'/infer');
+      if(api.charAt(0)!=='/')api='/'+api;
+      // Eigene Masse: viele SDXL-Spaces lehnen alles unter 1024 ab, waehrend
+      // andere Quellen mit 512 gut fahren. Deshalb hier getrennt einstellbar.
+      var daten=gradioDaten(CFG.gradioVorlage,{
+        prompt:a.prompt, negativ:a.negativ, seed:a.seed,
+        breite:auf64(CFG.gradioBreite||a.breite), hoehe:auf64(CFG.gradioHoehe||a.hoehe)
+      });
+      var kopf={'Content-Type':'application/json'};
+      if(CFG.gradioToken)kopf['Authorization']='Bearer '+CFG.gradioToken;
+
+      // Warteschlange: anstellen, dann den Ergebnisstrom derselben Sitzung lesen.
+      var fn=await gradioFnIndex(host,api,kopf);
+      var sitzung=sitzungsNummer();
+      var r=await fetch(host+'/gradio_api/queue/join',{
+        method:'POST',headers:kopf,
+        body:JSON.stringify({data:daten,fn_index:fn,session_hash:sitzung,trigger_id:null})
+      });
+      if(!r.ok)throw new Error('Anstellen abgelehnt (HTTP '+r.status+'): '+(await r.text()).substring(0,200)+
+        ' [fn_index '+fn+', '+daten.length+' Parameter]');
+
+      var e=await fetch(host+'/gradio_api/queue/data?session_hash='+encodeURIComponent(sitzung),
+                        {headers:CFG.gradioToken?{'Authorization':'Bearer '+CFG.gradioToken}:{}});
+      if(!e.ok)throw new Error('Ergebnisstrom nicht abrufbar (HTTP '+e.status+').');
+      var strom=await e.text();
+      var ausgabe;
+      try{
+        ausgabe=gradioQueueErgebnis(strom);
+      }catch(panne){
+        // Einmal nachfassen, wenn es die GPU des Space erwischt hat.
+        if(!istServerPanne(panne&&panne.message))throw panne;
+        await warte(8000);
+        var s2=sitzungsNummer();
+        var r2=await fetch(host+'/gradio_api/queue/join',{
+          method:'POST',headers:kopf,
+          body:JSON.stringify({data:daten,fn_index:fn,session_hash:s2,trigger_id:null})
+        });
+        if(!r2.ok)throw panne;
+        var e2=await fetch(host+'/gradio_api/queue/data?session_hash='+encodeURIComponent(s2),
+                           {headers:CFG.gradioToken?{'Authorization':'Bearer '+CFG.gradioToken}:{}});
+        if(!e2.ok)throw panne;
+        strom=await e2.text();
+        ausgabe=gradioQueueErgebnis(strom);
+      }
+      if(ausgabe===null)ausgabe=sseDaten(strom);   // Rueckfallebene fuer andere Fassungen
+      var bild=bildAusGradio(ausgabe,host);
+      if(!bild)throw new Error('Kein Bild in der Antwort. Anfang des Stroms: '+strom.substring(0,220));
+      // Token auch beim Herunterladen mitschicken - Space-Dateien koennen geschuetzt sein.
+      return await ladeBildUrl(bild,180000,CFG.gradioToken?{'Authorization':'Bearer '+CFG.gradioToken}:null);
+    }
+  },
+  url:{
+    label:'Eigene URL-Vorlage',
+    maxPrompt:1200,
+    info:'Für alles, was ein Bild per einfachem Aufruf liefert. Platzhalter: {prompt} {negativ} {seed} {breite} {hoehe}.',
+    felder:[{k:'urlVorlage',l:'URL-Vorlage',typ:'text'}],
+    zeichne:async function(a){
+      if(!CFG.urlVorlage)throw new Error('Keine URL-Vorlage hinterlegt.');
+      var u=String(CFG.urlVorlage)
+        .replace(/\{prompt\}/g,encodeURIComponent(a.prompt))
+        .replace(/\{negativ\}/g,encodeURIComponent(a.negativ||''))
+        .replace(/\{seed\}/g,String(seedFuerDienst(a.seed)))
+        .replace(/\{breite\}/g,String(a.breite))
+        .replace(/\{hoehe\}/g,String(a.hoehe));
+      return await ladeBildUrl(u,120000);
+    }
+  }
+};
+// Gradio-Spaces erwarten ihre Eingaben als Liste in fester Reihenfolge, die je
+// Space anders ist. Deshalb eine Vorlage, in die die Werte eingesetzt werden.
+function gradioDaten(vorlage,a){
+  var t=String(vorlage||'[]')
+    .replace(/"\{prompt\}"/g,JSON.stringify(String(a.prompt||'')))
+    .replace(/"\{negativ\}"/g,JSON.stringify(String(a.negativ||'')))
+    .replace(/\{seed\}/g,String(seedFuerDienst(a.seed)))
+    .replace(/\{breite\}/g,String(auf64(a.breite)))
+    .replace(/\{hoehe\}/g,String(auf64(a.hoehe)));
+  var d=JSON.parse(t);
+  if(!Array.isArray(d))throw new Error('Die Parameter-Vorlage muss eine Liste sein, z.B. ["{prompt}", 0].');
+  return d;
+}
+// Die Antwort ist je nach Gradio-Fassung verschieden verpackt: mal eine
+// data:-Adresse, mal {url:…}, mal {path:'/tmp/…'}. Erste brauchbare gewinnt.
+function bildAusGradio(daten,host){
+  var treffer=null;
+  (function suche(x){
+    if(treffer||x==null)return;
+    if(typeof x==='string'){
+      if(/^data:image/i.test(x))treffer=x;
+      else if(/^https?:\/\//i.test(x))treffer=x;
+      else if(x.charAt(0)==='/')treffer=host+'/gradio_api/file='+x;
+      return;
+    }
+    if(Array.isArray(x)){ for(var i=0;i<x.length&&!treffer;i++)suche(x[i]); return; }
+    if(typeof x==='object'){
+      if(typeof x.url==='string'&&x.url){ treffer=x.url; return; }
+      if(typeof x.path==='string'&&x.path){ treffer=host+'/gradio_api/file='+x.path; return; }
+      if(typeof x.name==='string'&&x.name){ treffer=host+'/file='+x.name; return; }
+      var k=Object.keys(x);
+      for(var j=0;j<k.length&&!treffer;j++)suche(x[k[j]]);
+    }
+  })(daten);
+  return treffer;
+}
+// Der Queue-Strom schickt je Zeile ein Objekt: estimation, process_starts,
+// zuletzt process_completed mit den Ausgabedaten.
+function gradioQueueErgebnis(text){
+  var ergebnis=null, fehler=null;
+  String(text||'').split('\n').forEach(function(z){
+    z=z.trim();
+    if(z.indexOf('data:')!==0)return;
+    var o=null;
+    try{ o=JSON.parse(z.substring(5).trim()); }catch(e){ return; }
+    if(!o||typeof o!=='object')return;
+    if(o.msg==='process_completed'){
+      if(o.success===false){
+        fehler=(o.output&&(o.output.error||o.output.detail||o.output.message))||'';
+        if(!fehler){
+          // Ohne Klartext wenigstens zeigen, was der Space geschickt hat.
+          try{ fehler='ohne Klartext, Rohmeldung: '+JSON.stringify(o.output||o).substring(0,200); }
+          catch(e1){ fehler='Der Space meldete einen Fehler.'; }
+        }
+      }else ergebnis=(o.output&&o.output.data)||o.output||null;
+    }else if(o.msg==='unexpected_error'||o.msg==='queue_full'){
+      fehler=o.message||o.msg;
+    }
+  });
+  if(fehler)throw new Error(String(fehler).substring(0,260));
+  return ergebnis;
+}
+function sitzungsNummer(){
+  return Math.random().toString(36).substring(2)+Date.now().toString(36);
+}
+// Passenden Endpunkt aus /config waehlen. Steht im Feld Unsinn (leer, "False",
+// ein Tippfehler), wird nicht abgebrochen, sondern der plausibelste genommen -
+// Hilfsendpunkte wie lambda oder load_example aber nie.
+function waehleEndpunkt(deps,wunsch){
+  var liste=(deps||[]).map(function(d,i){
+    return {name:String(d.api_name||'').replace(/^\//,''),id:(d.id!=null?d.id:i)};
+  }).filter(function(d){return d.name;});
+  if(!liste.length)return null;
+  var g=String(wunsch||'').replace(/^\//,'').trim();
+  var passt=function(pruef){ return liste.filter(pruef)[0]||null; };
+  if(g&&!/^(false|true|undefined|null|nan)$/i.test(g)){
+    var genau=passt(function(d){return d.name===g;});
+    if(genau)return genau;
+  }
+  return passt(function(d){return /^(generate|infer|predict|txt2img|run)$/i.test(d.name);})
+      || passt(function(d){return /generat|infer|predict|img|image/i.test(d.name);})
+      || null;
+}
+// fn_index aus /config holen: dort steht zu jedem api_name die passende id.
+async function gradioFnIndex(host,api,kopf){
+  if(CFG.gradioFnIndex!==''&&CFG.gradioFnIndex!=null&&!isNaN(parseInt(CFG.gradioFnIndex,10)))
+    return parseInt(CFG.gradioFnIndex,10);
+  var r=await fetch(host+'/config',{headers:kopf});
+  if(!r.ok)throw new Error('/config nicht abrufbar (HTTP '+r.status+') - fn_index bitte von Hand eintragen.');
+  var c=await r.json();
+  var deps=(c&&c.dependencies)||[];
+  var ep=waehleEndpunkt(deps,api);
+  if(!ep)throw new Error('Kein brauchbarer Endpunkt in /config. Vorhanden: '+
+    deps.map(function(d){return d.api_name;}).filter(Boolean).join(', '));
+  var gesucht=String(api||'').replace(/^\//,'').trim();
+  if(ep.name!==gesucht){
+    sysZeile('Endpunkt "'+ep.name+'" statt "'+(gesucht||'(leer)')+'" verwendet.');
+    CFG.gradioApi='/'+ep.name;speichereCfg();
+  }
+  return ep.id;
+}
+// Aus der Parameterliste von /gradio_api/info eine Vorlage bauen.
+function gradioVorlageAus(params){
+  return '['+(params||[]).map(function(pa){
+    var n=String(pa.parameter_name||pa.label||'').toLowerCase();
+    if(/negativ/.test(n))return '"{negativ}"';        // vor prompt pruefen!
+    if(/prompt/.test(n))return '"{prompt}"';
+    // Ein "randomize_seed" muss aus bleiben, sonst wuerfelt der Space selbst
+    // und die Figuren sehen von Bild zu Bild anders aus.
+    if(/random/.test(n)&&/seed/.test(n))return 'false';
+    if(/seed/.test(n))return '{seed}';
+    if(/width|breite/.test(n))return '{breite}';
+    if(/height/.test(n))return '{hoehe}';
+    if(pa.parameter_has_default&&pa.parameter_default!==undefined)return JSON.stringify(pa.parameter_default);
+    var t=String((pa.type&&pa.type.type)||(pa.python_type&&pa.python_type.type)||'').toLowerCase();
+    if(/bool/.test(t))return 'false';
+    if(/number|int|float/.test(t))return '0';
+    return '""';
+  }).join(', ')+']';
+}
+// Bessere Vorlage: die festen Werte kommen aus den Vorgaben des Space selbst
+// (props.value der zugehoerigen Bedienelemente), nicht aus geratenen Zahlen.
+function gradioVorlageAusConfig(params,dep,components){
+  var nachId={};
+  (components||[]).forEach(function(c){ nachId[c.id]=c; });
+  var eingaben=(dep&&dep.inputs)||[];
+  var wahlWert=function(x){
+    if(Array.isArray(x))return (x.length>1&&x[1]!=null)?x[1]:x[0];
+    return x;
+  };
+  return '['+(params||[]).map(function(pa,i){
+    var n=String(pa.parameter_name||pa.label||'').toLowerCase();
+    if(/negativ/.test(n))return '"{negativ}"';
+    if(/random/.test(n)&&/seed/.test(n))return 'false';
+    if(/prompt/.test(n))return '"{prompt}"';
+    if(/seed/.test(n))return '{seed}';
+    if(/width|breite/.test(n))return '{breite}';
+    if(/height/.test(n))return '{hoehe}';
+    var comp=nachId[eingaben[i]], props=(comp&&comp.props)||{};
+    // Seitenverhaeltnis auf "Custom" stellen, sonst bleiben Breite und Hoehe wirkungslos.
+    if(/aspect|ratio/.test(n)&&Array.isArray(props.choices)){
+      var eigen=props.choices.map(wahlWert).filter(function(x){return /custom/i.test(String(x));})[0];
+      if(eigen!=null)return JSON.stringify(String(eigen));
+    }
+    if(props.value!==undefined&&props.value!==null)return JSON.stringify(props.value);
+    if(pa.parameter_has_default&&pa.parameter_default!==undefined)return JSON.stringify(pa.parameter_default);
+    var t=String((pa.type&&pa.type.type)||(pa.python_type&&pa.python_type.type)||'').toLowerCase();
+    if(/bool/.test(t))return 'false';
+    if(/number|int|float/.test(t))return '0';
+    return '""';
+  }).join(', ')+']';
+}
+function sseDaten(text){
+  // Antwortstrom: Zeilen "event: complete" und "data: [...]" — letzte gültige nehmen.
+  var letzte=null;
+  String(text||'').split('\n').forEach(function(z){
+    z=z.trim();
+    if(z.indexOf('data:')!==0)return;
+    var roh=z.substring(5).trim();
+    if(!roh||roh==='null')return;
+    try{ letzte=JSON.parse(roh); }catch(e){}
+  });
+  return letzte;
+}
+
+// GPU-Pannen des Dienstes (CUDA, NVML, Speichermangel) sind nicht unsere
+// Anfrage. Meist voruebergehend, ein zweiter Anlauf lohnt sich.
+function istServerPanne(m){
+  return /internal assert|nvml|cuda|out of memory|oom|allocator|device-side/i.test(String(m||''));
+}
+function quelle(){ return BILDQUELLEN[CFG.quelle]||BILDQUELLEN.perchance; }
+function auf64(n){ n=Math.round((Number(n)||1024)/64)*64; return Math.max(256,Math.min(2048,n)); }
+// Bild-Backends rechnen mit 32-Bit-Seeds. Aeltere Spielstaende halten
+// zwoelfstellige Werte — die quittieren manche Dienste mit HTTP 500.
+function seedFuerDienst(s){ return (Math.abs(parseInt(s,10)||0)%2147483647)||1; }
+// Die AI Horde sperrt bei hoher Auslastung alles ueber 907x907 und ueber 50
+// Schritte. Seitenverhaeltnis beibehalten, auf Vielfache von 64 runden.
+function hordeMasse(breite,hoehe){
+  var b=auf64(breite), h=auf64(hoehe), grenze=907*907;
+  if(b*h>grenze){
+    var f=Math.sqrt(grenze/(b*h));
+    b=auf64(Math.floor(b*f/64)*64);
+    h=auf64(Math.floor(h*f/64)*64);
+    while(b*h>grenze&&(b>256||h>256)){ if(b>=h)b=Math.max(256,b-64); else h=Math.max(256,h-64); }
+  }
+  return {breite:b,hoehe:h};
+}
+// Am letzten Komma vor der Grenze kappen, damit kein Wort zerrissen wird.
+function kuerzeText(p,max){
+  p=String(p||'');
+  if(max<=0)return '';
+  if(p.length<=max)return p;
+  var schnitt=p.lastIndexOf(',',max);
+  return p.substring(0,schnitt>max*0.6?schnitt:max).trim();
+}
+// Zwei Wege, weil jeder für sich blind ist:
+// 1. fetch() nennt den echten HTTP-Status und liefert das Bild als blob:-Adresse,
+//    die auch dann noch anzeigbar ist, wenn fremde Bild-Hosts gesperrt sind.
+// 2. Scheitert fetch an CORS, bleibt der klassische <img>-Weg — der lädt zwar,
+//    verrät aber nie, woran es lag.
+async function ladeBildUrl(url,timeoutMs,kopf){
+  var limit=timeoutMs||90000, ersterGrund='';
+  try{
+    var ctl=(typeof AbortController==='function')?new AbortController():null;
+    var t=ctl?setTimeout(function(){ctl.abort();},limit):null;
+    var r=await fetch(url,{signal:ctl?ctl.signal:undefined,headers:kopf||{}});
+    if(t)clearTimeout(t);
+    if(!r.ok){
+      var wartehinweis='';
+      try{
+        var ra=r.headers&&r.headers.get&&r.headers.get('retry-after');
+        if(ra)wartehinweis=', frühestens in '+ra+'s wieder';
+      }catch(e0){}
+      throw new Error('Dienst antwortete HTTP '+r.status+(r.statusText?' '+r.statusText:'')+wartehinweis);
+    }
+    var b=await r.blob();
+    if(!b||b.size<200||(b.type&&b.type.indexOf('image')!==0)){
+      // Zu klein oder falscher Typ: hineinschauen, sonst raetselt man ewig.
+      var probe='';
+      try{ probe=(await b.text()).replace(/\s+/g,' ').substring(0,160); }catch(e2){}
+      throw new Error('Antwort war kein Bild ('+(b?b.size:0)+' Bytes'+(b&&b.type?', '+b.type:'')+')'+
+        (probe?': '+probe:'')+' [Adresse: '+String(url).substring(0,120)+']');
+    }
+    return URL.createObjectURL(b);
+  }catch(e){
+    ersterGrund=(e&&e.message)?e.message:String(e);
+    // Ein echter Dienstfehler bleibt einer — dann nicht noch einmal probieren.
+    if(/HTTP \d|kein Bild|war kein Bild/.test(ersterGrund))throw e;
+  }
+  return await new Promise(function(res,rej){
+    var fertig=false;
+    var t=setTimeout(function(){ if(!fertig){fertig=true;rej(new Error('Zeitüberschreitung nach '+Math.round(limit/1000)+'s. Vorher: '+ersterGrund));} },limit);
+    var im=new Image();
+    im.onload=function(){ if(fertig)return;fertig=true;clearTimeout(t);res(url); };
+    im.onerror=function(){ if(fertig)return;fertig=true;clearTimeout(t);
+      rej(new Error('Bild nicht ladbar. Direktabruf meldete: '+(ersterGrund||'unbekannt')+'. Prüfe URL-Länge, Dienst und ob Perchance externe Bilder zulässt.')); };
+    im.src=url;
+  });
+}
+
+// ── KI-WRAPPER ────────────────────────────────
+function extrahiereText(x){
+  if(x==null)return'';
+  if(typeof x==='string')return x;
+  return x.fullText||x.text||x.output||'';
+}
+// Das Text-Plugin von Perchance spricht ueber ein eigenes Iframe. Wird es zu
+// frueh gerufen — etwa direkt nach dem Laden aus einem Elternfenster —, meldet
+// es "Cannot read properties of null (reading 'contentWindow')". Das ist kein
+// Fehler der Anfrage, sondern schlicht zu frueh: kurz warten und erneut fragen.
+function kiNochNichtBereit(e){
+  var m=String((e&&e.message)||e||'');
+  return /contentWindow|streamTextFromIframe|of null|not defined/i.test(m);
+}
+async function frageKI(prompt,timeoutMs){
+  var letzter=null;
+  for(var versuch=0;versuch<3;versuch++){
+    try{
+      return await frageKIEinmal(prompt,timeoutMs);
+    }catch(e){
+      letzter=e;
+      if(!kiNochNichtBereit(e))throw e;
+      await warte(1200*(versuch+1));
+    }
+  }
+  throw new Error('Das Text-Plugin von Perchance war auch nach drei Anläufen nicht bereit ('+
+    ((letzter&&letzter.message)||'unbekannt')+'). Seite neu laden hilft meist.');
+}
+function frageKIEinmal(prompt,timeoutMs){
+  var limit=timeoutMs||90000;
+  return new Promise(function(resolve,reject){
+    var fertig=false;
+    var timer=setTimeout(function(){
+      if(!fertig){fertig=true;reject(new Error('KI-Timeout ('+Math.round(limit/1000)+'s)'));}
+    },limit);
+    function done(txt){
+      if(fertig)return;fertig=true;clearTimeout(timer);
+      resolve(String(txt||'').trim());
+    }
+    function versucheObjektForm(){
+      try{
+        ai({instruction:prompt,onFinish:function(data){done(extrahiereText(data));}});
+      }catch(e2){
+        if(!fertig){fertig=true;clearTimeout(timer);reject(e2);}
+      }
+    }
+    try{
+      var r=ai(prompt);
+      if(r&&typeof r.then==='function'){
+        r.then(function(res){done(extrahiereText(res));})
+         .catch(function(){versucheObjektForm();});
+      }else if(typeof r==='string'&&r.length){done(r);}
+      else{versucheObjektForm();}
+    }catch(e){versucheObjektForm();}
+  });
+}
+
+// ── ANTWORT-PARSER ────────────────────────────
+// Die KI wird um JSON gebeten. Kommt trotzdem "KEY: wert" zurueck (oder Markdown
+// drumherum), faengt der Zeilen-Parser das ab, statt die Runde zu verlieren.
+function jsonAus(text){
+  var t=String(text||'');
+  var a=t.indexOf('{'), b=t.lastIndexOf('}');
+  if(a<0||b<=a)return null;
+  try{ var o=JSON.parse(t.substring(a,b+1)); return (o&&typeof o==='object')?o:null; }catch(e){}
+  return null;
+}
+function felderAus(text){
+  var z={}, letzter=null;
+  String(text||'').split('\n').forEach(function(zeile){
+    var l=zeile.replace(/^\s*[-*>#\s]+/,'').replace(/\*\*/g,'').trim();
+    if(!l)return;
+    var i=l.indexOf(':');
+    var kopf=i>0?l.substring(0,i).trim():'';
+    // Nur als Feldname werten, was kurz ist und wie ein Schluessel aussieht —
+    // sonst zerlegt ein Doppelpunkt mitten im Fliesstext den Wert.
+    if(i>0&&kopf.length<=26&&/^[A-Za-zÄÖÜäöüß_ ]+$/.test(kopf)){
+      letzter=kopf.toUpperCase().replace(/\s+/g,'_');
+      z[letzter]=l.substring(i+1).trim();
+    }else if(letzter){
+      z[letzter]+=' '+l;   // Fortsetzungszeile an den letzten Wert haengen
+    }
+  });
+  return z;
+}
+function hole(obj,pfad,ersatz){
+  var cur=obj;
+  for(var i=0;i<pfad.length;i++){
+    if(cur==null||typeof cur!=='object')return ersatz;
+    cur=cur[pfad[i]];
+  }
+  if(cur==null)return ersatz;
+  if(Array.isArray(cur))cur=cur.join(', ');
+  var s=String(cur).trim();
+  return s?s:ersatz;
+}
+function entkleide(s){ return String(s||'').trim().replace(/^["'»«]+|["'»«]+$/g,'').trim(); }
+function einWort(s){ return String(s||'').toLowerCase().trim().split(/[\s,.;:]/)[0]||''; }
+
+// ── ZUSTAND ───────────────────────────────────
+var W = {
+  protagonist:{name:'',herkunft:'',beruf:'',eigenart:'',aussehen:'',kleidung:''},
+  stadt:'', rahmenhandlung:'', rahmenhandlungOriginal:'',
+  perspektive:'er',   // 'er' = Held im Bild, 'ich' = Blick durch seine Augen
+  ort:null,          // mit name, geschichte, bildPrompt
+  npcs:[]            // Figuren mit name, rolle, aussehen, kleidung, person, grundstimmung, eroeffnung
+};
+var S = {
+  imSpiel:false, wartet:false,
+  verlauf:[],                       // Eintraege: rolle 'ich' oder 'npc', idx, text, name
+  stimmung:[], kleidung:[], regieAnweisung:[],
+  handlung:'', fakten:[],           // Kurzzeit-Zusammenfassung + Langzeitgedaechtnis
+  seed:0,                           // fest, damit Figuren wiedererkennbar bleiben
+  bildGeneriert:false, bildZaehler:0, bildLaeuft:false, bildAusstehend:null, bildPauseBis:0,
+  letzteRohantwort:'', letzteJsonOk:false, kurzKontext:false,
+  szeneText:'', szeneGlobal:'', letzterPrompt:'', letzterNegativ:'', letzteBildUrl:'',
+  // Von Hand geschriebener Prompt. Solange gesetzt, gilt er statt des aus der
+  // Szene gebauten — auch ueber einen Wechsel der Bildquelle hinweg.
+  eigenerPrompt:'', eigenerNegativ:'', promptFesthalten:false,
+  npcErscheint:false, ortLaeuft:false,
+  autoAktiv:false, autoRegie:'', autoLaeuft:false, autoForceIdx:null,
+  stil:'', stilLabel:'',
+  rueckgaengig:[]                   // Schnappschuesse fuer /undo
+};
+var tipper=null;   // laufender Schreibmaschinen-Effekt
+
+function el(id){ return document.getElementById(id); }
+
+// ── FEHLERANZEIGE ─────────────────────────────
+function zeigeFehler(wo,e){
+  console.error(wo,e);
+  var meldung=wo+': '+(e&&e.message?e.message:String(e));
+  var box=el('fehlerbox');
+  if(!el('start').classList.contains('aus')){
+    box.textContent='⚠ '+meldung;box.style.display='block';
+  }else{ errZeile('⚠ '+meldung); }
+}
+
+// ── WÜRFELN ───────────────────────────────────
+function zufall(liste){ return liste[Math.floor(Math.random()*liste.length)]; }
+async function wuerfeln(){
+  var w1=zufall(WOERTER1),w2=zufall(WOERTER2),w3=zufall(WOERTER3);
+  var btn=el('wuerfelBtn'),status=el('wuerfelStatus'),feld=el('begriffe');
+  btn.disabled=true;btn.textContent='⏳';
+  status.textContent='KI erfindet eine Idee…';feld.value='';
+  try{
+    var txt=await frageKI(
+      'Erfinde die Grundidee fuer ein lebendiges deutsches Dialog-Adventure, in dem der Held an einen Ort kommt und dort eine interessante Person kennenlernt. Inspiration: '+w1+', '+w2+', '+w3+'. Schreibe NUR 1 bis 2 Saetze auf Deutsch als spannenden Ausgangspunkt. Kein Markdown, keine Ueberschrift.'
+    );
+    feld.value=entkleide(txt)||(w1+', '+w2+', '+w3);
+    status.textContent='Vorschlag bereit – du kannst ihn anpassen.';
+  }catch(e){
+    feld.value=w1+', '+w2+', '+w3;
+    status.textContent='KI nicht erreichbar – Begriffe eingesetzt.';
+    zeigeFehler('Würfeln',e);
+  }
+  btn.disabled=false;btn.textContent='⚄';
+}
+
+// ── WELT ERSCHAFFEN ───────────────────────────
+async function weltErstellen(){
+  var begriffe=el('begriffe').value.trim();
+  if(!begriffe){
+    begriffe=zufall(WOERTER1)+', '+zufall(WOERTER2)+', '+zufall(WOERTER3);
+    el('begriffe').value=begriffe;
+  }
+  el('erstellbtn').disabled=true;
+  el('erstellbtn').textContent='✦ ERSCHAFFE… ✦';
+  el('ladebereich').style.display='flex';
+  el('ladebar').classList.add('scan');
+  el('fehlerbox').style.display='none';
+  setStatus('Erfinde Welt…');
+
+  var p=
+    'Du bist Autor eines lebendigen deutschen Dialog-Adventures.'+
+    ' Ausgangsidee des Spielers: '+begriffe+'.'+
+    ' Der Held kommt an EINEN Ort und lernt dort eine interessante Person kennen. Spaeter koennen weitere Personen dazustossen. Es gibt keine Raetsel und kein Spielziel – es geht um Begegnungen, Gespraeche und Stimmungen.'+
+    ' WICHTIG: Die Person ist warm, offen und zugewandt; frivol und frech darf sie sein, aber nie unfreundlich, herablassend oder abweisend.\n\n'+
+    'Antworte NUR mit einem JSON-Objekt, ohne Codeblock, ohne Text davor oder danach, in genau dieser Form:\n'+
+    '{\n'+
+    '  "held": {"name":"Vor- und Nachname","herkunft":"Geburtsstadt","beruf":"Beruf","eigenart":"schrullige Eigenart"},\n'+
+    '  "stadt": "europaeische Stadt",\n'+
+    '  "rahmenhandlung": "deutsche Einfuehrung, 5 bis 7 Saetze",\n'+
+    '  "ort": {\n'+
+    '    "name": "Name des Ortes",\n'+
+    '    "geschichte": "atmosphaerische deutsche Beschreibung des Ortes, 3 bis 5 Saetze",\n'+
+    '    "bild": "english description of the OPENING scene when the hero arrives - what the person is DOING, plus setting, objects and lighting. An action, NOT the appearance. No art style."\n'+
+    '  },\n'+
+    '  "npc": {\n'+
+    '    "name": "Name der Person",\n'+
+    '    "rolle": "Rolle/Funktion am Ort",\n'+
+    '    "aussehen": "constant English visual IDENTITY only: age, face, hair, build, distinctive features. NO clothing, no art style, no background, no action, no mood.",\n'+
+    '    "kleidung": "english default outfit - clothing and accessories only, a few words.",\n'+
+    '    "person": "Persoenlichkeit, Sprechweise, Eigenheiten in einem deutschen Satz. Warmherzig, lebenslustig, frech, frivol, schlagfertig, aber immer zugewandt und respektvoll.",\n'+
+    '    "stimmung": "Grundstimmung in EINEM deutschen Wort (uebermuetig, gelassen, neugierig, warmherzig, verspielt, kokett, verschmitzt, melancholisch)",\n'+
+    '    "eroeffnung": "Der erste deutsche Satz, mit dem die Person den Helden anspricht."\n'+
+    '  }\n'+
+    '}';
+
+  // Ohne Rueckmeldung sieht ein langer Aufruf aus wie ein Absturz.
+  var seit=Date.now();
+  var ticker=setInterval(function(){
+    setStatus('Erfinde Welt… '+Math.round((Date.now()-seit)/1000)+'s');
+  },1000);
+  try{
+    var text=await frageKI(p,150000);
+    clearInterval(ticker);
+    verarbeiteWelt(text);
+  }catch(e){
+    clearInterval(ticker);
+    var m=String((e&&e.message)||e);
+    setStatus('Fehler bei der Welt-Generierung.');
+    if(/Timeout|Zeitüberschreitung/i.test(m)){
+      var box=el('fehlerbox');
+      box.textContent='⏱ Der Textdienst von Perchance hat nicht rechtzeitig geantwortet ('+
+        Math.round((Date.now()-seit)/1000)+'s). Das liegt nicht an deiner Eingabe. '+
+        'Einfach noch einmal auf ✦ WELT ERSCHAFFEN ✦ drücken — meist klappt der zweite Versuch.';
+      box.style.display='block';
+    }else{
+      zeigeFehler('Welt erschaffen',e);
+    }
+    freigebenErstellen();
+  }
+}
+
+function verarbeiteWelt(text){
+  if(!text){setStatus('KI-Antwort leer.');freigebenErstellen();return;}
+  var j=jsonAus(text), z=j?null:felderAus(text);
+  var luecken=[];
+  function f(pfad,flach,ersatz,label){
+    var v=j?hole(j,pfad,''):((z&&z[flach])||'');
+    if(!v){ if(label)luecken.push(label); return ersatz; }
+    return v;
+  }
+
+  W.protagonist.name     = f(['held','name'],'NAME','Egon Pfifferling','Name des Helden');
+  W.protagonist.herkunft = f(['held','herkunft'],'HERKUNFT','Hameln');
+  W.protagonist.beruf    = f(['held','beruf'],'BERUF','Reisender');
+  W.protagonist.eigenart = f(['held','eigenart'],'EIGENART','spricht in Sprichwoertern');
+  W.protagonist.aussehen = W.protagonist.aussehen||'';
+  W.protagonist.kleidung = W.protagonist.kleidung||'';
+  W.stadt                = f(['stadt'],'STADT','Wien');
+  W.rahmenhandlung       = f(['rahmenhandlung'],'RAHMENHANDLUNG','');
+
+  W.ort={
+    name:       f(['ort','name'],'ORT_NAME','Ein Ort','Name des Ortes'),
+    geschichte: f(['ort','geschichte'],'ORT_GESCHICHTE','Dieser Ort birgt Geschichten.'),
+    bildPrompt: f(['ort','bild'],'ORT_BILD','the person stands quietly in the foreground, european setting behind them')
+  };
+
+  var npc={
+    name:         f(['npc','name'],'NPC_NAME','Ein Fremder','Name der Person'),
+    rolle:        f(['npc','rolle'],'NPC_ROLLE','Bewohner'),
+    aussehen:     f(['npc','aussehen'],'NPC_AUSSEHEN','an adult with an ordinary but memorable face'),
+    kleidung:     f(['npc','kleidung'],'NPC_KLEIDUNG','simple everyday clothing'),
+    person:       f(['npc','person'],'NPC_PERSON','zurueckhaltend, aber vielschichtig'),
+    grundstimmung:einWort(f(['npc','stimmung'],'NPC_STIMMUNG','neugierig')),
+    eroeffnung:   f(['npc','eroeffnung'],'NPC_EROEFFNUNG','Oh – Besuch. Das passiert hier selten.','Eröffnungssatz')
+  };
+  setzeNpcs([npc]);
+
+  S.seed=neuerSeed();
+  S.szeneText=W.ort.bildPrompt;
+  S.handlung='';S.fakten=[];S.verlauf=[];S.rueckgaengig=[];
+
+  var rahmen=W.rahmenhandlung||(W.protagonist.name+' aus '+W.protagonist.herkunft+' kommt nach '+W.stadt+'.');
+  W.rahmenhandlung=rahmen;
+  W.rahmenhandlungOriginal=rahmen;
+
+  var sb=el('storybox');
+  sb.innerHTML='<strong>'+escapeHtml(W.protagonist.name.toUpperCase())+' &middot; '+escapeHtml(W.stadt.toUpperCase())+'</strong>'+
+    '<div class="storyhinweis">Du kannst die Geschichte bearbeiten. Beschreibst du darin die Person, die du triffst, wird sie daraus abgeleitet.</div>'+
+    '<textarea id="storyEdit" class="storyedit"></textarea>';
+  el('storyEdit').value=rahmen;
+  sb.style.display='block';
+
+  if(luecken.length){
+    var fb=el('fehlerbox');
+    fb.textContent='⚠ Die Antwort kam unvollständig zurück — es fehlten: '+luecken.join(', ')+
+      '. Dafür stehen jetzt Platzhalter. Du kannst so spielen, aber ✦ WELT ERSCHAFFEN ✦ noch einmal '+
+      'zu drücken bringt meist eine vollständige Welt.';
+    fb.style.display='block';
+  }
+  setStatus(luecken.length?'✦ Welt bereit (mit Lücken) ✦':'✦ Welt bereit ✦');
+  el('ladebar').classList.remove('scan');
+  el('ladefill').style.width='100%';
+  el('spielbtn').style.display='inline-block';
+  el('spielbtn').disabled=false;
+  el('spielbtn').textContent='▶ ABENTEUER BEGINNEN';
+  freigebenErstellen();
+}
+function freigebenErstellen(){
+  var b=el('erstellbtn');
+  b.disabled=false;b.textContent='✦ WELT ERSCHAFFEN ✦';
+}
+function setzeNpcs(liste){
+  W.npcs=liste;
+  S.stimmung=liste.map(function(n){return n.grundstimmung;});
+  S.kleidung=liste.map(function(n){return n.kleidung;});
+  S.regieAnweisung=liste.map(function(){return '';});
+}
+function neuerSeed(){ return Math.floor(1+Math.random()*999999998); }   // 32-Bit-sicher
+
+// ── SPIEL STARTEN ─────────────────────────────
+async function leiteNpcAusStoryAb(story){
+  var instruction=
+    'Aus der folgenden deutschen Vorgeschichte soll die EINE Person abgeleitet werden, die der Held am Ort zuerst trifft. Wenn die Vorgeschichte eine bestimmte Person beschreibt, nutze GENAU diese Person.\n\n'+
+    'HELD: '+W.protagonist.name+' aus '+W.protagonist.herkunft+'.\n'+
+    'STADT: '+W.stadt+'. ORT: '+W.ort.name+' — '+W.ort.geschichte+'\n'+
+    'VORGESCHICHTE:\n'+story+'\n\n'+
+    'Ton der Figur: warm, freundlich, offen; frivol/frech erlaubt, aber respektvoll.\n'+
+    'Antworte NUR mit einem JSON-Objekt, ohne Codeblock:\n'+
+    '{"name":"","rolle":"","aussehen":"constant English visual IDENTITY only, no clothing","kleidung":"english default outfit","person":"deutscher Satz","stimmung":"EIN deutsches Wort","eroeffnung":"erster deutscher Satz an den Helden"}';
+  var text=await frageKI(instruction,120000);
+  var j=jsonAus(text), z=j?null:felderAus(text);
+  function f(k,flach,ersatz){ return j?hole(j,[k],ersatz):(z[flach]||ersatz); }
+  var a=W.npcs[0]||{};
+  return {
+    name:         f('name','NPC_NAME',a.name||'Ein Fremder'),
+    rolle:        f('rolle','NPC_ROLLE',a.rolle||'Bewohner'),
+    aussehen:     f('aussehen','NPC_AUSSEHEN',a.aussehen||'an adult with a memorable face'),
+    kleidung:     f('kleidung','NPC_KLEIDUNG',a.kleidung||'simple clothing'),
+    person:       f('person','NPC_PERSON',a.person||'warm und offen'),
+    grundstimmung:einWort(f('stimmung','NPC_STIMMUNG',a.grundstimmung||'neugierig')),
+    eroeffnung:   f('eroeffnung','NPC_EROEFFNUNG',a.eroeffnung||'Oh – Besuch. Schön!')
+  };
+}
+// Die zuletzt getroffene Wahl auf dem Startbildschirm gilt.
+function leseErzaehlweise(){
+  var e=el('perspektive');
+  W.perspektive=(e&&e.value==='ich')?'ich':'er';
+}
+async function spielStarten(){
+  leseErzaehlweise();
+  var feld=el('storyEdit');
+  var neueStory=feld?feld.value.trim():W.rahmenhandlung;
+  var geaendert=neueStory && neueStory!==W.rahmenhandlungOriginal;
+  if(neueStory)W.rahmenhandlung=neueStory;
+  if(geaendert){
+    var btn=el('spielbtn');
+    if(btn){btn.disabled=true;btn.textContent='✦ PERSON WIRD ABGESTIMMT…';}
+    try{
+      setzeNpcs([await leiteNpcAusStoryAb(W.rahmenhandlung)]);
+    }catch(e){ zeigeFehler('Person ableiten',e); }
+    if(btn){btn.disabled=false;btn.textContent='▶ ABENTEUER BEGINNEN';}
+  }
+  betreteSpiel();
+}
+function betreteSpiel(){
+  el('start').classList.add('aus');
+  setTimeout(function(){
+    el('start').style.display='none';
+    el('spiel').classList.add('aktiv');
+    S.imSpiel=true;
+    starteOrt();
+  },500);
+}
+function starteOrt(){
+  el('raumtitel').textContent=(W.ort.name||'Ort').toUpperCase();
+  aktualisiereUI();
+  var g=el('gespraech');g.innerHTML='';
+  if(S.verlauf.length){
+    S.verlauf.forEach(function(v){
+      if(v.rolle==='npc')npcZeileSofort(v.idx,v.text,v.name); else ichSage(v.text);
+    });
+    sysZeile('— '+W.protagonist.name+' ist zurück —');
+  }else{
+    npcSagt(0,W.npcs[0].eroeffnung);
+    S.verlauf.push({rolle:'npc',idx:0,text:W.npcs[0].eroeffnung,name:W.npcs[0].name});
+  }
+  if(!S.bildGeneriert)zeichneBild({});
+}
+
+// ── WELT-KONTEXT & GEDÄCHTNIS ─────────────────
+function weltKontext(){
+  var k='WELT: Das Geschehen spielt in '+W.stadt+'.\n'+
+    'HELD: '+W.protagonist.name+', '+W.protagonist.beruf+' aus '+W.protagonist.herkunft+'. Eigenart: '+W.protagonist.eigenart+'.\n';
+  if(W.rahmenhandlung)k+='VORGESCHICHTE: '+kappe(W.rahmenhandlung,S.kurzKontext?260:400)+'\n';
+  k+=(W.perspektive==='ich')
+    ? 'ERZAEHLWEISE: Ich-Perspektive. Handlungen des Helden werden in der ICH-Form geschrieben ("\x5Bich greife nach dem Glas\x5D"). Die Figuren sprechen ihn direkt an. Das Geschehen wird durch SEINE Augen erlebt.\n'
+    : 'ERZAEHLWEISE: Er-Perspektive. Handlungen des Helden werden mit seinem NAMEN geschrieben ("\x5B'+W.protagonist.name+' greift nach dem Glas\x5D"). Das Geschehen wird von aussen beobachtet.\n';
+  // Nur die juengsten Fakten mitschicken - gespeichert bleiben alle.
+  var f=S.fakten.slice(-(S.kurzKontext?8:14));
+  if(f.length)k+='WAS BISHER FESTSTEHT:\n- '+f.map(function(x){return kappe(x,140);}).join('\n- ')+'\n';
+  if(S.handlung)k+='BISHERIGE HANDLUNG: '+kappe(S.handlung,S.kurzKontext?220:360)+'\n';
+  return k;
+}
+function merkeFakt(f){
+  f=entkleide(f);
+  if(!f||f.length<4)return;
+  if(/^(kein|keine|nichts|none|n\/a|-)$/i.test(f))return;
+  var klein=f.toLowerCase();
+  if(S.fakten.some(function(x){return x.toLowerCase()===klein;}))return;
+  S.fakten.push(f);
+  while(S.fakten.length>MAX_FAKTEN)S.fakten.shift();
+}
+// Der Verlauf ist der groesste Block in der Anweisung. Zeilenzahl UND
+// Zeilenlaenge deckeln, sonst waechst er mit jedem Zug weiter.
+function verlaufText(n,maxZeile){
+  var m=maxZeile||(S.kurzKontext?140:240);
+  return S.verlauf.slice(-n).map(function(v){
+    var wer=(v.rolle==='npc'?(v.name||(W.npcs[v.idx]&&W.npcs[v.idx].name)||'NPC'):W.protagonist.name);
+    var t=String(v.text||'');
+    if(t.length>m)t=t.substring(0,m)+'…';
+    return wer+': '+t;
+  }).join('\n');
+}
+function kappe(t,max){
+  t=String(t||'');
+  return t.length>max?(t.substring(0,max)+'…'):t;
+}
+
+// ── EIN ZUG: Regie + Schauspiel + Bildidee in EINEM Aufruf ──
+async function naechsterZug(erzwinge,autoModus){
+  var mehrere=W.npcs.length>1;
+  var liste=W.npcs.map(function(n,i){
+    return '- NPC'+(i+1)+' = '+n.name+' ('+n.rolle+'). Persoenlichkeit: '+n.person+
+           '. Aktuelle Stimmung: '+S.stimmung[i]+
+           '. Traegt gerade: '+(S.kleidung[i]||n.kleidung||'unbestimmt')+'.';
+  }).join('\n');
+  var regieZeilen='';
+  for(var i=0;i<W.npcs.length;i++){
+    if(S.regieAnweisung[i]){
+      regieZeilen+='VERDECKTE REGIE fuer '+W.npcs[i].name+' (NPC'+(i+1)+'): '+S.regieAnweisung[i]+'. Setze das in Rede/Handlung um, ohne es zu erwaehnen oder zu zitieren.\n';
+      S.regieAnweisung[i]='';
+    }
+  }
+  var szeneRegie=S.autoRegie?('STEHENDE REGIE (szenenweit, ALLE Figuren beachten sie dauerhaft): '+S.autoRegie+'. Baue das laufend in Rede/Handlung ein, ohne es zu zitieren.\n'):'';
+  var zwang=(erzwinge>=0)?('WICHTIG: In DIESEM Zug MUSS NPC'+(erzwinge+1)+' ('+W.npcs[erzwinge].name+') sprechen.\n'):'';
+  var letzterNpc=-1, letzterWar='';
+  for(var j=S.verlauf.length-1;j>=0;j--){
+    if(S.verlauf[j].rolle==='npc'){letzterNpc=S.verlauf[j].idx;letzterWar=(W.npcs[letzterNpc]&&W.npcs[letzterNpc].name)||'';break;}
+    if(S.verlauf[j].rolle==='ich'){letzterWar=W.protagonist.name;break;}
+  }
+  var altern=(autoModus&&erzwinge<0&&letzterWar&&(mehrere||heldSpielt))
+    ?('Zuletzt sprach '+letzterWar+'. Lass nun bevorzugt jemand ANDEREN zu Wort kommen, damit sich alle abwechseln.\n'):'';
+  var heldSpielt=!!(autoModus&&CFG.autoHeld);
+  var werOpt=W.npcs.map(function(n,i){return 'NPC'+(i+1);}).join(' oder ');
+  if(heldSpielt)werOpt+=' oder HELD';
+
+  var instruction=
+    'Du fuehrst Regie UND spielst die Figuren in einem deutschen Dialog-Adventure. Am Ort sind '+W.npcs.length+' Person(en) anwesend. Du entscheidest, wer als Naechstes spricht, und schreibst diese EINE Zeile voll in der Rolle dieser Figur.\n\n'+
+    weltKontext()+
+    'ORT: '+W.ort.name+' — '+kappe(W.ort.geschichte,S.kurzKontext?260:420)+'\n'+
+    'ANWESENDE FIGUREN:\n'+liste+'\n\n'+
+    (mehrere?'Die Figuren duerfen sich auch GEGENSEITIG ansprechen und die Handlung gemeinsam vorantreiben. Jede Figur handelt eigenstaendig, mit eigener Stimme.\n':'')+
+    (autoModus&&!heldSpielt?'AUTO-MODUS: Der Held schweigt gerade. Die Figuren treiben die Szene EIGENSTAENDIG voran, reden miteinander und handeln.\n':'')+
+    (heldSpielt?('AUTO-MODUS MIT MITSPIELENDEM HELDEN: Auch '+W.protagonist.name+' handelt jetzt eigenstaendig. Du darfst ihn sprechen und handeln lassen, dann ist WER = HELD. Er bleibt dabei ganz er selbst: '+
+                 W.protagonist.beruf+' aus '+W.protagonist.herkunft+', Eigenart: '+W.protagonist.eigenart+'. Er ist kein blosser Stichwortgeber, sondern verfolgt eigene Absichten, fragt nach, widerspricht auch mal und ergreift die Initiative.\n'):'')+
+    (autoModus&&!mehrere?'Es ist nur EINE Figur anwesend: sie handelt allein weiter – denkt laut, beschaeftigt sich, kommentiert die Umgebung, geht ihrer Taetigkeit nach und treibt die Szene voran, auch ohne Gegenueber.\n':'')+
+    'REGISTER: Der Ton ist warm, freundlich und offen. Alle Figuren begegnen einander UND dem Helden mit Respekt und Sympathie. Frivole, freche, anzuegliche und teils obszoene Sprueche sind erlaubt und erwuenscht, solange sie SPIELERISCH und gutmuetig bleiben. KEINE Beleidigungen, keine Herablassung, keine Feindseligkeit untereinander — necken ja, verletzen oder respektlos sein nein.\n'+
+    '- Text des Helden in eckigen Klammern sind seine HANDLUNGEN. Figuren antworten mit EIGENEN Handlungen (in eckigen Klammern) und Rede.\n'+
+    '- Reagiere KONKRET auf das zuletzt Gesagte. Wiederhole keine Formulierungen aus frueheren Zeilen.\n'+
+    '- Widersprich nichts, was unter WAS BISHER FESTSTEHT aufgefuehrt ist.\n'+
+    '- Stimmungen duerfen sich durch das Gespraech aendern, zum Guten wie zum Schlechten.\n\n'+
+    szeneRegie+regieZeilen+altern+zwang+
+    'BISHERIGES GESCHEHEN:\n'+verlaufText(S.kurzKontext?6:10)+'\n\n'+
+    'Antworte NUR mit einem gueltigen JSON-Objekt, ohne Codeblock, ohne Kommentare, ohne Text davor oder danach:\n'+
+    '{\n'+
+    '  "wer": "'+werOpt+(autoModus?'':' oder STOP')+'",\n'+
+    '  "antwort": "die gesprochene Reaktion dieser Figur auf Deutsch, 1 bis 3 Saetze, Handlungen in eckigen Klammern",\n'+
+    '  "stimmung": "Stimmung DIESER Figur nach dem Moment, EIN deutsches Wort",\n'+
+    '  "weiter": false,\n'+
+    '  "auftritt": "Person, die JETZT dazustoesst: Name und Rolle. Sonst leer.",\n'+
+    '  "abgang": "Anwesende Person, die JETZT weggeht: ihr Name. Sonst leer.",\n'+
+    '  "ortwechsel": "Neuer Ort mit kurzer Beschreibung, wenn der Schauplatz JETZT wechselt. Sonst leer.",\n'+
+    '  "kleidung": "Name: neues Outfit auf ENGLISCH, wenn sich jemand JETZT umzieht. Sonst leer.",\n'+
+    '  "ortaenderung": "kurzer Satz, wenn sich am Ort etwas dauerhaft aendert. Sonst leer.",\n'+
+    '  "bild": "one English sentence, PURELY VISUAL: what the characters do, posture, expression, gaze, setting, light, camera framing. No names, no art style.",\n'+
+    '  "handlung": "1 bis 2 Saetze, die die Handlung fortschreiben",\n'+
+    '  "fakt": "ein kurzer neuer Fakt, der spaeter gelten soll, sonst leer"\n'+
+    '}\n\n'+
+    'Die vier Felder auftritt, abgang, ortwechsel und kleidung veraendern das Spiel wirklich: Was dort nicht steht, geschieht nicht. Kommt in deiner Antwort jemand herein, MUSST du "auftritt" ausfuellen. Eine blosse Ankuendigung gehoert nicht hinein.\n'+
+    'Anwesend: '+W.npcs.map(function(n){return n.name;}).join(', ')+'. '+
+    (autoModus?'"wer": Es MUSS eine Figur sprechen, niemals STOP.':'"wer": STOP heisst, der Held ist wieder dran.')+
+    ' "weiter": true, wenn sofort noch eine ANDERE Figur reagieren sollte.';
+
+  var text=await frageKI(instruction,150000);
+  var j2=jsonAus(text), z=j2?null:felderAus(text);
+  // Fuer /roh aufheben: ohne Blick auf die Rohantwort ist nicht zu erkennen,
+  // ob ein Feld fehlte, leer war oder die Antwort abgeschnitten wurde.
+  S.letzteRohantwort=String(text||'');
+  S.letzteJsonOk=!!j2;
+  var wer      = j2?hole(j2,['wer'],''):(z['WER']||'');
+  var antwort  = entkleide(j2?hole(j2,['antwort'],''):(z['ANTWORT']||''));
+  var stimmung = einWort(j2?hole(j2,['stimmung'],''):(z['STIMMUNG']||''));
+  var bild     = entkleide(j2?hole(j2,['bild'],''):(z['BILD']||z['SZENE']||''));
+  var handlung = entkleide(j2?hole(j2,['handlung'],''):(z['HANDLUNG']||''));
+  var fakt     = entkleide(j2?hole(j2,['fakt'],''):(z['FAKT']||''));
+  var ortwechsel  = entkleide(j2?hole(j2,['ortwechsel'],''):(z['ORTWECHSEL']||''));
+  var ortaenderung= entkleide(j2?hole(j2,['ortaenderung'],''):(z['ORTAENDERUNG']||''));
+  var kleidungNeu = entkleide(j2?hole(j2,['kleidung'],''):(z['KLEIDUNG']||''));
+  var auftritt = entkleide(j2?hole(j2,['auftritt'],''):(z['AUFTRITT']||''));
+  var abgang   = entkleide(j2?hole(j2,['abgang'],''):(z['ABGANG']||''));
+  var weiterRoh= j2?j2.weiter:(z['WEITER']||'');
+  var weiter   = (weiterRoh===true)||/^(ja|yes|true)/i.test(String(weiterRoh||''));
+
+  if(!antwort||(!autoModus&&/STOP/i.test(wer)))return {stop:true};
+  if(heldSpielt&&/\bHELD\b|PROTAGONIST/i.test(wer)){
+    if(handlung)S.handlung=handlung;
+    if(fakt)merkeFakt(fakt);
+    if(bild)S.szeneText=bild;
+    return {stop:false,held:true,text:antwort,weiter:false,auftritt:auftritt,abgang:abgang,
+            ortwechsel:ortwechsel,ortaenderung:ortaenderung,kleidung:kleidungNeu};
+  }
+  var idx=0;
+  var m=String(wer).match(/(\d+)/);
+  if(m)idx=parseInt(m[1],10)-1;
+  if(erzwinge>=0)idx=erzwinge;
+  if(idx<0||idx>=W.npcs.length)idx=0;
+
+  if(handlung)S.handlung=handlung;
+  if(fakt)merkeFakt(fakt);
+  if(bild)S.szeneText=bild;
+
+  return {stop:false,idx:idx,text:antwort,stimmung:stimmung,weiter:(weiter&&W.npcs.length>1),
+          auftritt:auftritt,abgang:abgang,ortwechsel:ortwechsel,ortaenderung:ortaenderung,
+          kleidung:kleidungNeu};
+}
+
+// Eine Zeitueberschreitung heisst meist: die Anweisung war zu lang oder der
+// Dienst ueberlastet. Ab dann kuerzer fragen, statt weiter aufzulaufen.
+function pruefeZeitueberschreitung(e){
+  var m=String((e&&e.message)||e);
+  if(!/Timeout|Zeitüberschreitung|Zeitueberschreitung/i.test(m))return false;
+  if(!S.kurzKontext){
+    S.kurzKontext=true;
+    sysZeile('⏱ Die KI hat nicht rechtzeitig geantwortet. Ab jetzt wird der Kontext kürzer gehalten — '+
+             'mit /nochmal kannst du den Zug wiederholen.');
+    autosave();
+  }else{
+    sysZeile('⏱ Wieder keine Antwort. Der Textdienst ist vermutlich überlastet — /nochmal versucht es erneut.');
+  }
+  return true;
+}
+// Leere Angaben kommen in vielen Verkleidungen zurueck.
+function leerAngabe(t){
+  return !t||/^(nein|kein|keine[rn]?|niemand|none|null|nichts|-|\u2014)$/i.test(String(t).trim());
+}
+function findeNpc(name){
+  var n=String(name||'').toLowerCase().trim();
+  if(!n)return -1;
+  var erstes=n.split(/[\s,]+/)[0];
+  var idx=-1;
+  W.npcs.forEach(function(f,i){
+    if(idx>=0)return;
+    var fn=String(f.name||'').toLowerCase();
+    if(!fn)return;
+    if(fn===n||n.indexOf(fn)>=0||fn.split(/\s+/)[0]===erstes)idx=i;
+  });
+  return idx;
+}
+// Die Handlung entscheidet mit, wer am Ort ist: kuendigt sie jemanden an oder
+// laesst jemanden gehen, zieht die Besetzung nach.
+// "Ida: a red silk dress" - auch mehrere, mit Semikolon getrennt. Gilt fuer
+// die Figuren wie fuer den Helden. Unveraenderte Angaben werden verworfen,
+// damit nicht bei jedem Zug dasselbe Bild neu entsteht.
+function kleidungAendern(eintrag){
+  var geaendert=false;
+  String(eintrag||'').split(/\s*;\s*/).forEach(function(teil){
+    var m=teil.match(/^([^:]{1,48}):\s*([\s\S]+)$/);
+    if(!m)return;
+    var name=entkleide(m[1]), outfit=entkleide(m[2]);
+    if(leerAngabe(outfit)||outfit.length<3)return;
+    var pn=String(W.protagonist.name||'').toLowerCase().split(/\s+/)[0];
+    if(pn&&name.toLowerCase().indexOf(pn)>=0){
+      if(String(W.protagonist.kleidung||'').toLowerCase()===outfit.toLowerCase())return;
+      W.protagonist.kleidung=outfit;
+      sysZeile('✦ '+W.protagonist.name+' trägt jetzt: '+outfit+' ✦');
+      geaendert=true;return;
+    }
+    var i=findeNpc(name);
+    if(i<0)return;
+    if(String(S.kleidung[i]||'').toLowerCase()===outfit.toLowerCase())return;
+    S.kleidung[i]=outfit;
+    W.npcs[i].kleidung=outfit;   // damit es auch im Figurenmenü steht
+    sysZeile('✦ '+W.npcs[i].name+' trägt jetzt: '+outfit+' ✦');
+    geaendert=true;
+  });
+  return geaendert;
+}
+// Reihenfolge: erst der Ort, dann wer bleibt und wer dazukommt. Sonst
+// tritt die neue Person noch am alten Schauplatz auf.
+async function folgeHandlung(res){
+  if(!res)return;
+  if(CFG.autoBesetzung&&!leerAngabe(res.ortaenderung))ortNotiz(res.ortaenderung);
+  if(CFG.autoBesetzung&&!leerAngabe(res.ortwechsel)&&!S.ortLaeuft)await ortWechseln(res.ortwechsel);
+  await besetzungAendern(res);
+  // Ein Kleiderwechsel ist sichtbar - deshalb sofort neu zeichnen, nicht erst
+  // beim naechsten Bildtakt.
+  if(CFG.autoBesetzung&&!leerAngabe(res.kleidung)&&kleidungAendern(res.kleidung)){
+    S.bildZaehler=0;
+    autosave();
+    zeichneBild({});
+  }
+}
+async function besetzungAendern(res){
+  if(!CFG.autoBesetzung||!res)return;
+  if(!leerAngabe(res.abgang)){
+    var i=findeNpc(res.abgang);
+    if(i>=0&&W.npcs.length>1)entferneNPC(i);
+  }
+  if(!leerAngabe(res.auftritt)&&W.npcs.length<MAX_NPCS&&!S.npcErscheint){
+    await erscheineNPC(res.auftritt,true);
+  }
+}
+
+// ── SCHLAGABTAUSCH ────────────────────────────
+async function fuehreSchlagabtausch(erzwungenerIdx){
+  if(S.wartet&&erzwungenerIdx<0)return;
+  setWartet(true);
+  var cap=W.npcs.length>1?Math.min(MAX_ZUEGE,W.npcs.length):1;
+  var erzwinge=(typeof erzwungenerIdx==='number')?erzwungenerIdx:-1;
+  var zuege=0;
+  while(zuege<cap){
+    var res=null;
+    try{ res=await naechsterZug(erzwinge); }
+    catch(e){ if(!pruefeZeitueberschreitung(e))zeigeFehler('NPC-Zug',e); break; }
+    erzwinge=-1;
+    if(!res||res.stop)break;
+    npcSagt(res.idx,res.text);
+    S.verlauf.push({rolle:'npc',idx:res.idx,text:res.text,name:W.npcs[res.idx].name});
+    if(res.stimmung){ S.stimmung[res.idx]=res.stimmung; zeigeStimmung(); }
+    await folgeHandlung(res);
+    zuege++;
+    if(!res.weiter)break;
+  }
+  bildTakt();
+  autosave();
+  setWartet(false);
+}
+function bildTakt(){
+  if(!CFG.bildTakt)return;
+  S.bildZaehler=(S.bildZaehler||0)+1;
+  if(S.bildZaehler<CFG.bildTakt)return;
+  S.bildZaehler=0;
+  if(S.bildPauseBis&&Date.now()<S.bildPauseBis)return;   // Dienst drosselt gerade
+  if(S.eigenerPrompt){
+    // Festgehalten: das Bild soll bewusst stehenbleiben, also gar nicht erst
+    // dieselbe Anfrage noch einmal stellen.
+    if(S.promptFesthalten)return;
+    // Sonst hat die Handlung Vorrang: ab hier folgt das Bild wieder der Szene.
+    S.eigenerPrompt='';S.eigenerNegativ='';
+  }
+  zeichneBild({});
+}
+
+// ── AUTO-MODUS ────────────────────────────────
+function warte(ms){ return new Promise(function(r){setTimeout(r,ms);}); }
+function autoUmschalten(){
+  if(!S.imSpiel)return;
+  S.autoAktiv=!S.autoAktiv;
+  aktualisiereUI();
+  if(S.autoAktiv){
+    sysZeile('▶ Auto-Modus an — '+(CFG.autoHeld?(W.protagonist.name+' und die Figuren übernehmen'):'die Figuren übernehmen')+
+             '. Deine Eingaben sind jetzt Regie (mit /sag: sprichst du selbst).');
+    autoSchleife();
+  }else{
+    sysZeile('⏹ Auto-Modus aus.');
+  }
+}
+async function autoSchleife(){
+  if(S.autoLaeuft)return;
+  S.autoLaeuft=true;
+  var fehler=0;
+  while(S.autoAktiv){
+    var erzwinge=(S.autoForceIdx!=null)?S.autoForceIdx:-1;
+    S.autoForceIdx=null;
+    var res=null;
+    try{
+      res=await naechsterZug(erzwinge,true);
+      fehler=0;
+    }catch(e){
+      // Nicht sofort aufgeben: kurze Pause, dann erneut. Erst nach drei
+      // Fehlschlaegen abschalten – und dann auch sichtbar, nicht stumm.
+      fehler++;
+      if(!pruefeZeitueberschreitung(e))zeigeFehler('Auto-Zug',e);
+      if(fehler>=3){
+        S.autoAktiv=false;
+        sysZeile('⏹ Auto-Modus nach mehreren Fehlern beendet.');
+        break;
+      }
+      await warte(2000*fehler);
+      continue;
+    }
+    if(!S.autoAktiv)break;
+    if(res&&!res.stop){
+      if(res.held){
+        ichSage(res.text);
+        S.verlauf.push({rolle:'ich',text:res.text});
+      }else{
+        npcSagt(res.idx,res.text);
+        S.verlauf.push({rolle:'npc',idx:res.idx,text:res.text,name:W.npcs[res.idx].name});
+        if(res.stimmung){ S.stimmung[res.idx]=res.stimmung; zeigeStimmung(); }
+      }
+      await folgeHandlung(res);
+      bildTakt();
+      autosave();
+      await warte(Math.min(6000,900+String(res.text).length*Math.max(8,CFG.tempo)));
+    }else{
+      await warte(1500);
+    }
+  }
+  S.autoLaeuft=false;
+  aktualisiereUI();
+}
+function setzeAutoRegie(txt){
+  S.autoRegie=txt;
+  sysZeile('🎬 Stehende Regie: '+txt);
+  autosave();
+}
+
+// ── BILD-PIPELINE ─────────────────────────────
+// Der Prompt wird aus Bausteinen gebaut, damit beim Kuerzen nicht ausgerechnet
+// das Ende verlorengeht: dort stehen Stil und Bildaufbau, und die bestimmen,
+// wie das Bild ueberhaupt aussieht. Gekuerzt wird in der Mitte.
+function bauePrompt(opts,max){
+  var figurenArr=[];
+  var P=W.protagonist;
+  var ichSicht=(W.perspektive==='ich');
+  // In der Ich-Perspektive taucht der Held nicht als eigene Figur auf -
+  // die Kamera ist sein Blick.
+  if(!ichSicht&&P&&(P.aussehen||'').trim()){
+    var pa=P.aussehen.trim().replace(/[.\s]+$/,'');
+    var pk=(P.kleidung||'').trim().replace(/[.\s]+$/,'');
+    figurenArr.push(pa+(pk?', wearing '+pk:''));
+  }
+  W.npcs.forEach(function(n,i){
+    var a=(n.aussehen||'a person').trim().replace(/[.\s]+$/,'');
+    var k=(S.kleidung[i]||n.kleidung||'').trim().replace(/[.\s]+$/,'');
+    figurenArr.push(a+(k?', wearing '+k:''));
+  });
+  var figuren=figurenArr.join(' AND ');
+  var figCount=figurenArr.length;
+  var szene=(opts.szene||S.szeneText||(W.ort&&W.ort.bildPrompt)||'').trim();
+  var setting=(S.szeneGlobal||'').trim().replace(/[.\s]+$/,'');
+  var stimmungen=W.npcs.map(function(n,i){return S.stimmung[i];}).filter(Boolean).join(' and ');
+  var anzahl=figCount>1?(figCount+' distinct characters together in the scene, interacting'):'single character in the foreground';
+
+  var sicht=ichSicht
+    ? ', first person point of view, seen through the protagonist eyes, the viewer is the protagonist, protagonist himself not visible'
+    : '';
+  var schwanz=', '+aktuellerStil()+', '+anzahl+sicht+', comic panel composition, dramatic lighting, detailed background';
+  var mitte=(setting?'. Setting: '+setting:'')+(szene?'. Scene: '+szene:'')+(stimmungen?', mood: '+stimmungen:'');
+  var ganz=figuren+mitte+schwanz;
+  if(!max||ganz.length<=max)return ganz;
+
+  // Zu lang: Stil und Bildaufbau bleiben unangetastet, der Rest teilt sich den Platz.
+  var frei=Math.max(80,max-schwanz.length);
+  var figurAnteil=Math.floor(frei*0.55);
+  if(figuren.length>figurAnteil)figuren=kuerzeText(figuren,figurAnteil);
+  mitte=kuerzeText(mitte,Math.max(0,frei-figuren.length));
+  return figuren+mitte+schwanz;
+}
+function baueNegativ(){
+  var extra=STIL_NEGATIV[aktuellerStilSchluessel()];
+  return CFG.negativ+(extra?', '+extra:'');
+}
+async function zeichneBild(opts){
+  opts=opts||{};
+  // Laeuft schon eines? Dann NICHT verwerfen, sondern vormerken —
+  // sonst bleibt das Bild bei langsamen Diensten minutenlang stehen.
+  if(S.bildLaeuft){ S.bildAusstehend=opts; return; }
+  S.bildLaeuft=true;
+  el('szenelade').classList.add('an');
+  try{
+    // Rangfolge: einmaliger Override → eigener Prompt (überdauert Quellenwechsel)
+    // → automatisch aus der Szene gebaut.
+    var max=quelle().maxPrompt;
+    var prompt = (opts.promptOverride!=null) ? String(opts.promptOverride).trim()
+               : (S.eigenerPrompt ? S.eigenerPrompt : bauePrompt(opts,max));
+    if(max&&prompt.length>max)prompt=kuerzeText(prompt,max);   // greift nur bei eigenen Prompts
+    var negativ= (opts.negativOverride!=null)?String(opts.negativOverride).trim():(S.eigenerNegativ||baueNegativ());
+    var seed   = (opts.seedOverride!=null&&String(opts.seedOverride).trim()!=='')
+                 ?(parseInt(opts.seedOverride,10)||S.seed)
+                 :(S.seed||(S.seed=neuerSeed()));
+    S.seed=seed;
+    var src=await quelle().zeichne({prompt:prompt,negativ:negativ,seed:seed,breite:auf64(CFG.breite),hoehe:auf64(CFG.hoehe)});
+    if(S.letzteBildUrl&&S.letzteBildUrl.indexOf('blob:')===0&&S.letzteBildUrl!==src){
+      try{ URL.revokeObjectURL(S.letzteBildUrl); }catch(e1){}
+    }
+    el('img0').src=src;
+    S.letzteBildUrl=src;
+    S.bildGeneriert=true;
+    S.letzterPrompt=prompt;
+    S.letzterNegativ=negativ;
+  }catch(e){
+    var m=String((e&&e.message)||e);
+    var gedrosselt=/HTTP 429/.test(m);
+    // Ein erschöpftes Kontingent meldet nicht jeder Dienst als 429 — ZeroGPU
+    // etwa schreibt es in die Antwort. Auch dann nicht weiter anklopfen.
+    var kontingent=/zerogpu|quota|rate.?limit|exceeded|kontingent/i.test(m);
+    if(!gedrosselt&&!kontingent&&istServerPanne(m)){
+      S.bildPauseBis=Date.now()+90000;
+      errZeile('⚠ '+quelle().label+' ist auf einen GPU-Fehler gelaufen — das passiert auf dem Server, '+
+               'nicht in deiner Anfrage. Zweiter Anlauf ist schon gescheitert, daher 90s Pause. '+
+               'Bleibt es dabei, ist der Space gerade defekt; Perchance zeichnet weiter.');
+    }else if(gedrosselt||kontingent){
+      var sek=gedrosselt?60:300, ra=m.match(/in (\d+)s/);
+      if(ra)sek=Math.max(15,Math.min(600,parseInt(ra[1],10)||60));
+      S.bildPauseBis=Date.now()+sek*1000;
+      errZeile('⚠ '+quelle().label+(kontingent?' — Kontingent erschöpft':' drosselt (HTTP 429)')+
+               '. Keine Bildanfragen für '+sek+'s. '+
+               (/token/i.test(m)?'Ein Hugging-Face-Token im Feld „Token" (⚙) hebt das Kontingent deutlich an. ':'')+
+               'Sonst: Bild-Takt in ⚙ erhöhen oder zurück auf Perchance.');
+    }else{
+      zeigeFehler('Bild ('+quelle().label+')',e);
+    }
+  }
+  el('szenelade').classList.remove('an');
+  S.bildLaeuft=false;
+  if(S.bildAusstehend){ var n=S.bildAusstehend; S.bildAusstehend=null; zeichneBild(n); }
+}
+
+// ── BEFEHLE ───────────────────────────────────
+var BEFEHLE=[
+  {muster:/^\/hilfe\b/i,                        hilfe:['/hilfe','öffnet dieses Fenster'],
+   fn:function(){ oeffneHilfe(); }},
+  {muster:/^\/sag\s*:?\s*([\s\S]*)$/i,          hilfe:['/sag: …','sprich selbst — auch wenn der Auto-Modus läuft'],
+   fn:function(m){ var t=entkleide(m[1]); if(!t){sysZeile('/sag: gib an, was du sagen willst.');return;} if(S.wartet){sysZeile('— Bitte kurz warten —');return;} spielerSagt(t); }},
+  {muster:/^\/npc\s*(\d+)\s*:?\s*([\s\S]*)$/i,  hilfe:['/npcN: …','verdeckte Regie an Figur N (neue Nummer = neue Figur tritt auf)'],
+   fn:function(m){ regieBefehl(parseInt(m[1],10)-1,m[2]); }},
+  {muster:/^\/kleidung\s*(\d+)\s*:?\s*([\s\S]*)$/i, hilfe:['/kleidungN: …','dauerhaftes Outfit für Figur N (englisch)'],
+   fn:function(m){ kleidungBefehl(parseInt(m[1],10)-1,m[2]); }},
+  {muster:/^\/regie\s*:?\s*([\s\S]*)$/i,        hilfe:['/regie: …','stehende Regie für die ganze Szene (leer = löschen)'],
+   fn:function(m){ var t=entkleide(m[1]); if(!t){S.autoRegie='';sysZeile('🎬 Stehende Regie gelöscht.');autosave();return;} setzeAutoRegie(t); }},
+  {muster:/^\/bild\s*:?\s*([\s\S]*)$/i,         hilfe:['/bild: …','neues Bild aus deiner Beschreibung (englisch wirkt am besten)'],
+   fn:function(m){ bildBefehl(m[1]); }},
+  {muster:/^\/stil\s*:?\s*([\s\S]*)$/i,         hilfe:['/stil: …','Bildstil ändern (manga, comic, aquarell, oel, realistisch, pixel oder eigener Text)'],
+   fn:function(m){ stilBefehl(m[1]); }},
+  {muster:/^\/quelle\b\s*:?\s*([\s\S]*)$/i,     hilfe:['/quelle','Bildquelle wechseln (öffnet die Einstellungen)'],
+   fn:function(m){ quelleBefehl(m[1]); }},
+  {muster:/^\/roh\b/i,                          hilfe:['/roh','zeigt die letzte Antwort der Regie im Original — zur Fehlersuche'],
+   fn:function(){ zeigeRohantwort(); }},
+  {muster:/^\/ort\s*:?\s*([\s\S]*)$/i,          hilfe:['/ort: …','an einen anderen Ort wechseln (ohne Angabe: Ort-Menü)'],
+   fn:function(m){ var t=entkleide(m[1]); if(!t){oeffneOrtMenu();return;} if(S.wartet){sysZeile('— Bitte kurz warten —');return;} ortWechseln(t); }},
+  {muster:/^\/perspektive\s*:?\s*([\s\S]*)$/i,   hilfe:['/perspektive: ich|er','Erzählweise wechseln (ohne Angabe: aktuelle anzeigen)'],
+   fn:function(m){ perspektiveBefehl(m[1]); }},
+  {muster:/^\/undo\b/i,                         hilfe:['/undo','letzten Zug zurücknehmen'],
+   fn:function(){ undo(); }},
+  {muster:/^\/nochmal\b/i,                      hilfe:['/nochmal','letzten Zug verwerfen und die Antwort neu würfeln'],
+   fn:function(){ nochmal(); }},
+  {muster:/^\/speichern\b/i,                    hilfe:['/speichern','Spielstände öffnen'],
+   fn:function(){ oeffneSpeicher(); }}
+];
+function befehlVerarbeitet(txt){
+  for(var i=0;i<BEFEHLE.length;i++){
+    var m=txt.match(BEFEHLE[i].muster);
+    if(m){ BEFEHLE[i].fn(m); return true; }
+  }
+  return false;
+}
+// Zeigt, was die Regie zuletzt wirklich geantwortet hat, und was davon
+// angekommen ist. Damit laesst sich unterscheiden: Feld fehlte, Feld war leer,
+// oder die Antwort brach ab.
+function zeigeRohantwort(){
+  var roh=S.letzteRohantwort||'';
+  if(!roh){ sysZeile('Noch keine Antwort der Regie da.'); return; }
+  var j=jsonAus(roh);
+  var felder=['wer','antwort','stimmung','weiter','auftritt','abgang','ortwechsel','kleidung','ortaenderung','bild','handlung','fakt'];
+  var zeilen=felder.map(function(f){
+    var wert=j?j[f]:undefined;
+    var da=(wert!==undefined&&wert!==null&&String(wert).trim()!=='');
+    return (da?'✓ ':(wert===undefined?'— ':'· '))+f+(da?': '+String(wert).substring(0,60):'');
+  });
+  var g=el('gespraech');
+  var z=document.createElement('div');
+  z.className='zeile hilfe';
+  z.innerHTML='<div class="txt"><b>LETZTE ANTWORT DER REGIE</b><br>'+
+    'Als JSON lesbar: '+(S.letzteJsonOk?'ja':'nein — der Zeilenparser hat übernommen')+'<br>'+
+    'Kontext: '+(S.kurzKontext?'gekürzt (nach Zeitüberschreitung)':'normal')+'<br>'+
+    'Länge: '+roh.length+' Zeichen'+(/\}\s*$/.test(roh.trim())?'':' · <b>endet nicht mit }</b> — vermutlich abgeschnitten')+'<br><br>'+
+    zeilen.map(escapeHtml).join('<br>')+
+    '<br><br><b>ORIGINAL</b><br>'+escapeHtml(roh.substring(0,900))+(roh.length>900?' …':'')+'</div>';
+  g.appendChild(z);scrolle();
+}
+// Die Liste baut sich aus der Befehls-Registry auf: ein neuer Befehl steht
+// damit automatisch in der Hilfe, ohne dass sie nachgepflegt werden muss.
+function oeffneHilfe(){
+  var h='<div class="hilfeabschnitt">SO SPRICHST UND HANDELST DU</div>'+
+    '<div class="hilfeabsatz">Was du ohne Schrägstrich schreibst, <b>sagt deine Figur</b>. '+
+    'Text in \x5Beckigen Klammern\x5D ist eine <b>Handlung</b> statt einer Rede — '+
+    'zum Beispiel <i>\x5Bich lege die Hand auf den Tisch\x5D Und jetzt?</i><br><br>'+
+    'Läuft der <b>Auto-Modus</b>, wird jede Eingabe ohne Schrägstrich zur <b>stehenden Regie</b> '+
+    'für die ganze Szene. Selbst sprechen kannst du dann mit <b>/sag:</b>.</div>'+
+    '<div class="hilfeabschnitt">BEFEHLE</div>';
+  BEFEHLE.forEach(function(b){
+    h+='<div class="hilfezeile"><div class="hilfebefehl">'+escapeHtml(b.hilfe[0])+'</div>'+
+       '<div class="hilfetext">'+escapeHtml(b.hilfe[1])+'</div></div>';
+  });
+  h+='<div class="hilfeabschnitt">WAS DIE HANDLUNG VON SELBST TUT</div>'+
+    '<div class="hilfeabsatz">Erzählt die Regie, dass jemand <b>hereinkommt oder geht</b>, dass der '+
+    '<b>Ort wechselt</b> oder sich jemand <b>umzieht</b>, geschieht das wirklich — die Besetzung, der '+
+    'Raumtitel, das Figurenmenü und das Bild ziehen nach. Abschaltbar in ⚙.<br><br>'+
+    'Bleibt eine solche Änderung aus, zeigt <b>/roh</b>, was die Regie tatsächlich geantwortet hat.</div>'+
+    '<div class="hilfeabschnitt">DIE KNÖPFE OBEN</div>';
+  [['📖','Chronik: Ort, Handlung und die Figuren'],
+   ['👤','Figuren bearbeiten — Name, Aussehen, Kleidung, Stimmung'],
+   ['📍','Ort: Name, Beschreibung, Bildkulisse, Ortswechsel'],
+   ['🎬','Bildstil'],
+   ['🖼','Bild: Prompt, Negativprompt, Seed, neu zeichnen'],
+   ['⚙','Einstellungen: Bildquelle, Bildgröße, Takt, Schreibtempo'],
+   ['💾','Spielstände: vier Plätze, Export und Import'],
+   ['⟲','letzten Zug zurücknehmen'],
+   ['+ NPC','eine weitere Person auftreten lassen'],
+   ['▶ AUTO','die Figuren spielen selbstständig weiter'],
+   ['⌃','Kopfleiste ein- und ausklappen']
+  ].forEach(function(k){
+    h+='<div class="hilfezeile"><div class="hilfebefehl">'+escapeHtml(k[0])+'</div>'+
+       '<div class="hilfetext">'+escapeHtml(k[1])+'</div></div>';
+  });
+  el('hilfeInhalt').innerHTML=h;
+  oeffneModal('mHilfe');
+}
+function sendeFreitext(){
+  var feld=el('freitext');
+  var txt=feld.value.trim();
+  if(!txt)return;
+  if(befehlVerarbeitet(txt)){ feld.value=''; return; }
+  if(S.autoAktiv){ feld.value=''; setzeAutoRegie(txt); return; }
+  if(S.wartet)return;
+  feld.value='';
+  spielerSagt(txt);
+}
+function spielerSagt(txt){
+  merkeSchnappschuss();
+  ichSage(txt);
+  S.verlauf.push({rolle:'ich',text:txt});
+  fuehreSchlagabtausch(-1);
+}
+function regieBefehl(idx,hintRaw){
+  if(!S.imSpiel)return;
+  var hint=entkleide(hintRaw);
+  if(idx===W.npcs.length&&idx<MAX_NPCS){ erscheineNPC(hint); return; }   // naechste freie Nummer = neue Figur
+  if(idx<0||idx>=W.npcs.length){ sysZeile('Diese Figur gibt es nicht (1 bis '+W.npcs.length+').'); return; }
+  if(!hint){ sysZeile('/npc'+(idx+1)+': gib nach dem Doppelpunkt eine Regieanweisung an.'); return; }
+  if(S.autoAktiv){
+    S.regieAnweisung[idx]=hint;
+    S.autoForceIdx=idx;
+    sysZeile('🎬 Regie an '+W.npcs[idx].name+': '+hint);
+    autosave();
+    return;
+  }
+  if(S.wartet){ sysZeile('— Bitte kurz warten —'); return; }
+  merkeSchnappschuss();
+  S.regieAnweisung[idx]=hint;
+  sysZeile('🎬 Regie an '+W.npcs[idx].name+': '+hint);
+  fuehreSchlagabtausch(idx);
+}
+function kleidungBefehl(idx,outfitRaw){
+  if(!S.imSpiel)return;
+  if(idx<0||idx>=W.npcs.length){ sysZeile('Diese Figur gibt es nicht.'); return; }
+  var outfit=entkleide(outfitRaw);
+  if(!outfit){ sysZeile('/kleidung'+(idx+1)+': gib nach dem Doppelpunkt ein Outfit an.'); return; }
+  S.kleidung[idx]=outfit;
+  sysZeile('✦ Neues Outfit für '+W.npcs[idx].name+': '+outfit+' ✦');
+  if(S.eigenerPrompt)sysZeile('Hinweis: Ein eigener Prompt ist aktiv, das Outfit wirkt erst nach „AUS SZENE" im Bildmenü.');
+  autosave();
+  zeichneBild({});
+}
+function bildBefehl(descRaw){
+  if(!S.imSpiel)return;
+  var beschreibung=entkleide(descRaw);
+  if(!beschreibung){ sysZeile('/bild: gib nach dem Doppelpunkt eine Bildbeschreibung an.'); return; }
+  S.szeneText=beschreibung;
+  S.bildZaehler=0;
+  S.eigenerPrompt='';S.eigenerNegativ='';S.promptFesthalten=false;   // ausdrueckliche Neubeschreibung schlaegt den eigenen Prompt
+  sysZeile('✦ Neues Bild: '+beschreibung+' ✦');
+  zeichneBild({szene:beschreibung});
+}
+function stilBefehl(raw){
+  if(!S.imSpiel)return;
+  var t=entkleide(raw);
+  if(!t){
+    var akt=S.stil?S.stilLabel:('Start-Auswahl ('+(el('stilwahl')?el('stilwahl').value:'?')+')');
+    sysZeile('Aktueller Stil: '+akt+'. Presets: '+Object.keys(STILE).join(', ')+' — oder /stil: <eigener Text>.');
+    return;
+  }
+  var key=t.toLowerCase();
+  if(STILE[key]){ S.stil=STILE[key]; S.stilLabel=key; }
+  else{ S.stil=t; S.stilLabel=t; }
+  sysZeile('✦ Bildstil: '+S.stilLabel+' ✦');
+  if(S.eigenerPrompt)sysZeile('Hinweis: Ein eigener Prompt ist aktiv, der Stil wirkt erst nach „AUS SZENE" im Bildmenü.');
+  autosave();
+  zeichneBild({});
+}
+function perspektiveBefehl(raw){
+  if(!S.imSpiel)return;
+  var t=entkleide(raw).toLowerCase();
+  if(!t){
+    sysZeile('Erzählweise: '+(W.perspektive==='ich'?'Ich-Perspektive (du siehst durch seine Augen)'
+                                                   :'Er-Perspektive ('+W.protagonist.name+' ist im Bild)')+
+             ' — umschalten mit /perspektive: ich  oder  /perspektive: er');
+    return;
+  }
+  var neu=/^(ich|first|1|ego)/.test(t)?'ich':(/^(er|sie|third|3)/.test(t)?'er':'');
+  if(!neu){ sysZeile('Unbekannt. Möglich: /perspektive: ich  oder  /perspektive: er'); return; }
+  W.perspektive=neu;
+  sysZeile(neu==='ich'?'✦ Ab jetzt durch deine Augen ✦':'✦ Ab jetzt aus der Beobachterperspektive ✦');
+  autosave();
+  zeichneBild({});
+}
+function quelleBefehl(raw){
+  var t=entkleide(raw).toLowerCase();
+  if(t&&BILDQUELLEN[t]){
+    CFG.quelle=t;speichereCfg();
+    sysZeile('✦ Bildquelle: '+BILDQUELLEN[t].label+' ✦');
+    zeichneBild({});
+    return;
+  }
+  if(t)sysZeile('Unbekannte Quelle. Möglich: '+Object.keys(BILDQUELLEN).join(', '));
+  oeffneEinstellungen();
+}
+
+// ── UNDO / NOCHMAL ────────────────────────────
+function merkeSchnappschuss(){
+  S.rueckgaengig.push(JSON.stringify({
+    verlauf:S.verlauf, stimmung:S.stimmung, kleidung:S.kleidung,
+    handlung:S.handlung, fakten:S.fakten, szeneText:S.szeneText
+  }));
+  while(S.rueckgaengig.length>MAX_UNDO)S.rueckgaengig.shift();
+}
+function stelleZurueck(){
+  var roh=S.rueckgaengig.pop();
+  if(!roh)return null;
+  var d=JSON.parse(roh);
+  S.verlauf=d.verlauf;S.stimmung=d.stimmung;S.kleidung=d.kleidung;
+  S.handlung=d.handlung;S.fakten=d.fakten;S.szeneText=d.szeneText;
+  return d;
+}
+function undo(){
+  if(!S.imSpiel)return;
+  if(S.wartet){ sysZeile('— Bitte kurz warten —'); return; }
+  if(!S.rueckgaengig.length){ sysZeile('Nichts mehr zurückzunehmen.'); return; }
+  stelleZurueck();
+  zeichneVerlaufNeu();
+  sysZeile('⟲ Zug zurückgenommen.');
+  autosave();
+}
+function nochmal(){
+  if(!S.imSpiel)return;
+  if(S.wartet){ sysZeile('— Bitte kurz warten —'); return; }
+  if(!S.rueckgaengig.length){ sysZeile('Es gibt keinen Zug zum Wiederholen.'); return; }
+  var vorher=JSON.parse(S.rueckgaengig[S.rueckgaengig.length-1]);
+  // Letzte Spielereingabe suchen, um sie erneut zu senden.
+  var letzte=null;
+  for(var i=S.verlauf.length-1;i>=vorher.verlauf.length;i--){
+    if(S.verlauf[i].rolle==='ich'){ letzte=S.verlauf[i].text; break; }
+  }
+  stelleZurueck();
+  zeichneVerlaufNeu();
+  sysZeile('⟲ Noch einmal…');
+  if(letzte)spielerSagt(letzte);
+  else fuehreSchlagabtausch(-1);
+}
+function zeichneVerlaufNeu(){
+  tippenFertig();
+  var g=el('gespraech');g.innerHTML='';
+  S.verlauf.forEach(function(v){
+    if(v.rolle==='npc')npcZeileSofort(v.idx,v.text,v.name); else ichSage(v.text);
+  });
+  zeigeStimmung();
+  aktualisiereUI();
+}
+
+// ── FIGUREN AUFTRETEN / ABTRETEN ──────────────
+async function erscheineNPC(hint,still){
+  if(!S.imSpiel)return;
+  if(W.npcs.length>=MAX_NPCS){ sysZeile('Mehr als '+MAX_NPCS+' Personen werden hier nicht gleichzeitig gespielt.'); return; }
+  if(S.npcErscheint||(S.wartet&&!still)){ if(!still)sysZeile('— Bitte kurz warten —'); return; }
+  hint=entkleide(hint);
+  S.npcErscheint=true;
+  if(!still)setWartet(true);
+  var anwesend=W.npcs.map(function(n){return n.name+' ('+n.rolle+')';}).join(', ');
+  var instruction=
+    'Erfinde spontan eine WEITERE Person, die JETZT am Ort dazustoesst, passend zur Situation.\n\n'+
+    weltKontext()+
+    'ORT: '+W.ort.name+' — '+W.ort.geschichte+'\n'+
+    'BEREITS ANWESEND: '+anwesend+'.\n'+
+    'BISHERIGES GESCHEHEN:\n'+verlaufText(10)+'\n'+
+    (hint?'VORGABE fuer die neue Person: '+hint+'\n':'')+
+    '\nAntworte NUR mit einem JSON-Objekt, ohne Codeblock:\n'+
+    '{"name":"","rolle":"","aussehen":"constant English visual IDENTITY only, no clothing, no art style","kleidung":"english default outfit","person":"deutscher Satz, warm, frech, frivol, aber respektvoll","stimmung":"EIN deutsches Wort","eroeffnung":"erster deutscher Satz beim Hereinkommen, Handlungen in eckigen Klammern erlaubt"}';
+  try{
+    var text=await frageKI(instruction);
+    var j=jsonAus(text), z=j?null:felderAus(text);
+    var f=function(k,flach,ersatz){ return j?hole(j,[k],ersatz):(z[flach]||ersatz); };
+    var npc={
+      name:         f('name','NAME','Ein Fremder'),
+      rolle:        f('rolle','ROLLE','Bewohner'),
+      aussehen:     f('aussehen','AUSSEHEN','an adult with a memorable face'),
+      kleidung:     f('kleidung','KLEIDUNG','simple clothing'),
+      person:       f('person','PERSON','zurueckhaltend'),
+      grundstimmung:einWort(f('stimmung','STIMMUNG','neugierig')),
+      eroeffnung:   f('eroeffnung','EROEFFNUNG','\x5Btritt ein\x5D Störe ich?')
+    };
+    var idx=W.npcs.length;
+    W.npcs.push(npc);
+    S.stimmung.push(npc.grundstimmung);
+    S.kleidung.push(npc.kleidung);
+    S.regieAnweisung.push('');
+    sysZeile('— '+npc.name+' erscheint —');
+    npcSagt(idx,npc.eroeffnung);
+    S.verlauf.push({rolle:'npc',idx:idx,text:npc.eroeffnung,name:npc.name});
+    merkeFakt(npc.name+' ist am Ort dazugekommen ('+npc.rolle+').');
+    aktualisiereUI();
+    S.npcErscheint=false;
+    S.bildZaehler=0;
+    if(!still)setWartet(false);
+    // Aus der Handlung heraus: keine zusaetzliche Runde ausloesen, die laeuft schon.
+    if(hint&&!still){ S.regieAnweisung[idx]=hint; await fuehreSchlagabtausch(idx); }
+    zeichneBild({});
+  }catch(e){
+    S.npcErscheint=false;if(!still)setWartet(false);
+    zeigeFehler('Figur erscheinen',e);
+  }
+}
+function entferneNPC(idx){
+  if(!S.imSpiel)return;
+  if(W.npcs.length<2){ sysZeile('Mindestens eine Person muss bleiben.'); return; }
+  if(idx<0||idx>=W.npcs.length)return;
+  var name=W.npcs[idx].name;
+  // Verlauf: Namen einfrieren, Indizes nachziehen.
+  S.verlauf.forEach(function(v){
+    if(v.rolle==='npc'){
+      if(v.name==null)v.name=(W.npcs[v.idx]&&W.npcs[v.idx].name)||'NPC';
+      if(v.idx===idx)v.idx=-1;
+      else if(v.idx>idx)v.idx=v.idx-1;
+    }
+  });
+  W.npcs.splice(idx,1);
+  S.stimmung.splice(idx,1);
+  S.kleidung.splice(idx,1);
+  S.regieAnweisung.splice(idx,1);
+  S.autoForceIdx=null;
+  merkeFakt(name+' hat den Ort verlassen.');
+  sysZeile('— '+name+' geht —');
+  aktualisiereUI();
+  autosave();
+  zeichneBild({});
+}
+
+// ── DIALOG-AUSGABE ────────────────────────────
+function neueZeile(klasse,werText){
+  var g=el('gespraech');
+  var z=document.createElement('div');
+  z.className='zeile '+klasse;
+  z.innerHTML=(werText?'<div class="wer">'+escapeHtml(String(werText).toUpperCase())+'</div>':'')+'<div class="txt"></div>';
+  g.appendChild(z);
+  return z;
+}
+function npcName(idx,name){ return name||(W.npcs[idx]&&W.npcs[idx].name)||'NPC'; }
+function npcSagt(idx,text,name){
+  var z=neueZeile('npc',npcName(idx,name));
+  tippe(z.querySelector('.txt'),text);
+  scrolle();
+}
+function npcZeileSofort(idx,text,name){
+  var z=neueZeile('npc',npcName(idx,name));
+  z.querySelector('.txt').innerHTML=formatAktionen(text);
+}
+function ichSage(text){
+  var z=neueZeile('ich',W.protagonist.name);
+  z.querySelector('.txt').innerHTML=formatAktionen(text);
+  scrolle();
+}
+function sysZeile(text){
+  var z=neueZeile('sys','');
+  z.querySelector('.txt').innerHTML=escapeHtml(text);
+  scrolle();
+}
+function errZeile(text){
+  var z=neueZeile('err','');
+  z.querySelector('.txt').innerHTML=escapeHtml(text);
+  scrolle();
+}
+// Schreibmaschine: immer nur EINE laufende Animation, und die vorherige Zeile
+// wird sauber fertiggestellt statt halb getippt stehenzubleiben.
+function tippe(elem,text){
+  tippenFertig();
+  if(!CFG.tempo){ elem.innerHTML=formatAktionen(text); scrolle(); return; }
+  var i=0;
+  tipper={el:elem,text:text,timer:null};
+  tipper.timer=setInterval(function(){
+    if(i<text.length){ elem.textContent+=text[i++]; scrolle(); }
+    else{ tippenFertig(); }
+  },CFG.tempo);
+}
+function tippenFertig(){
+  if(!tipper)return;
+  clearInterval(tipper.timer);
+  tipper.el.innerHTML=formatAktionen(tipper.text);
+  tipper=null;
+  scrolle();
+}
+function scrolle(){ var g=el('gespraech'); if(g)g.scrollTop=g.scrollHeight; }
+function escapeHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function formatAktionen(s){ return escapeHtml(s).replace(/\[([^\]]*)\]/g,'<span class="aktion">[$1]</span>'); }
+function setWartet(b){
+  S.wartet=b;
+  el('sendBtn').disabled=b;
+  el('freitext').disabled=b;
+  el('gespraech').setAttribute('aria-busy',b?'true':'false');
+  var g=el('gespraech'), alt=el('tippt');
+  if(b){
+    if(!alt){ var d=document.createElement('div'); d.id='tippt'; d.textContent='…'; g.appendChild(d); scrolle(); }
+  }else if(alt){ alt.remove(); }
+}
+
+// ── UI-AKTUALISIERUNG ─────────────────────────
+function aktualisiereUI(){
+  zeigeStimmung();
+  zeichneKopfSchalter();
+  var npcbtn=el('npcbtn');
+  if(npcbtn)npcbtn.style.display=(S.imSpiel&&W.npcs.length<MAX_NPCS)?'block':'none';
+  var undobtn=el('undobtn');
+  if(undobtn)undobtn.disabled=!S.rueckgaengig.length;
+  var a=el('autobtn');
+  if(a){
+    a.classList.toggle('an',!!S.autoAktiv);
+    a.textContent=S.autoAktiv?'■ AUTO':'▶ AUTO';
+  }
+  var f=el('freitext');
+  if(f)f.placeholder=S.autoAktiv
+    ? 'Regie (gilt dauerhaft)   ·   /sag: selbst sprechen   ·   /hilfe'
+    : 'Sprich oder handle in \x5Beckigen Klammern\x5D   ·   /hilfe';
+  baueChronikNav();
+}
+// Kopfleiste ein-/ausklappen. Der Schalter bleibt sichtbar, damit sie
+// zurueckgeholt werden kann; der Zustand ueberlebt den Neustart.
+function kopfUmschalten(){
+  CFG.kopfOffen=!CFG.kopfOffen;
+  speichereCfg();
+  zeichneKopfSchalter();
+}
+function zeichneKopfSchalter(){
+  var k=el('kopf'), b=el('kopfschalter');
+  if(!k||!b)return;
+  k.classList.toggle('zu',!CFG.kopfOffen);
+  b.textContent=CFG.kopfOffen?'⌃':'⌄';
+  b.title=CFG.kopfOffen?'Kopfleiste einklappen':'Kopfleiste ausklappen';
+  b.setAttribute('aria-expanded',CFG.kopfOffen?'true':'false');
+}
+function zeigeStimmung(){
+  var e=el('npcstatus'); if(!e)return;
+  e.innerHTML='';
+  var zeigeWeg=(W.npcs.length>=2);
+  W.npcs.forEach(function(n,i){
+    var chip=document.createElement('span');chip.className='npcchip';
+    chip.appendChild(document.createTextNode(n.name+' ('+n.rolle+', '+S.stimmung[i]+')'));
+    if(zeigeWeg){
+      var x=document.createElement('span');x.className='npcweg';x.textContent='✕';
+      x.title=n.name+' entfernen';
+      x.onclick=function(){entferneNPC(i);};
+      chip.appendChild(x);
+    }
+    e.appendChild(chip);
+  });
+}
+
+// ── MODAL-VERWALTUNG (ein Bauplan für alle) ───
+function oeffneModal(id){
+  document.querySelectorAll('.modal.an').forEach(function(m){m.classList.remove('an');});
+  el(id).classList.add('an');
+}
+function schliesseModal(){
+  document.querySelectorAll('.modal.an').forEach(function(m){m.classList.remove('an');});
+}
+document.addEventListener('keydown',function(ev){
+  if(ev.key==='Escape')schliesseModal();
+});
+// Scheitert etwas ausserhalb unserer Aufrufkette — etwa im Text-Plugin selbst —,
+// landet die Meldung sonst nur in Perchances Fehlerkasten. Lieber im Spiel zeigen.
+if(typeof window!=='undefined'&&window.addEventListener){
+  window.addEventListener('unhandledrejection',function(ev){
+    var g=(ev&&ev.reason)||{};
+    var text=String(g.message||g);
+    if(kiNochNichtBereit(g)){
+      errZeile('⚠ Das Text-Plugin war kurz nicht bereit. Wenn nichts weitergeht: Seite neu laden.');
+    }else{
+      errZeile('⚠ '+text);
+    }
+    if(ev.preventDefault)ev.preventDefault();
+  });
+}
+document.querySelectorAll('.modal').forEach(function(m){
+  m.addEventListener('click',function(ev){ if(ev.target===m)schliesseModal(); });
+});
+
+// ── CHRONIK ───────────────────────────────────
+function baueChronikNav(){
+  var nav=el('chronikNav'); if(!nav)return;
+  nav.innerHTML='';
+  var b0=document.createElement('button');b0.textContent='ORT';
+  b0.onclick=function(){zeigeChronik('ort');};nav.appendChild(b0);
+  var b1=document.createElement('button');b1.textContent='HANDLUNG';
+  b1.onclick=function(){zeigeChronik('handlung');};nav.appendChild(b1);
+  W.npcs.forEach(function(n,i){
+    var b=document.createElement('button');b.textContent=n.name;
+    b.onclick=function(){zeigeChronik(i);};nav.appendChild(b);
+  });
+}
+function zeigeChronik(ziel){
+  if(!S.imSpiel)return;
+  baueChronikNav();
+  var kopf=el('chronikTitel'), inhalt=el('chronikInhalt');
+  inhalt.style.whiteSpace=(ziel==='handlung')?'pre-wrap':'normal';
+  if(ziel==='ort'){
+    kopf.textContent='📖 '+((W.ort&&W.ort.name)||'Ort').toUpperCase();
+    inhalt.textContent=((W.ort&&W.ort.geschichte)||'Keine Aufzeichnungen.')+
+      (S.szeneGlobal?'\n\nKulisse: '+S.szeneGlobal:'');
+    inhalt.style.whiteSpace='pre-wrap';
+  }else if(ziel==='handlung'){
+    kopf.textContent='📖 HANDLUNG';
+    var t=(S.handlung||'Noch nichts geschehen.');
+    if(S.fakten.length)t+='\n\n• '+S.fakten.join('\n• ');
+    inhalt.textContent=t;
+  }else{
+    var n=W.npcs[ziel];
+    if(!n)return;
+    kopf.textContent='📖 '+(n.name||'NPC').toUpperCase();
+    inhalt.textContent=n.rolle+'. '+n.person+'  (Stimmung: '+S.stimmung[ziel]+', trägt: '+(S.kleidung[ziel]||n.kleidung)+')';
+  }
+  oeffneModal('mChronik');
+}
+
+// ── BILD-MENÜ ─────────────────────────────────
+function oeffneBildModal(){
+  if(!S.imSpiel)return;
+  if(!S.bildGeneriert&&!S.letzterPrompt&&!S.eigenerPrompt){ sysZeile('Das erste Bild entsteht gerade…'); return; }
+  el('bildPromptFeld').value=S.eigenerPrompt||S.letzterPrompt||'';
+  el('bildNegativFeld').value=S.eigenerNegativ||S.letzterNegativ||baueNegativ();
+  el('bildSeedFeld').value=S.seed||'';
+  el('bildFest').checked=!!S.promptFesthalten;
+  el('bildQuelleInfo').textContent=(S.eigenerPrompt
+      ? (S.promptFesthalten
+         ? '✎ Prompt festgehalten — das Bild bleibt so, bis du den Haken entfernst oder „AUS SZENE" drückst. '
+         : '✎ Eigener Prompt — er überlebt den Wechsel der Bildquelle, beim nächsten Bildtakt übernimmt aber wieder die Handlung. ')
+      : 'Automatisch aus der Szene gebaut. ')
+    +'Quelle: '+quelle().label+' — '+quelle().info;
+  oeffneModal('mBild');
+}
+function wuerfelSeed(){ el('bildSeedFeld').value=String(neuerSeed()); }
+function bildNeuZeichnen(){
+  if(!S.imSpiel)return;
+  var p=el('bildPromptFeld').value.trim();
+  var n=el('bildNegativFeld').value.trim();
+  var s=el('bildSeedFeld').value.trim();
+  // Bearbeitung festhalten, statt sie beim naechsten automatischen Bild oder
+  // beim Wechsel der Bildquelle zu verlieren.
+  S.eigenerPrompt=p;
+  S.eigenerNegativ=(n&&n!==baueNegativ())?n:'';
+  S.promptFesthalten=!!(el('bildFest')&&el('bildFest').checked);
+  schliesseModal();
+  autosave();
+  zeichneBild({seedOverride:s});
+}
+// Zurueck zur Automatik: Prompt und Negativprompt entstehen wieder aus der Szene.
+function bildAusSzene(){
+  if(!S.imSpiel)return;
+  S.eigenerPrompt='';S.eigenerNegativ='';S.promptFesthalten=false;
+  schliesseModal();
+  sysZeile('✦ Bild folgt wieder der Szene ✦');
+  autosave();
+  zeichneBild({});
+}
+function bildOeffnen(){
+  if(!S.letzteBildUrl)return;
+  try{ window.open(S.letzteBildUrl,'_blank'); }catch(e){ zeigeFehler('Bild öffnen',e); }
+}
+
+// ── FIGUREN-MENÜ ──────────────────────────────
+function oeffneFigurMenu(){
+  if(!S.imSpiel)return;
+  var werte=[];
+  function feld(id,label,value,multi){
+    werte.push({id:id,value:(value==null?'':String(value))});
+    return '<label class="feldlabel" for="'+id+'">'+escapeHtml(label)+'</label>'+
+      (multi?'<textarea id="'+id+'" class="feld" rows="2"></textarea>':'<input id="'+id+'" class="feld" type="text">');
+  }
+  var P=W.protagonist;
+  var html='<div class="figblock"><div class="figtitel">HELD</div>'+
+    feld('fig_held_name','Name',P.name,false)+
+    feld('fig_held_herkunft','Herkunft',P.herkunft,false)+
+    feld('fig_held_beruf','Beruf',P.beruf,false)+
+    feld('fig_held_eigenart','Eigenart',P.eigenart,true)+
+    feld('fig_held_aussehen','Aussehen (englisch, nur wenn der Held im Bild erscheinen soll)',P.aussehen,true)+
+    feld('fig_held_kleidung','Kleidung (englisch)',P.kleidung,true)+
+    '</div>';
+  W.npcs.forEach(function(n,i){
+    html+='<div class="figblock"><div class="figtitel">'+escapeHtml(n.name||('NPC'+(i+1)))+'</div>'+
+      feld('fig_npc'+i+'_name','Name',n.name,false)+
+      feld('fig_npc'+i+'_rolle','Rolle',n.rolle,false)+
+      feld('fig_npc'+i+'_stimmung','Stimmung (ein Wort)',S.stimmung[i]||n.grundstimmung,false)+
+      feld('fig_npc'+i+'_person','Persönlichkeit / Sprechweise',n.person,true)+
+      feld('fig_npc'+i+'_aussehen','Aussehen (englisch, nur Identität)',n.aussehen,true)+
+      feld('fig_npc'+i+'_kleidung','Kleidung (englisch)',S.kleidung[i]||n.kleidung,true)+
+      '</div>';
+  });
+  el('figurInhalt').innerHTML=html;
+  werte.forEach(function(w){ var e=el(w.id); if(e)e.value=w.value; });
+  oeffneModal('mFigur');
+}
+function speichereFiguren(){
+  function g(id){ var e=el(id); return e?e.value.trim():''; }
+  var P=W.protagonist;
+  P.name=g('fig_held_name')||P.name;
+  P.herkunft=g('fig_held_herkunft')||P.herkunft;
+  P.beruf=g('fig_held_beruf')||P.beruf;
+  P.eigenart=g('fig_held_eigenart')||P.eigenart;
+  P.aussehen=g('fig_held_aussehen');   // leer erlaubt: dann erscheint der Held nicht im Bild
+  P.kleidung=g('fig_held_kleidung');
+  W.npcs.forEach(function(n,i){
+    n.name=g('fig_npc'+i+'_name')||n.name;
+    n.rolle=g('fig_npc'+i+'_rolle')||n.rolle;
+    n.person=g('fig_npc'+i+'_person')||n.person;
+    n.aussehen=g('fig_npc'+i+'_aussehen')||n.aussehen;
+    var kl=g('fig_npc'+i+'_kleidung'); if(kl){ S.kleidung[i]=kl; n.kleidung=kl; }
+    var st=g('fig_npc'+i+'_stimmung'); if(st){ S.stimmung[i]=einWort(st); }
+  });
+  schliesseModal();
+  aktualisiereUI();
+  autosave();
+  zeichneBild({});
+}
+
+// ── SZENEN-MENÜ ───────────────────────────────
+// Dieselbe Stilauswahl wie auf dem Startbildschirm, nur im laufenden Spiel.
+var STIL_NAMEN={manga:'Manga / Anime',comic:'Westlicher Comic',aquarell:'Aquarell',
+                oel:'Ölgemälde',realistisch:'Fotorealistisch',pixel:'Pixel-Art',
+                illustrious:'Illustrious / Anime-Tags'};
+function oeffneSzeneMenu(){
+  if(!S.imSpiel)return;
+  var sel=el('szeneStil');
+  sel.innerHTML='';
+  Object.keys(STILE).forEach(function(k){
+    var o=document.createElement('option');
+    o.value=k;o.textContent=STIL_NAMEN[k]||k;
+    sel.appendChild(o);
+  });
+  var oe=document.createElement('option');
+  oe.value='eigen';oe.textContent='Eigener Stil…';
+  sel.appendChild(oe);
+
+  // Vorbelegen: gesetzter Stil, sonst eigener Text, sonst die Startauswahl.
+  var eigen=el('szeneStilEigen');
+  if(S.stilLabel&&STILE[S.stilLabel]){
+    sel.value=S.stilLabel;eigen.value='';
+  }else if(S.stil){
+    sel.value='eigen';eigen.value=S.stilLabel||S.stil;
+  }else{
+    var start=el('stilwahl');
+    sel.value=(start&&STILE[start.value])?start.value:'manga';
+    eigen.value='';
+  }
+  szeneStilGewechselt();
+  el('szeneStilHinweis').textContent=S.eigenerPrompt
+    ? 'Ein eigener Prompt ist aktiv — Stil und Kulisse wirken erst, wenn du im Bildmenü „AUS SZENE" drückst.'
+    : '';
+  oeffneModal('mSzene');
+}
+function szeneStilGewechselt(){
+  var eigen=el('szeneStilEigen');
+  eigen.style.display=(el('szeneStil').value==='eigen')?'block':'none';
+}
+function speichereSzene(){
+  var wahl=el('szeneStil').value;
+  if(wahl==='eigen'){
+    var t=el('szeneStilEigen').value.trim();
+    if(t){ S.stil=t; S.stilLabel=t; }
+  }else if(STILE[wahl]){
+    S.stil=STILE[wahl];S.stilLabel=wahl;
+  }
+  schliesseModal();
+  sysZeile('✦ Stil: '+(S.stilLabel||'unverändert')+' ✦');
+  autosave();
+  zeichneBild({});
+}
+
+// ── ORT ───────────────────────────────────────
+function zeigeRaumtitel(){
+  var e=el('raumtitel');
+  if(e)e.textContent=((W.ort&&W.ort.name)||'Ort').toUpperCase();
+}
+function oeffneOrtMenu(){
+  if(!S.imSpiel)return;
+  el('ortName').value=(W.ort&&W.ort.name)||'';
+  el('ortGeschichte').value=(W.ort&&W.ort.geschichte)||'';
+  el('ortKulisse').value=S.szeneGlobal||'';
+  el('ortWechselFeld').value='';
+  el('ortHinweis').textContent=S.eigenerPrompt
+    ? 'Ein eigener Bildprompt ist aktiv — die Kulisse wirkt erst nach „AUS SZENE" im Bildmenü.'
+    : 'Beschreibt die Handlung einen Ortswechsel, geschieht er von selbst. Hier kannst du ihn auch auslösen.';
+  oeffneModal('mOrt');
+}
+function speichereOrt(){
+  if(!W.ort)W.ort={name:'',geschichte:'',bildPrompt:''};
+  W.ort.name=el('ortName').value.trim()||W.ort.name;
+  W.ort.geschichte=el('ortGeschichte').value.trim()||W.ort.geschichte;
+  S.szeneGlobal=el('ortKulisse').value.trim();
+  schliesseModal();
+  zeigeRaumtitel();
+  baueChronikNav();
+  autosave();
+  zeichneBild({});
+}
+function ortWechselAusMenu(){
+  var t=el('ortWechselFeld').value.trim();
+  if(!t){ el('ortHinweis').textContent='Beschreibe zuerst, wohin es gehen soll.'; return; }
+  schliesseModal();
+  ortWechseln(t);
+}
+// Ortswechsel: neuen Ort von der KI ausformulieren lassen, damit Beschreibung
+// und Bildkulisse zusammenpassen. Die alte Besetzung regelt die Regie ueber
+// das Feld "abgang" - wer nicht mitkommt, bleibt zurueck.
+async function ortWechseln(beschreibung){
+  if(!S.imSpiel)return;
+  beschreibung=entkleide(beschreibung);
+  if(!beschreibung||S.ortLaeuft)return;
+  S.ortLaeuft=true;
+  sysZeile('— Ortswechsel: ' + beschreibung + ' —');
+  try{
+    var text=await frageKI(
+      'Der Schauplatz eines deutschen Dialog-Adventures wechselt. Formuliere den NEUEN Ort aus.\n\n'+
+      weltKontext()+
+      'BISHERIGER ORT: '+((W.ort&&W.ort.name)||'?')+' — '+((W.ort&&W.ort.geschichte)||'')+'\n'+
+      'NEUER ORT laut Handlung: '+beschreibung+'\n'+
+      'ANWESEND: '+W.npcs.map(function(n){return n.name;}).join(', ')+'\n\n'+
+      'Antworte NUR mit einem JSON-Objekt, ohne Codeblock:\n'+
+      '{"name":"Name des neuen Ortes","geschichte":"atmosphaerische deutsche Beschreibung, 3 bis 6 Saetze",'+
+      '"kulisse":"english description of the surroundings for image generation: architecture, objects, light, weather",'+
+      '"bild":"one English sentence: what is seen the moment the characters arrive"}',
+      120000);
+    var j=jsonAus(text), z=j?null:felderAus(text);
+    var f=function(k,flach,ersatz){ return j?hole(j,[k],ersatz):((z&&z[flach])||ersatz); };
+    if(!W.ort)W.ort={};
+    W.ort.name=f('name','NAME',beschreibung.substring(0,40));
+    W.ort.geschichte=f('geschichte','GESCHICHTE',beschreibung);
+    W.ort.bildPrompt=f('bild','BILD',W.ort.bildPrompt||'');
+    S.szeneGlobal=f('kulisse','KULISSE',S.szeneGlobal||'');
+    S.szeneText=W.ort.bildPrompt;
+    merkeFakt('Der Ort wechselte zu '+W.ort.name+'.');
+    zeigeRaumtitel();
+    baueChronikNav();
+    S.bildZaehler=0;
+    autosave();
+    zeichneBild({});
+  }catch(e){
+    zeigeFehler('Ortswechsel',e);
+  }
+  S.ortLaeuft=false;
+}
+// Der Ort veraendert sich, ohne dass gewechselt wird (Licht geht aus, Regen setzt ein).
+function ortNotiz(satz){
+  satz=entkleide(satz);
+  if(!satz||!W.ort)return;
+  var g=String(W.ort.geschichte||'');
+  if(g.indexOf(satz)>=0)return;
+  W.ort.geschichte=(g+' '+satz).trim();
+  if(W.ort.geschichte.length>1400)W.ort.geschichte=W.ort.geschichte.substring(W.ort.geschichte.length-1400);
+  merkeFakt('Am Ort: '+satz);
+  sysZeile('— '+satz+' —');
+}
+
+// ── EINSTELLUNGEN ─────────────────────────────
+function oeffneEinstellungen(){
+  var html='<label class="feldlabel" for="cfgQuelle">BILDQUELLE</label><select id="cfgQuelle" class="feld" onchange="zeichneQuellenFelder()">';
+  Object.keys(BILDQUELLEN).forEach(function(k){
+    html+='<option value="'+k+'"'+(k===CFG.quelle?' selected':'')+'>'+escapeHtml(BILDQUELLEN[k].label)+'</option>';
+  });
+  html+='</select><div id="quelleFelder"></div><div class="pruefzeile" id="quellePruef"></div>'+
+    '<label class="feldlabel">BILDGRÖSSE (Breite × Höhe)</label>'+
+    '<div class="reihe"><input id="cfgBreite" class="feld" type="number" step="64" value="'+auf64(CFG.breite)+'">'+
+    '<input id="cfgHoehe" class="feld" type="number" step="64" value="'+auf64(CFG.hoehe)+'"></div>'+
+    '<label class="feldlabel" for="cfgNegativ">NEGATIVPROMPT (gilt für alle Bilder)</label>'+
+    '<textarea id="cfgNegativ" class="feld" rows="3"></textarea>'+
+    '<label class="feldlabel" for="cfgTakt">BILD-TAKT — neues Bild alle N Züge (0 = nur auf Zuruf)</label>'+
+    '<input id="cfgTakt" class="feld" type="number" min="0" max="20" value="'+(Number(CFG.bildTakt)||0)+'">'+
+    '<label class="feldlabel"><input type="checkbox" id="cfgAutoHeld"'+(CFG.autoHeld?' checked':'')+
+    '> Im Auto-Modus handelt der Held selbst mit</label>'+
+    '<label class="feldlabel"><input type="checkbox" id="cfgAutoBesetzung"'+(CFG.autoBesetzung?' checked':'')+
+    '> Handlung verändert Ort, Besetzung und Kleidung</label>'+
+    '<label class="feldlabel" for="cfgTempo">SCHREIBTEMPO in ms pro Zeichen (0 = sofort)</label>'+
+    '<input id="cfgTempo" class="feld" type="number" min="0" max="120" value="'+(Number(CFG.tempo)||0)+'">'+
+    datenschutzHtml();
+  el('einstellInhalt').innerHTML=html;
+  el('cfgNegativ').value=CFG.negativ||'';
+  zeichneQuellenFelder();
+  oeffneModal('mEinstellungen');
+}
+// Wer den Generator benutzt, soll ohne Suchen sehen, was sein Geraet verlaesst.
+// Steht am Ende der Einstellungen, gleich unter der Wahl der Bildquelle.
+function datenschutzHtml(){
+  return '<label class="feldlabel">DATENSCHUTZ</label>'+
+    '<div class="hinweis">'+
+    'Spielst\u00e4nde, Einstellungen und eingetragene Schl\u00fcssel liegen im localStorage dieses Browsers. Hinter diesem Generator steht kein eigener Server, auf dem etwas landen k\u00f6nnte.'+
+    '<br><br>Nach au\u00dfen gehen zwei Dinge: die Texteingaben an das KI-Plugin von Perchance \u2014 und die Bildbeschreibung an die oben gew\u00e4hlte Bildquelle, sobald das nicht Perchance ist. Bei der Quelle Perchance verl\u00e4sst auch der Bildprompt Perchance nicht.'+
+    '<br><br>Beim Start holt der Generator seinen eigenen Quelltext von raw.githubusercontent.com; GitHub sieht dabei die IP-Adresse. Schriften kommen aus dem System, es wird keine Schrift von fremden Servern nachgeladen.'+
+    '<br><br>Alles l\u00f6schen: die Browserdaten f\u00fcr perchance.org entfernen \u2014 damit sind Spielst\u00e4nde, Einstellungen und Schl\u00fcssel weg.'+
+    '</div>';
+}
+function zeichneQuellenFelder(){
+  var k=el('cfgQuelle').value;
+  var q=BILDQUELLEN[k]||BILDQUELLEN.perchance;
+  var html='<div class="hinweis">'+escapeHtml(q.info)+'</div>';
+  (q.felder||[]).forEach(function(f){
+    html+='<label class="feldlabel" for="q_'+f.k+'">'+escapeHtml(f.l)+'</label>'+
+      '<input id="q_'+f.k+'" class="feld" type="'+(f.typ==='passwort'?'password':(f.typ==='zahl'?'number':'text'))+'">';
+  });
+  if((q.felder||[]).some(function(f){return f.typ==='passwort';})){
+    html+='<div class="warnung">Schlüssel werden unverschlüsselt im Browser (localStorage) abgelegt und bei jedem Bild an den Dienst geschickt. Nur eigene Schlüssel mit Ausgabenlimit verwenden.</div>';
+  }
+  if(k==='gradio'){
+    html+='<div class="reihe" style="margin-top:6px"><button class="feld" style="cursor:pointer" onclick="gradioErkunden()">'+
+          '&#9670; API ERKUNDEN &amp; VORLAGE BAUEN</button></div>'+
+          '<div class="hinweis" id="gradioInfo"></div>';
+  }
+  if(q.modelle){
+    html+='<label class="feldlabel" for="modellWahl">VERFÜGBARE MODELLE — Liste kommt vom Dienst</label>'+
+      '<div class="reihe"><select id="modellWahl" class="feld" onchange="modellGewaehlt()">'+
+      '<option value="">(noch nicht geladen)</option></select>'+
+      '<button onclick="ladeModelle()" title="Modell-Liste abrufen">⟳</button></div>';
+  }
+  if(k!=='perchance'){
+    html+='<div class="warnung">Prompt und Bild laufen über einen fremden Server, nicht über Perchance. Wenn der Dienst keine Anfragen aus dem Browser erlaubt (CORS), bleibt das Bild leer — dann „QUELLE TESTEN" nutzen und notfalls zurück auf Perchance wechseln.</div>';
+  }
+  el('quelleFelder').innerHTML=html;
+  (q.felder||[]).forEach(function(f){ var e=el('q_'+f.k); if(e)e.value=(CFG[f.k]==null?'':CFG[f.k]); });
+  el('quellePruef').textContent='';el('quellePruef').className='pruefzeile';
+}
+// Modell-Liste beim Dienst abrufen. Schlaegt das fehl, bleibt das Textfeld
+// bestehen — ein Modellname laesst sich immer von Hand eintragen.
+async function ladeModelle(){
+  var k=el('cfgQuelle').value, q=BILDQUELLEN[k];
+  var sel=el('modellWahl'), pr=el('quellePruef');
+  if(!q||!q.modelle||!sel)return;
+  pr.className='pruefzeile';pr.textContent='Rufe Modell-Liste ab…';
+  try{
+    var liste=await q.modelle();
+    var feld=el('q_'+q.modellSchluessel);
+    var aktuell=feld?feld.value.trim():'';
+    sel.innerHTML='';
+    var o0=document.createElement('option');
+    o0.value='';o0.textContent='(Standard des Dienstes)';
+    sel.appendChild(o0);
+    liste.forEach(function(m){
+      var o=document.createElement('option');
+      o.value=m.wert;o.textContent=m.label;
+      if(m.wert===aktuell)o.selected=true;
+      sel.appendChild(o);
+    });
+    pr.className='pruefzeile ok';
+    pr.textContent='✓ '+liste.length+' Modelle verfügbar'+(aktuell?'':' — oben auswählen');
+  }catch(e){
+    pr.className='pruefzeile fehler';
+    pr.textContent='✕ Liste nicht abrufbar ('+((e&&e.message)||e)+'). Modellname von Hand eintragen.';
+  }
+}
+function modellGewaehlt(){
+  var q=BILDQUELLEN[el('cfgQuelle').value];
+  var sel=el('modellWahl'), feld=q&&el('q_'+q.modellSchluessel);
+  if(sel&&feld)feld.value=sel.value;
+}
+
+// Endpunkte und Parameter beim Space erfragen und die Vorlage daraus bauen.
+// Erspart das Abtippen aus "Use via API" und deckt Tippfehler sofort auf.
+async function gradioErkunden(){
+  leseEinstellungen();
+  var pr=el('quellePruef'), info=el('gradioInfo');
+  var host=String(CFG.gradioHost||'').replace(/\/+$/,'');
+  if(!host){ pr.className='pruefzeile fehler'; pr.textContent='Erst die Space-Adresse eintragen.'; return; }
+  var kopf={};
+  if(CFG.gradioToken)kopf['Authorization']='Bearer '+CFG.gradioToken;
+  pr.className='pruefzeile'; pr.textContent='Frage den Space ab...';
+  try{
+    var r=await fetch(host+'/gradio_api/info',{headers:kopf});
+    if(!r.ok)throw new Error('HTTP '+r.status+' auf /gradio_api/info');
+    var j=await r.json();
+    var punkte=(j&&j.named_endpoints)||{};
+    var namen=Object.keys(punkte);
+    if(!namen.length)throw new Error('Der Space nennt keine benannten Endpunkte.');
+
+    // Gewuenschten Endpunkt nehmen, sonst den ersten mit Bildausgabe.
+    var wunsch=String(CFG.gradioApi||'');
+    if(wunsch.charAt(0)!=='/')wunsch='/'+wunsch;
+    // Nach denselben Regeln waehlen wie zur Laufzeit: der Space nennt seinen
+    // ersten Endpunkt "/False", der ist ganz sicher nicht der Bildgenerator.
+    var gewaehlt=waehleEndpunkt(namen.map(function(n){return {api_name:n};}),wunsch);
+    var name=gewaehlt?('/'+gewaehlt.name):null;
+    if(!name||!punkte[name]){
+      name=namen.filter(function(n){
+        return (punkte[n].returns||[]).some(function(rt){return /image/i.test(String(rt.component||rt.label||''));});
+      })[0]||namen[0];
+    }
+    var ep=punkte[name];
+    var params=ep.parameters||[];
+
+    var feldApi=el('q_gradioApi'), feldVor=el('q_gradioVorlage'), feldFn=el('q_gradioFnIndex');
+    if(feldApi)feldApi.value=name;
+    if(feldVor)feldVor.value=gradioVorlageAus(params);   // vorlaeufig, ohne /config
+
+    // fn_index und die echten Vorgabewerte aus /config nachziehen.
+    var fnText='';
+    try{
+      var c=await (await fetch(host+'/config',{headers:kopf})).json();
+      var gesucht=name.replace(/^\//,''), dep=null, gefunden=null;
+      (c&&c.dependencies||[]).forEach(function(d,i){
+        if(String(d.api_name||'').replace(/^\//,'')===gesucht&&gefunden===null){
+          gefunden=(d.id!=null?d.id:i); dep=d;
+        }
+      });
+      if(gefunden!==null&&feldFn){ feldFn.value=String(gefunden); fnText=', fn_index '+gefunden; }
+      if(dep&&feldVor)feldVor.value=gradioVorlageAusConfig(params,dep,c&&c.components);
+    }catch(e2){}
+
+    // Vorgabewerte fuer Breite und Hoehe aus /config lesen, damit die Masse
+    // von vornherein im erlaubten Bereich liegen.
+    var masseText='';
+    try{
+      var cc=await (await fetch(host+'/config',{headers:kopf})).json();
+      var werte={};
+      (cc&&cc.components||[]).forEach(function(comp){
+        var lab=String((comp.props&&(comp.props.label||comp.props.info))||'').toLowerCase();
+        var pr=comp.props||{};
+        if(pr.minimum==null&&pr.value==null)return;
+        if(/width|breite/.test(lab)&&!werte.b)werte.b=Math.max(Number(pr.minimum)||0,Number(pr.value)||0);
+        if(/height|h(ö|oe)he/.test(lab)&&!werte.h)werte.h=Math.max(Number(pr.minimum)||0,Number(pr.value)||0);
+      });
+      var fb=el('q_gradioBreite'), fh=el('q_gradioHoehe');
+      if(werte.b&&fb){ fb.value=String(auf64(werte.b)); }
+      if(werte.h&&fh){ fh.value=String(auf64(werte.h)); }
+      if(werte.b||werte.h)masseText='  |  Maße: '+auf64(werte.b||1024)+'x'+auf64(werte.h||1024);
+    }catch(e3){}
+
+    info.textContent='Endpunkte: '+namen.join(', ')+'  |  gewählt: '+name+fnText+masseText+
+      '  |  Parameter: '+params.map(function(pa,i){
+        return (i+1)+'. '+(pa.parameter_name||pa.label||'?')+
+               ' ('+String((pa.type&&pa.type.type)||(pa.python_type&&pa.python_type.type)||'?')+')';
+      }).join(' · ');
+    pr.className='pruefzeile ok';
+    pr.textContent='\u2713 Vorlage gebaut. Bitte prüfen, dann ÜBERNEHMEN und QUELLE TESTEN.';
+    leseEinstellungen();
+  }catch(e){
+    pr.className='pruefzeile fehler';
+    pr.textContent='\u2715 '+((e&&e.message)||e)+' — Angaben notfalls von Hand aus "Use via API" übernehmen.';
+  }
+}
+
+function leseEinstellungen(){
+  CFG.quelle=el('cfgQuelle').value;
+  CFG.breite=auf64(el('cfgBreite').value);
+  CFG.hoehe=auf64(el('cfgHoehe').value);
+  CFG.negativ=el('cfgNegativ').value.trim();
+  CFG.bildTakt=Math.max(0,Math.min(20,parseInt(el('cfgTakt').value,10)||0));
+  CFG.tempo=Math.max(0,Math.min(120,parseInt(el('cfgTempo').value,10)||0));
+  var ah=el('cfgAutoHeld'); if(ah)CFG.autoHeld=!!ah.checked;
+  var ab=el('cfgAutoBesetzung'); if(ab)CFG.autoBesetzung=!!ab.checked;
+  var q=BILDQUELLEN[CFG.quelle];
+  (q.felder||[]).forEach(function(f){
+    var e=el('q_'+f.k);
+    if(e)CFG[f.k]=(f.typ==='zahl')?(parseInt(e.value,10)||0):e.value.trim();
+  });
+  speichereCfg();
+}
+function speichereEinstellungen(){
+  leseEinstellungen();
+  fuelleQuelleKurz();
+  schliesseModal();
+  if(S.imSpiel){
+    sysZeile('⚙ Einstellungen übernommen — Bildquelle: '+quelle().label);
+    zeichneBild({});
+  }
+}
+async function quellePruefen(){
+  leseEinstellungen();
+  var p=el('quellePruef');
+  p.className='pruefzeile';p.textContent='Teste '+quelle().label+'…';
+  try{
+    var src=await quelle().zeichne({
+      prompt:'a single red apple on a wooden table, simple, centered',
+      negativ:'text, watermark', seed:12345,
+      breite:512, hoehe:512
+    });
+    if(!src)throw new Error('Keine Bilddaten erhalten.');
+    p.className='pruefzeile ok';p.textContent='✓ Quelle antwortet. Bild erhalten.';
+    if(S.imSpiel){ el('img0').src=src; S.letzteBildUrl=src; S.bildGeneriert=true; }
+  }catch(e){
+    p.className='pruefzeile fehler';
+    p.textContent='✕ '+(e&&e.message?e.message:String(e));
+  }
+}
+function fuelleQuelleKurz(){
+  var s=el('quelleKurz'); if(!s)return;
+  s.innerHTML='';
+  Object.keys(BILDQUELLEN).forEach(function(k){
+    var o=document.createElement('option');
+    o.value=k;o.textContent=BILDQUELLEN[k].label;
+    if(k===CFG.quelle)o.selected=true;
+    s.appendChild(o);
+  });
+}
+function quelleKurzGewechselt(){
+  CFG.quelle=el('quelleKurz').value;
+  speichereCfg();
+}
+
+// ── SPEICHERSTÄNDE ────────────────────────────
+var SAVE_VERSION=7;
+var SLOTS=['proxima_v7_auto','proxima_v7_1','proxima_v7_2','proxima_v7_3'];
+var SLOT_NAMEN=['Automatisch','Platz 1','Platz 2','Platz 3'];
+
+// Die Undo-Schnappschuesse enthalten jeweils den ganzen Verlauf — die kommen
+// NICHT mit in den Speicherstand, sonst waechst er quadratisch.
+function standObjekt(){
+  var kopie={};
+  Object.keys(S).forEach(function(k){ if(k!=='rueckgaengig')kopie[k]=S[k]; });
+  kopie.rueckgaengig=[];
+  if(kopie.verlauf&&kopie.verlauf.length>600)kopie.verlauf=kopie.verlauf.slice(-600);
+  return {version:SAVE_VERSION,zeit:Date.now(),welt:W,stand:kopie};
+}
+function schreibeSlot(i){
+  try{ localStorage.setItem(SLOTS[i],JSON.stringify(standObjekt())); return true; }
+  catch(e){ zeigeFehler('Speichern',e); return false; }
+}
+function autosave(){ schreibeSlot(0); }
+function leseSlot(i){
+  try{
+    var roh=localStorage.getItem(SLOTS[i]);
+    if(!roh)return null;
+    var d=JSON.parse(roh);
+    return pruefeStand(d)?d:null;
+  }catch(e){ return null; }
+}
+function pruefeStand(d){
+  return !!(d&&d.welt&&d.stand&&d.welt.ort&&Array.isArray(d.welt.npcs)&&d.welt.npcs.length);
+}
+function irgendeinStand(){
+  for(var i=0;i<SLOTS.length;i++){ if(leseSlot(i))return true; }
+  return false;
+}
+// Alte Formate (V6 und aelter) mitnehmen, statt sie stumm zu verlieren.
+function migriere(d){
+  var w=d.welt, s=d.stand;
+  if(!Array.isArray(s.verlauf))s.verlauf=[];
+  if(!Array.isArray(s.stimmung))s.stimmung=w.npcs.map(function(n){return n.grundstimmung;});
+  if(!Array.isArray(s.kleidung))s.kleidung=w.npcs.map(function(n){return n.kleidung;});
+  if(!Array.isArray(s.regieAnweisung))s.regieAnweisung=[];
+  while(s.regieAnweisung.length<w.npcs.length)s.regieAnweisung.push('');
+  if(!Array.isArray(s.fakten))s.fakten=[];
+  if(!Array.isArray(s.rueckgaengig))s.rueckgaengig=[];
+  if(typeof s.handlung!=='string')s.handlung='';
+  if(typeof s.autoRegie!=='string')s.autoRegie='';
+  if(typeof s.stil!=='string')s.stil='';
+  if(typeof s.stilLabel!=='string')s.stilLabel='';
+  if(typeof s.szeneGlobal!=='string')s.szeneGlobal='';
+  if(typeof s.szeneText!=='string')s.szeneText='';
+  if(typeof s.letzterNegativ!=='string')s.letzterNegativ='';
+  if(typeof s.eigenerPrompt!=='string')s.eigenerPrompt='';
+  if(typeof s.eigenerNegativ!=='string')s.eigenerNegativ='';
+  s.promptFesthalten=!!s.promptFesthalten;
+  if(!s.seed)s.seed=(w.ort&&parseInt(w.ort.seed,10))||neuerSeed();   // V6 hielt den Seed am Ort
+  if(w.perspektive!=='ich'&&w.perspektive!=='er')w.perspektive='er';
+  if(w.protagonist){
+    if(typeof w.protagonist.aussehen!=='string')w.protagonist.aussehen='';
+    if(typeof w.protagonist.kleidung!=='string')w.protagonist.kleidung='';
+  }
+  // Transiente Zustaende zuruecksetzen; das Bild entsteht beim Betreten neu.
+  s.wartet=false;s.bildLaeuft=false;s.bildAusstehend=null;s.npcErscheint=false;
+  s.bildGeneriert=false;s.bildZaehler=0;s.imSpiel=true;
+  s.autoAktiv=false;s.autoLaeuft=false;s.autoForceIdx=null;
+  s.letzteBildUrl='';s.bildPauseBis=0;s.ortLaeuft=false;s.letzteRohantwort='';
+  return d;
+}
+function oeffneSpeicher(){
+  var html='';
+  SLOTS.forEach(function(k,i){
+    var d=leseSlot(i);
+    var info=d
+      ? escapeHtml((d.welt.protagonist&&d.welt.protagonist.name)||'?')+' · '+escapeHtml((d.welt.ort&&d.welt.ort.name)||'?')+
+        '<small>'+new Date(d.zeit||0).toLocaleString()+' · '+(d.stand.verlauf?d.stand.verlauf.length:0)+' Zeilen</small>'
+      : '<span style="color:var(--dim)">leer</span>';
+    html+='<div class="slot"><div class="slotinfo"><b>'+SLOT_NAMEN[i]+'</b><br>'+info+'</div>'+
+      (i>0?'<button onclick="slotSpeichern('+i+')"'+(S.imSpiel?'':' disabled')+'>SICHERN</button>':'')+
+      '<button onclick="slotLaden('+i+')"'+(d?'':' disabled')+'>LADEN</button>'+
+      '<button onclick="slotLoeschen('+i+')"'+(d?'':' disabled')+'>✕</button></div>';
+  });
+  html+='<label class="feldlabel" for="exportFeld">EXPORT / IMPORT (Textblock sichern oder einfügen)</label>'+
+        '<textarea id="exportFeld" class="feld" rows="4" placeholder="Hier erscheint der Export – oder füge einen fremden Spielstand ein und drücke IMPORT."></textarea>';
+  el('speicherInhalt').innerHTML=html;
+  oeffneModal('mSpeicher');
+}
+function slotSpeichern(i){
+  if(!S.imSpiel)return;
+  if(schreibeSlot(i))oeffneSpeicher();
+}
+function slotLoeschen(i){
+  try{ localStorage.removeItem(SLOTS[i]); }catch(e){}
+  oeffneSpeicher();
+  pruefeLadeButton();
+}
+function slotLaden(i){
+  var d=leseSlot(i);
+  if(!d){ zeigeFehler('Laden',new Error('Dieser Platz ist leer oder beschädigt.')); return; }
+  uebernehmeStand(d);
+}
+function uebernehmeStand(d){
+  migriere(d);
+  W=d.welt;S=d.stand;
+  tipper=null;
+  schliesseModal();
+  if(el('start').style.display!=='none'&&!el('start').classList.contains('aus')){
+    betreteSpiel();
+  }else{
+    S.imSpiel=true;
+    starteOrt();
+  }
+}
+function exportAnzeigen(){
+  if(!S.imSpiel){
+    var d=leseSlot(0);
+    if(!d){ sysZeile('Kein Spielstand zum Exportieren.'); return; }
+    el('exportFeld').value=JSON.stringify(d);
+    return;
+  }
+  el('exportFeld').value=JSON.stringify(standObjekt());
+  el('exportFeld').select();
+}
+function importStand(){
+  var t=el('exportFeld').value.trim();
+  if(!t){ zeigeFehler('Import',new Error('Kein Text zum Einlesen.')); return; }
+  var d;
+  try{ d=JSON.parse(t); }catch(e){ zeigeFehler('Import',new Error('Das ist kein gültiger Spielstand.')); return; }
+  if(!pruefeStand(d)){ zeigeFehler('Import',new Error('Spielstand unvollständig.')); return; }
+  uebernehmeStand(d);
+}
+function pruefeLadeButton(){
+  var b=el('ladebtn');
+  if(b)b.style.display=irgendeinStand()?'inline-block':'none';
+}
+
+// ── HELFER ────────────────────────────────────
+function setStatus(t){ var e=el('ladelabel'); if(e)e.textContent=t; }
+
+// Einen alten V6-Stand einmalig auf Platz 1 heben, statt ihn liegenzulassen.
+function uebernehmeAltstand(){
+  try{
+    var roh=localStorage.getItem('proxima_save_v6');
+    if(!roh)return;
+    if(leseSlot(1))return;
+    var d=JSON.parse(roh);
+    if(!pruefeStand(d))return;
+    localStorage.setItem(SLOTS[1],JSON.stringify({version:6,zeit:Date.now(),welt:d.welt,stand:d.stand}));
+  }catch(e){}
+}
+
+// ── START ─────────────────────────────────────
+(function(){
+  ladeCfg();
+  zeichneKopfSchalter();
+  fuelleQuelleKurz();
+  uebernehmeAltstand();
+  pruefeLadeButton();
+})();
+</script>

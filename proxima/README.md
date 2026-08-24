@@ -4,8 +4,59 @@ Ein Dialog-Abenteuer für [perchance.org](https://perchance.org): Der Held kommt
 trifft dort Menschen und redet mit ihnen. Keine Rätsel, kein Spielziel — Begegnungen, Gespräche,
 Stimmungen. Zu jedem Moment zeichnet der Generator ein Comic-Panel.
 
-`proxima.html` ist der komplette Generator in einer Datei — Inhalt in den HTML-Bereich deines
-Perchance-Generators kopieren, fertig.
+Der Generator holt seinen Quelltext bei jedem Seitenaufruf aus diesem Repository:
+**push nach `main` → beim nächsten Laden steht die Änderung in Perchance.** Kein Kopieren mehr.
+
+| Datei | Rolle |
+|---|---|
+| `proxima.html` | Die **Ladeschale**. Einmal in den HTML-Bereich des Perchance-Generators kopieren, danach praktisch nie wieder anfassen. |
+| `proxima.app.html` | Der **komplette Generator** — Stil, Markup, Skript. Hier wird gearbeitet. |
+| `test/logik.test.js` | Prüft beides ohne Netz und ohne Browser. |
+
+## Wie der Abgleich läuft
+
+Die Ladeschale holt beim Start
+
+```
+https://raw.githubusercontent.com/Colimbuli/MeinGitHub/main/proxima/proxima.app.html
+```
+
+zerlegt die Datei in `<style>`, Markup und `<script>` und hängt die drei Teile in die Seite. Das
+Skript kommt als echtes `script`-Element ins DOM und nicht durch `eval` — nur so landen die
+Funktionen wieder im globalen Namensraum, wo die `onclick`-Attribute des Markups und die
+Perchance-Plugins `ai()` und `image()` sie erwarten. Für den laufenden Generator ist das
+ununterscheidbar von der früheren Fassung aus einer Datei.
+
+Vier Dinge, die dabei mitgedacht sind:
+
+* **Wie schnell eine Änderung ankommt.** `raw.githubusercontent.com` erlaubt fünf Minuten Cache.
+  Die Ladeschale hängt einen Zeitstempel im Minutentakt an die Adresse, damit es bei einer Minute
+  bleibt. Sofort geht auch: `PROXIMA_LADER.neu()` in der Browserkonsole lädt am Cache vorbei.
+* **Wenn `raw` nicht durchkommt** (Netzsperre, Schulnetz), versucht die Schale denselben Stand über
+  `cdn.jsdelivr.net`. Der hält Zweig-Stände länger vor, taugt also nur als Rückfallebene.
+* **Wenn GitHub gar nicht erreichbar ist**, läuft die zuletzt geladene Fassung aus dem
+  `localStorage` weiter, statt dass der Generator schwarz bleibt. `PROXIMA_LADER.vergiss()` wirft
+  sie weg.
+* **Zum Ausprobieren ohne `main` anzufassen**: `#prx-zweig=mein-zweig` an die Generator-Adresse
+  hängen. Die Wahl bleibt gemerkt, `#prx-zweig=standard` schaltet zurück.
+
+Wer den Generator forkt, ändert nur den Block `CFG` oben im Skript von `proxima.html`
+(`besitzer`, `repo`, `zweig`, `pfad`, `taktSekunden`).
+
+## Voraussetzung: öffentliches Repository
+
+`raw.githubusercontent.com` liefert aus einem **privaten** Repository nichts — für alle 404, auch
+für dich. Ein Token, das das ändern würde, stünde im HTML-Bereich des Generators und damit für
+jeden lesbar da. Das Repository muss also öffentlich sein.
+
+Umstellen: Repository → **Settings** → **General** → ganz unten **Danger Zone** →
+*Change repository visibility* → **Make public**.
+
+Vorher einmal durchsehen, denn veröffentlicht wird auch die **gesamte Historie**: API-Schlüssel,
+Zugangsdaten, private Notizen in alten Commits sind danach draußen. (Die Schlüssel der Bildquellen
+sind davon nicht betroffen — die liegen im Browser des Spielers, nicht im Repository.) Soll der
+Rest privat bleiben, ist der saubere Weg ein zweites, öffentliches Repository, das nur `proxima/`
+enthält; dann in `CFG` `besitzer`/`repo` darauf zeigen lassen.
 
 ## Voraussetzungen
 
@@ -182,12 +233,12 @@ Ausdruck. Entscheidend ist deshalb der *Zeitpunkt*, nicht der Ort:
 
 | | |
 |---|---|
-| **Beim Laden vorhanden** — Markup, Attribute, Kommentare | wird geprüft → hier keine eckigen Klammern um Wörter |
-| **Erst zur Laufzeit erzeugt** — per JavaScript ins DOM geschrieben | wird nicht mehr geprüft → unbedenklich |
+| **`proxima.html`** — steht beim Laden im HTML-Bereich | wird geprüft → keine eckigen und keine geschweiften Klammern im Markup |
+| **`proxima.app.html`** — kommt erst zur Laufzeit ins DOM | wird nicht mehr geprüft → beliebiger Inhalt |
 
-Darum laufen die Dialogzeilen mit ihren `[Handlungen]` und der ausführliche Platzhalter des
-Eingabefelds problemlos: die entstehen erst nach dem Laden. Ein Platzhalter-Attribut im
-Start-Markup dagegen legt den Generator lahm.
+Das ist der stille Gewinn der Umstellung: Die Dialogzeilen mit ihren `[Handlungen]`, Platzhalter,
+Kommentare — im Generator selbst ist die Klammerfrage erledigt. Nur die Schale muss sauber bleiben,
+und die ändert sich fast nie.
 
 **HTML-Entities helfen nicht.** `&#91;` wird vom Browser beim Parsen zu `[` aufgelöst — und erst
 danach schaut Perchance hin. Im Start-Markup hilft nur, die Klammern wegzulassen.
@@ -197,8 +248,8 @@ durch, zwei nackte Wörter wie `[eckigen Klammern]` ergeben *„Unexpected ident
 zieht Folgefehler nach sich — ohne aufgebaute Generator-Struktur findet das KI-Plugin sein Iframe
 nicht mehr (*„Cannot read properties of null (reading 'contentWindow')"*).
 
-`node test/logik.test.js` prüft das Start-Markup **nach** dem Auflösen der Entities und schlägt
-fehl, bevor es in Perchance auffällt.
+`node test/logik.test.js` prüft die Ladeschale **nach** dem Auflösen der Entities und schlägt fehl,
+bevor es in Perchance auffällt.
 
 ## Wenn das Text-Plugin klemmt
 
@@ -403,6 +454,31 @@ Der Bildstil wird weiterhin beim Zeichnen aus der Startauswahl gelesen und nicht
 festgehalten. Nach dem Laden eines Standes steht die Auswahl deshalb wieder auf *Manga*, solange
 der Stil nicht per `/stil:` gesetzt wurde. (Ausdrücklich so gewünscht.)
 
+## Was nach außen geht
+
+Der Generator hat keinen eigenen Server. Spielstände, Einstellungen und eingetragene Schlüssel
+liegen im `localStorage` des Spielers. Nach außen gehen nur:
+
+| Wohin | Was | Wann |
+|---|---|---|
+| Perchance | Texteingaben an das KI-Plugin | immer |
+| die gewählte Bildquelle | Bildbeschreibung, ggf. Schlüssel | nur wenn die Quelle nicht Perchance ist |
+| `raw.githubusercontent.com` | nichts als die Anfrage selbst — GitHub sieht dabei die IP | bei jedem Start |
+
+Derselbe Text steht als Block **DATENSCHUTZ** am Ende der Einstellungen, damit ihn auch findet,
+wer die README nie öffnet.
+
+**Schriften kommen aus dem System.** Cinzel und EB Garamond hingen früher an
+`fonts.googleapis.com` — jede Einbindung von dort schickt die IP-Adresse des Besuchers an Google,
+und genau dafür gab es in Deutschland Abmahnungen (LG München I, 2022). Die beiden Stacks stehen
+als `--schrift-titel` und `--schrift-text` im `:root`-Block. Wer die Originalschriften zurückwill,
+hostet sie selbst und trägt sie dort ein; ein Link zu Google gehört nicht zurück in die Datei.
+
+## Lizenz
+
+MIT, siehe `LICENSE` im Wurzelverzeichnis. Der Code ist selbst geschrieben, ohne fremde
+Bibliotheken und ohne eingebettete Fremdinhalte — es gibt nichts, was gesondert nachzuweisen wäre.
+
 ## Test
 
 ```
@@ -410,5 +486,11 @@ node test/logik.test.js
 ```
 
 Prüft Parser, Prompt-Bau, Befehlserkennung, Bildquellen-Registry, Spielstände und die
-V6-Migration gegen einen minimalen DOM-Stub — ohne Netz und ohne Browser. Das Skript wird direkt
-aus `proxima.html` gezogen, läuft also nie gegen eine veraltete Kopie.
+V6-Migration gegen einen minimalen DOM-Stub — ohne Netz und ohne Browser. Dazu die Ladeschale:
+Aufteilen der geholten Datei, Adressbau, Zweig-Umschaltung, beide Rückfallebenen und die
+Fehlermeldung bei 404. Beide Skripte werden direkt aus den HTML-Dateien gezogen, laufen also nie
+gegen eine veraltete Kopie.
+
+Weil `main` jetzt der laufende Generator ist, läuft derselbe Test bei jedem Push über
+`.github/workflows/proxima.yml`. Ein roter Haken dort heißt: nicht mergen, sonst ist der Fehler
+eine Minute später im Generator.
