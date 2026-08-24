@@ -79,7 +79,13 @@ html,body{width:100%;height:var(--hoehe);background:var(--bg);font-family:var(--
 #kopfreihe{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
 #raumtitel{font-family:var(--schrift-titel);font-size:clamp(0.75rem,1.9vw,1.05rem);font-weight:700;letter-spacing:0.18em;color:var(--gold2);text-shadow:0 0 14px rgba(212,160,51,0.6),0 2px 6px rgba(0,0,0,0.9);text-align:center;padding:8px 4px 0;pointer-events:none;}
 #werkzeuge{flex:0 0 auto;pointer-events:all;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;max-width:62%;}
-#werkzeuge button{background:rgba(42,28,14,0.82);border:1px solid var(--border);color:var(--gold2);font-family:var(--schrift-titel);font-size:0.65rem;letter-spacing:0.08em;padding:4px 8px;cursor:pointer;transition:background 0.15s,border-color 0.15s;}
+/* Festes Raster statt Padding: ein Zeichen quadratisch (1:1), die beiden
+   beschrifteten Knoepfe doppelt so breit wie hoch (1:2). Mit Padding zoege der
+   Text die Breite sonst wieder auseinander. */
+#werkzeuge button{background:rgba(42,28,14,0.82);border:1px solid var(--border);color:var(--gold2);font-family:var(--schrift-titel);font-size:0.65rem;letter-spacing:0.08em;cursor:pointer;transition:background 0.15s,border-color 0.15s;
+  width:30px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;line-height:1;flex:0 0 auto;overflow:hidden;}
+#werkzeuge button.breit{width:60px;}
+#werkzeuge button svg{display:block;}
 #werkzeuge button:hover{background:rgba(212,160,51,0.12);border-color:var(--gold);}
 #werkzeuge button:disabled{opacity:0.3;cursor:default;}
 #autobtn.an{background:var(--gold);color:#2a1c0e;border-color:var(--gold2);}
@@ -172,7 +178,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.29</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.32</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -225,15 +231,14 @@ select.feld option{background:var(--panel);}
     <div id="werkzeuge">
       <button id="chronikbtn" onclick="zeigeChronik('ort')" title="Chronik">📖</button>
       <button id="figurbtn" onclick="oeffneFigurMenu()" title="Figuren bearbeiten">👤</button>
-      <button id="ortbtn" onclick="oeffneOrtMenu()" title="Ort bearbeiten">📍</button>
-      <button id="szenebtn" onclick="oeffneSzeneMenu()" title="Bildstil">🎬</button>
-      <button id="bildbtn" onclick="oeffneBildModal()" title="Bild bearbeiten">🖼</button>
+      <button id="ortbtn" onclick="oeffneOrtMenu()" title="Ort bearbeiten" aria-label="Ort bearbeiten"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false"><path d="M12 2.4c-3.7 0-6.7 3-6.7 6.7 0 4.9 6.7 12.5 6.7 12.5s6.7-7.6 6.7-12.5c0-3.7-3-6.7-6.7-6.7z" fill="currentColor"/><circle cx="12" cy="9" r="2.5" fill="#2a1c0e"/></svg></button>
+      <button id="bildbtn" onclick="oeffneBildModal()" title="Bild: Stil, Prompt, Seed">🖼</button>
       <button id="einstellbtn" onclick="oeffneEinstellungen()" title="Einstellungen">⚙</button>
       <button id="speicherbtn" onclick="oeffneSpeicher()" title="Speichern / Laden">💾</button>
       <button id="hilfebtn" onclick="oeffneHilfe()" title="Befehle und Hilfe">?</button>
       <button id="undobtn" onclick="undo()" title="Letzten Zug zurücknehmen">⟲</button>
-      <button id="npcbtn" onclick="erscheineNPC('')" title="Weitere Person auftreten lassen">+ NPC</button>
-      <button id="autobtn" onclick="autoUmschalten()" title="Figuren spielen allein weiter">▶ AUTO</button>
+      <button id="npcbtn" class="breit" onclick="erscheineNPC('')" title="Weitere Person auftreten lassen">+ NPC</button>
+      <button id="autobtn" class="breit" onclick="autoUmschalten()" title="Figuren spielen allein weiter">▶ AUTO</button>
     </div>
     </div>
     <div id="raumtitel"></div>
@@ -270,6 +275,10 @@ select.feld option{background:var(--panel);}
   <div class="modalBox">
     <div class="modalKopf"><span>🖼 BILD BEARBEITEN</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
     <div class="modalInhalt">
+      <label class="feldlabel" for="szeneStil">BILDSTIL — gilt für alle weiteren Bilder</label>
+      <select id="szeneStil" class="feld" onchange="szeneStilGewechselt()"></select>
+      <input id="szeneStilEigen" class="feld" type="text" placeholder="z.B. noir ink sketch, high contrast" style="display:none">
+      <div class="hinweis" id="szeneStilHinweis"></div>
       <label class="feldlabel" for="bildPromptFeld">PROMPT</label>
       <textarea id="bildPromptFeld" class="feld" rows="6"></textarea>
       <label class="feldlabel" for="bildNegativFeld">NEGATIVPROMPT</label>
@@ -302,26 +311,27 @@ select.feld option{background:var(--panel);}
   </div>
 </div>
 
-<div class="modal" id="mSzene">
+<div class="modal" id="mMission">
   <div class="modalBox">
-    <div class="modalKopf"><span>🎬 BILDSTIL</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalKopf"><span>✦ MISSION</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
     <div class="modalInhalt">
-      <label class="feldlabel" for="szeneStil">BILDSTIL — gilt für alle weiteren Bilder</label>
-      <select id="szeneStil" class="feld" onchange="szeneStilGewechselt()"></select>
-      <input id="szeneStilEigen" class="feld" type="text" placeholder="z.B. noir ink sketch, high contrast" style="display:none">
-      <div class="hinweis">Die Kulisse steht jetzt im Ort-Menü 📍, weil sie zum Ort gehört.</div>
-      <div class="hinweis" id="szeneStilHinweis"></div>
+      <label class="feldlabel" for="missionZiel">ZIEL — worauf die Geschichte zuläuft. Ein Satz, an dem man scheitern kann.</label>
+      <textarea id="missionZiel" class="feld" rows="3"></textarea>
+      <label class="feldlabel" for="missionStandFeld">STAND — wie weit es gediehen ist. Die Regie schreibt hier von selbst fort.</label>
+      <textarea id="missionStandFeld" class="feld" rows="3"></textarea>
+      <div class="hinweis" id="missionHinweis"></div>
     </div>
     <div class="modalNav">
       <button onclick="schliesseModal()">SCHLIESSEN</button>
-      <button class="haupt" onclick="speichereSzene()">✦ ÜBERNEHMEN</button>
+      <button onclick="missionLoeschen()" title="Ohne Ziel verfolgen die Figuren eigene Absichten">✕ OHNE ZIEL</button>
+      <button class="haupt" onclick="speichereMission()">✦ ÜBERNEHMEN</button>
     </div>
   </div>
 </div>
 
 <div class="modal" id="mOrt">
   <div class="modalBox">
-    <div class="modalKopf"><span>📍 ORT</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalKopf"><span><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false" style="vertical-align:-2px"><path d="M12 2.4c-3.7 0-6.7 3-6.7 6.7 0 4.9 6.7 12.5 6.7 12.5s6.7-7.6 6.7-12.5c0-3.7-3-6.7-6.7-6.7z" fill="currentColor"/><circle cx="12" cy="9" r="2.5" fill="#2a1c0e"/></svg> ORT</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
     <div class="modalInhalt">
       <label class="feldlabel" for="ortName">NAME DES ORTES</label>
       <input id="ortName" class="feld" type="text">
@@ -1039,6 +1049,7 @@ function einWort(s){ return String(s||'').toLowerCase().trim().split(/[\s,.;:]/)
 var W = {
   protagonist:{name:'',herkunft:'',beruf:'',eigenart:'',aussehen:'',kleidung:''},
   stadt:'', rahmenhandlung:'', rahmenhandlungOriginal:'',
+  mission:'',         // das uebergeordnete Ziel, dem die Szene folgt
   perspektive:'er',   // 'er' = Held im Bild, 'ich' = Blick durch seine Augen
   ort:null,          // mit name, geschichte, bildPrompt
   npcs:[]            // Figuren mit name, rolle, aussehen, kleidung, person, grundstimmung, eroeffnung
@@ -1048,6 +1059,8 @@ var S = {
   verlauf:[],                       // Eintraege: rolle 'ich' oder 'npc', idx, text, name
   stimmung:[], kleidung:[], regieAnweisung:[],
   handlung:'', fakten:[],           // Kurzzeit-Zusammenfassung + Langzeitgedaechtnis
+  missionStand:'',                  // wie weit die Mission gediehen ist
+  beziehungen:{},                   // wer wie zu wem steht: {Figur:{Ziel:'Haltung'}}
   seed:0,                           // fest, damit Figuren wiedererkennbar bleiben
   bildGeneriert:false, bildZaehler:0, bildLaeuft:false, bildAusstehend:null, bildPauseBis:0,
   letzteRohantwort:'', letzteJsonOk:false, kurzKontext:false,
@@ -1111,29 +1124,40 @@ async function weltErstellen(){
 
   var p=
     'Du bist Autor eines lebendigen deutschen Dialog-Adventures.'+
-    ' Ausgangsidee des Spielers: '+begriffe+'.'+
-    ' Der Held kommt an EINEN Ort und lernt dort eine interessante Person kennen. Spaeter koennen weitere Personen dazustossen. Es gibt keine Raetsel und kein Spielziel – es geht um Begegnungen, Gespraeche und Stimmungen.'+
-    ' WICHTIG: Die Person ist warm, offen und zugewandt; frivol und frech darf sie sein, aber nie unfreundlich, herablassend oder abweisend.\n\n'+
+    ' Ausgangsidee des Spielers: '+begriffe+'.\n\n'+
+    'LIES DIE AUSGANGSIDEE GENAU:\n'+
+    '- Nennt sie PERSONEN ("meine Frau", "mein Chef", "zwei alte Freunde"), dann sind genau diese Personen von Anfang an anwesend. Jede bekommt einen eigenen Eintrag in "npcs", einen Namen und eine Rolle, die das Verhaeltnis festhaelt ("Ehefrau des Helden"). Sie sind KEINE Fremden: wer den Helden kennt, spricht ihn auch so an.\n'+
+    '- Nennt sie einen ORT (Kino, Bahnhof, Werkstatt), dann ist DAS der Ort. Erfinde keinen anderen.\n'+
+    '- Nennt sie weder Personen noch Ort, erfindest du eine interessante Person und einen Ort dazu.\n'+
+    '- Hoechstens '+MAX_NPCS+' Personen. Weitere koennen spaeter dazustossen.\n\n'+
+    'DIE MISSION: Die Geschichte folgt einem uebergeordneten Ziel — etwas Konkretes, das an diesem Tag erreicht, herausgefunden, geklaert oder zustande gebracht werden soll. Es darf klein und alltaeglich sein, aber es muss ein Ziel sein, an dem man scheitern kann. KEIN Liebesziel: Verliebtsein, Erobern oder Verfuehren ist niemals die Mission.\n\n'+
+    'DER TON: Die Figuren sind warm, offen und zugewandt; frivol und frech duerfen sie sein, aber nie unfreundlich, herablassend oder abweisend. Zuneigung darf entstehen, sie ist aber nicht der Zweck der Szene.\n\n'+
     'Antworte NUR mit einem JSON-Objekt, ohne Codeblock, ohne Text davor oder danach, in genau dieser Form:\n'+
     '{\n'+
     '  "held": {"name":"Vor- und Nachname","herkunft":"Geburtsstadt","beruf":"Beruf","eigenart":"schrullige Eigenart"},\n'+
     '  "stadt": "europaeische Stadt",\n'+
-    '  "rahmenhandlung": "deutsche Einfuehrung, 5 bis 7 Saetze",\n'+
+    '  "mission": "das uebergeordnete Ziel in EINEM deutschen Satz, konkret und ueberpruefbar",\n'+
+    '  "rahmenhandlung": "deutsche Einfuehrung, 5 bis 7 Saetze, die auch die Mission und die anwesenden Personen erklaert",\n'+
     '  "ort": {\n'+
     '    "name": "Name des Ortes",\n'+
     '    "geschichte": "atmosphaerische deutsche Beschreibung des Ortes, 3 bis 5 Saetze",\n'+
-    '    "bild": "english description of the OPENING scene when the hero arrives - what the person is DOING, plus setting, objects and lighting. An action, NOT the appearance. No art style."\n'+
+    '    "bild": "english description of the OPENING scene - what the people are DOING, plus setting, objects and lighting. An action, NOT the appearance. No art style."\n'+
     '  },\n'+
-    '  "npc": {\n'+
-    '    "name": "Name der Person",\n'+
-    '    "rolle": "Rolle/Funktion am Ort",\n'+
-    '    "aussehen": "constant English visual IDENTITY only: age, face, hair, build, distinctive features. NO clothing, no art style, no background, no action, no mood.",\n'+
-    '    "kleidung": "english default outfit - clothing and accessories only, a few words.",\n'+
-    '    "person": "Persoenlichkeit, Sprechweise, Eigenheiten in einem deutschen Satz. Warmherzig, lebenslustig, frech, frivol, schlagfertig, aber immer zugewandt und respektvoll.",\n'+
-    '    "stimmung": "Grundstimmung in EINEM deutschen Wort (uebermuetig, gelassen, neugierig, warmherzig, verspielt, kokett, verschmitzt, melancholisch)",\n'+
-    '    "eroeffnung": "Der erste deutsche Satz, mit dem die Person den Helden anspricht."\n'+
-    '  }\n'+
-    '}';
+    '  "npcs": [\n'+
+    '    {\n'+
+    '      "name": "Name der Person",\n'+
+    '      "rolle": "Rolle am Ort UND Verhaeltnis zum Helden, falls eines besteht",\n'+
+    '      "aussehen": "constant English visual IDENTITY only: age, face, hair, build, distinctive features. NO clothing, no art style, no background, no action, no mood.",\n'+
+    '      "kleidung": "english default outfit - clothing and accessories only, a few words.",\n'+
+    '      "person": "Persoenlichkeit, Sprechweise, Eigenheiten in einem deutschen Satz.",\n'+
+    '      "stimmung": "Grundstimmung in EINEM deutschen Wort",\n'+
+    '      "beziehung": "Haltung DIESER Person zum Helden in ein bis drei deutschen Woertern (vertraut, alte Freundin, hoeflich distanziert, skeptisch, verliebt, dankbar)",\n'+
+    '      "beziehungen": "Haltung zu den ANDEREN Personen in dieser Liste, Format Name: Haltung; Name: Haltung. Bei nur einer Person leer.",\n'+
+    '      "eroeffnung": "Der erste deutsche Satz dieser Person. Nur die ERSTE Person in der Liste spricht ihn wirklich."\n'+
+    '    }\n'+
+    '  ]\n'+
+    '}\n\n'+
+    'Die Beziehungen muessen zur Ausgangsidee passen: Eine Ehefrau ist dem Helden vertraut, ein Fremder nicht. Nicht alle Figuren moegen einander gleich — Unterschiede machen die Szene lebendig.';
 
   // Ohne Rueckmeldung sieht ein langer Aufruf aus wie ein Absturz.
   var seit=Date.now();
@@ -1179,6 +1203,7 @@ function verarbeiteWelt(text){
   W.protagonist.kleidung = W.protagonist.kleidung||'';
   W.stadt                = f(['stadt'],'STADT','Wien');
   W.rahmenhandlung       = f(['rahmenhandlung'],'RAHMENHANDLUNG','');
+  W.mission              = entkleide(f(['mission'],'MISSION',''));
 
   W.ort={
     name:       f(['ort','name'],'ORT_NAME','Ein Ort','Name des Ortes'),
@@ -1186,20 +1211,50 @@ function verarbeiteWelt(text){
     bildPrompt: f(['ort','bild'],'ORT_BILD','the person stands quietly in the foreground, european setting behind them')
   };
 
-  var npc={
-    name:         f(['npc','name'],'NPC_NAME','Ein Fremder','Name der Person'),
-    rolle:        f(['npc','rolle'],'NPC_ROLLE','Bewohner'),
-    aussehen:     f(['npc','aussehen'],'NPC_AUSSEHEN','an adult with an ordinary but memorable face'),
-    kleidung:     f(['npc','kleidung'],'NPC_KLEIDUNG','simple everyday clothing'),
-    person:       f(['npc','person'],'NPC_PERSON','zurueckhaltend, aber vielschichtig'),
-    grundstimmung:einWort(f(['npc','stimmung'],'NPC_STIMMUNG','neugierig')),
-    eroeffnung:   f(['npc','eroeffnung'],'NPC_EROEFFNUNG','Oh – Besuch. Das passiert hier selten.','Eröffnungssatz')
-  };
-  setzeNpcs([npc]);
+  // Neu ist die Liste: Nennt die Ausgangsidee mehrere Personen, treten sie alle
+  // sofort auf. Aeltere Antworten mit einem einzelnen "npc" gehen weiter durch.
+  var rohListe=(j&&Array.isArray(j.npcs)&&j.npcs.length)?j.npcs:null;
+  function ausEintrag(e,i){
+    function g(schluessel,flach,ersatz,label){
+      var v=e?entkleide(String(e[schluessel]==null?'':e[schluessel])).trim():'';
+      if(!v)v=(z&&z[flach])||'';
+      if(!v){ if(label&&i===0)luecken.push(label); return ersatz; }
+      return v;
+    }
+    return {
+      name:         g('name','NPC_NAME','Ein Fremder','Name der Person'),
+      rolle:        g('rolle','NPC_ROLLE','Bewohner'),
+      aussehen:     g('aussehen','NPC_AUSSEHEN','an adult with an ordinary but memorable face'),
+      kleidung:     g('kleidung','NPC_KLEIDUNG','simple everyday clothing'),
+      person:       g('person','NPC_PERSON','zurueckhaltend, aber vielschichtig'),
+      grundstimmung:einWort(g('stimmung','NPC_STIMMUNG','neugierig')),
+      eroeffnung:   g('eroeffnung','NPC_EROEFFNUNG','Oh – Besuch. Das passiert hier selten.','Eröffnungssatz'),
+      startBeziehung:  e?entkleide(String(e.beziehung==null?'':e.beziehung)).trim():'',
+      startBeziehungen:e?String(e.beziehungen==null?'':e.beziehungen):''
+    };
+  }
+  var liste=[];
+  if(rohListe){
+    rohListe.slice(0,MAX_NPCS).forEach(function(e,i){ liste.push(ausEintrag(e,i)); });
+  }else{
+    // hole() macht aus einem Objekt eine Zeichenkette - hier braucht es das
+    // Objekt selbst, sonst faellt die alte Form auf die Ersatzwerte zurueck.
+    liste.push(ausEintrag((j&&j.npc&&typeof j.npc==='object')?j.npc:null,0));
+  }
+  setzeNpcs(liste);
+
+  // Startbeziehungen eintragen, bevor der erste Satz faellt.
+  S.beziehungen={};
+  liste.forEach(function(x){
+    if(x.startBeziehung)setzeBeziehung(x.name,heldName(),x.startBeziehung);
+    if(x.startBeziehungen)uebernimmBeziehungen(x.startBeziehungen,x.name);
+    delete x.startBeziehung; delete x.startBeziehungen;
+  });
+  beziehungenAufraeumen();
 
   S.seed=neuerSeed();
   S.szeneText=W.ort.bildPrompt;
-  S.handlung='';S.fakten=[];S.verlauf=[];S.rueckgaengig=[];
+  S.handlung='';S.fakten=[];S.verlauf=[];S.rueckgaengig=[];S.missionStand='';
 
   var rahmen=W.rahmenhandlung||(W.protagonist.name+' aus '+W.protagonist.herkunft+' kommt nach '+W.stadt+'.');
   W.rahmenhandlung=rahmen;
@@ -1310,6 +1365,105 @@ function starteOrt(){
 }
 
 // ── WELT-KONTEXT & GEDÄCHTNIS ─────────────────
+// ── MISSION UND BEZIEHUNGEN ───────────────────
+// Zwei Dinge halten eine Szene zusammen: ein Ziel, auf das alle zulaufen, und
+// eine klare Haltung jeder Figur zu jeder anderen. Ohne beides kippt jedes
+// Gespraech frueher oder spaeter in dieselbe Richtung.
+var MAX_BEZIEHUNG=44;   // Zeichen je Eintrag - eine Haltung, kein Aufsatz
+function heldName(){ return (W.protagonist&&W.protagonist.name)||'Held'; }
+function istHeld(name){
+  var t=String(name||'').trim().toLowerCase();
+  return t==='held'||t==='protagonist'||t==='user'||t==='spieler'||t==='ich'||
+         (!!heldName()&&t===heldName().toLowerCase());
+}
+// Namen aus der KI-Antwort auf eine wirklich anwesende Figur abbilden.
+function figurName(name){
+  if(istHeld(name))return heldName();
+  var i=findeNpc(name);
+  return i>=0?W.npcs[i].name:'';
+}
+// Der Held fuehrt kein Register ueber sich selbst - was er fuehlt, spielt der
+// Mensch vor dem Bildschirm.
+function setzeBeziehung(von,zu,wert){
+  var v=figurName(von), z=figurName(zu), w=kappe(entkleide(String(wert||'')).trim(),MAX_BEZIEHUNG);
+  if(!v||!z||!w||v===z||istHeld(von))return false;
+  if(leerAngabe(w))return false;
+  if(!S.beziehungen[v])S.beziehungen[v]={};
+  if(S.beziehungen[v][z]===w)return false;
+  S.beziehungen[v][z]=w;
+  return true;
+}
+// Erwartet "Ida > HELD: neugierig; Ida > Bo: skeptisch" - so antwortet die KI
+// zuverlaessiger als mit verschachteltem JSON.
+function beziehungenAus(text){
+  var raus=[];
+  String(text==null?'':text).split(/[;\n]+/).forEach(function(t){
+    var m=t.match(/^\s*([^>:]{1,44}?)\s*(?:>|->|→|zu)\s*([^:]{1,44}?)\s*:\s*(.+)$/);
+    if(m)raus.push({von:m[1],zu:m[2],wert:m[3]});
+  });
+  return raus;
+}
+// Fuer die Welterschaffung: "Bo: skeptisch; Ida: alte Freundin" bei bekanntem Absender.
+function beziehungenVonAus(text){
+  var raus=[];
+  String(text==null?'':text).split(/[;\n]+/).forEach(function(t){
+    var m=t.match(/^\s*([^:]{1,44}?)\s*:\s*(.+)$/);
+    if(m)raus.push({zu:m[1],wert:m[2]});
+  });
+  return raus;
+}
+function uebernimmBeziehungen(roh,von){
+  var n=0;
+  if(Array.isArray(roh)){
+    roh.forEach(function(b){
+      if(!b)return;
+      if(setzeBeziehung(b.von||b.from||von,b.zu||b.to||b.ziel,b.wert||b.value||b.haltung))n++;
+    });
+    return n;
+  }
+  if(von){
+    beziehungenVonAus(roh).forEach(function(b){ if(setzeBeziehung(von,b.zu,b.wert))n++; });
+    return n;
+  }
+  beziehungenAus(roh).forEach(function(b){ if(setzeBeziehung(b.von,b.zu,b.wert))n++; });
+  return n;
+}
+// Wer nicht mehr da ist, steht auch nicht mehr im Register.
+function beziehungenAufraeumen(){
+  var erlaubt={};
+  erlaubt[heldName()]=true;
+  W.npcs.forEach(function(x){ erlaubt[x.name]=true; });
+  Object.keys(S.beziehungen).forEach(function(v){
+    if(!erlaubt[v]||istHeld(v)){ delete S.beziehungen[v]; return; }
+    Object.keys(S.beziehungen[v]).forEach(function(z){
+      if(!erlaubt[z]||z===v)delete S.beziehungen[v][z];
+    });
+  });
+}
+function beziehungZu(von,zu){
+  var m=S.beziehungen[von];
+  return (m&&m[zu])||'';
+}
+function beziehungText(){
+  beziehungenAufraeumen();
+  var zeilen=[];
+  W.npcs.forEach(function(x){
+    var ziele=[heldName()].concat(W.npcs.map(function(a){return a.name;}).filter(function(nm){return nm!==x.name;}));
+    var teile=ziele.map(function(z){ return z+': '+(beziehungZu(x.name,z)||'noch unbestimmt'); });
+    zeilen.push('- '+x.name+' → '+teile.join(' | '));
+  });
+  return zeilen.join('\n');
+}
+// Nach jedem Zug: geaenderte Haltungen eintragen, Missionsstand fortschreiben.
+function folgeBeziehungen(bezRoh,missionRoh){
+  uebernimmBeziehungen(bezRoh);
+  if(missionRoh&&!leerAngabe(missionRoh))S.missionStand=kappe(missionRoh,300);
+}
+function missionText(){
+  if(!W.mission)return '';
+  return 'MISSION (das uebergeordnete Ziel dieser Geschichte): '+kappe(W.mission,S.kurzKontext?200:320)+'\n'+
+    (S.missionStand?'STAND DER MISSION: '+kappe(S.missionStand,S.kurzKontext?160:260)+'\n':'');
+}
 function weltKontext(){
   var k='WELT: Das Geschehen spielt in '+W.stadt+'.\n'+
     'HELD: '+W.protagonist.name+', '+W.protagonist.beruf+' aus '+W.protagonist.herkunft+'. Eigenart: '+W.protagonist.eigenart+'.\n';
@@ -1321,6 +1475,9 @@ function weltKontext(){
   var f=S.fakten.slice(-(S.kurzKontext?8:14));
   if(f.length)k+='WAS BISHER FESTSTEHT:\n- '+f.map(function(x){return kappe(x,140);}).join('\n- ')+'\n';
   if(S.handlung)k+='BISHERIGE HANDLUNG: '+kappe(S.handlung,S.kurzKontext?220:360)+'\n';
+  k+=missionText();
+  var bez=beziehungText();
+  if(bez)k+='BEZIEHUNGEN (Haltung jeder Figur zu jeder anderen — so spricht sie mit ihr):\n'+bez+'\n';
   return k;
 }
 function merkeFakt(f){
@@ -1386,6 +1543,12 @@ async function naechsterZug(erzwinge,autoModus){
     (heldSpielt?('AUTO-MODUS MIT MITSPIELENDEM HELDEN: Auch '+W.protagonist.name+' handelt jetzt eigenstaendig. Du darfst ihn sprechen und handeln lassen, dann ist WER = HELD. Er bleibt dabei ganz er selbst: '+
                  W.protagonist.beruf+' aus '+W.protagonist.herkunft+', Eigenart: '+W.protagonist.eigenart+'. Er ist kein blosser Stichwortgeber, sondern verfolgt eigene Absichten, fragt nach, widerspricht auch mal und ergreift die Initiative.\n'):'')+
     (autoModus&&!mehrere?'Es ist nur EINE Figur anwesend: sie handelt allein weiter – denkt laut, beschaeftigt sich, kommentiert die Umgebung, geht ihrer Taetigkeit nach und treibt die Szene voran, auch ohne Gegenueber.\n':'')+
+    'WORAUF DIE SZENE ZULAEUFT:\n'+
+    (W.mission
+      ? '- Die MISSION steht ueber allem. Jede Figur weiss, worum es geht; auch beim Plaudern kehrt das Gespraech dorthin zurueck, und jeder Zug bringt sie voran, verkompliziert sie oder zeigt, was ihr im Weg steht.\n'
+      : '- Es gibt kein festes Ziel. Dann verfolgt jede Figur eigene Absichten am Ort und treibt die Szene damit voran.\n')+
+    '- Die BEZIEHUNGEN oben sind verbindlich: Jede Figur spricht mit jeder anderen genau so, wie es dort steht — vertraut, skeptisch, verliebt, dankbar. Wer den Helden kennt, behandelt ihn nicht wie einen Fremden.\n'+
+    '- ANNAEHERUNG: Zuneigung, Flirt und Begehren duerfen entstehen, sind aber weder das Thema noch eine Abkuerzung. Sie wachsen langsam aus gemeinsamem Tun und Vertrauen, in kleinen Schritten und nur, wenn BEIDE Seiten sie tragen. Ueberspringe keine Stufe: aus "hoeflich" wird nicht im naechsten Zug "verliebt". Nimmt die Szene eine amouroese Wendung, laeuft alles andere trotzdem weiter — die Mission, die uebrigen Anwesenden, der Ort.\n'+
     'REGISTER: Der Ton ist warm, freundlich und offen. Alle Figuren begegnen einander UND dem Helden mit Respekt und Sympathie. Frivole, freche, anzuegliche und teils obszoene Sprueche sind erlaubt und erwuenscht, solange sie SPIELERISCH und gutmuetig bleiben. KEINE Beleidigungen, keine Herablassung, keine Feindseligkeit untereinander — necken ja, verletzen oder respektlos sein nein.\n'+
     '- Text des Helden in eckigen Klammern sind seine HANDLUNGEN. Figuren antworten mit EIGENEN Handlungen (in eckigen Klammern) und Rede.\n'+
     '- Reagiere KONKRET auf das zuletzt Gesagte. Wiederhole keine Formulierungen aus frueheren Zeilen.\n'+
@@ -1398,6 +1561,8 @@ async function naechsterZug(erzwinge,autoModus){
     '  "wer": "'+werOpt+(autoModus?'':' oder STOP')+'",\n'+
     '  "antwort": "die gesprochene Reaktion dieser Figur auf Deutsch, 1 bis 3 Saetze, Handlungen in eckigen Klammern",\n'+
     '  "stimmung": "Stimmung DIESER Figur nach dem Moment, EIN deutsches Wort",\n'+
+    '  "beziehungen": "nur was sich JETZT wirklich geaendert hat, Format Figur > Ziel: Haltung, mehrere durch Semikolon getrennt. Kleine Schritte, keine Spruenge. Sonst leer.",\n'+
+    '  "mission": "ein kurzer Satz, was die Mission JETZT vorangebracht, verzoegert oder verkompliziert hat. Sonst leer.",\n'+
     '  "weiter": false,\n'+
     '  "auftritt": "Person, die JETZT dazustoesst: Name und Rolle. Sonst leer.",\n'+
     '  "abgang": "Anwesende Person, die JETZT weggeht: ihr Name. Sonst leer.",\n'+
@@ -1428,6 +1593,8 @@ async function naechsterZug(erzwinge,autoModus){
   var ortwechsel  = entkleide(j2?hole(j2,['ortwechsel'],''):(z['ORTWECHSEL']||''));
   var ortaenderung= entkleide(j2?hole(j2,['ortaenderung'],''):(z['ORTAENDERUNG']||''));
   var kleidungNeu = entkleide(j2?hole(j2,['kleidung'],''):(z['KLEIDUNG']||''));
+  var bezRoh   = j2?(j2.beziehungen==null?'':j2.beziehungen):(z['BEZIEHUNGEN']||'');
+  var missionRoh=entkleide(j2?hole(j2,['mission'],''):(z['MISSION']||''));
   var auftritt = entkleide(j2?hole(j2,['auftritt'],''):(z['AUFTRITT']||''));
   var abgang   = entkleide(j2?hole(j2,['abgang'],''):(z['ABGANG']||''));
   var weiterRoh= j2?j2.weiter:(z['WEITER']||'');
@@ -1438,6 +1605,7 @@ async function naechsterZug(erzwinge,autoModus){
     if(handlung)S.handlung=handlung;
     if(fakt)merkeFakt(fakt);
     if(bild)S.szeneText=bild;
+    folgeBeziehungen(bezRoh,missionRoh);
     return {stop:false,held:true,text:antwort,weiter:false,auftritt:auftritt,abgang:abgang,
             ortwechsel:ortwechsel,ortaenderung:ortaenderung,kleidung:kleidungNeu};
   }
@@ -1450,6 +1618,7 @@ async function naechsterZug(erzwinge,autoModus){
   if(handlung)S.handlung=handlung;
   if(fakt)merkeFakt(fakt);
   if(bild)S.szeneText=bild;
+  folgeBeziehungen(bezRoh,missionRoh);
 
   return {stop:false,idx:idx,text:antwort,stimmung:stimmung,weiter:(weiter&&W.npcs.length>1),
           auftritt:auftritt,abgang:abgang,ortwechsel:ortwechsel,ortaenderung:ortaenderung,
@@ -1830,6 +1999,8 @@ var BEFEHLE=[
    fn:function(m){ quelleBefehl(m[1]); }},
   {muster:/^\/roh\b/i,                          hilfe:['/roh','zeigt die letzte Antwort der Regie im Original — zur Fehlersuche'],
    fn:function(){ zeigeRohantwort(); }},
+  {muster:/^\/mission\s*:?\s*([\s\S]*)$/i,      hilfe:['/mission: …','das Ziel der Geschichte setzen (ohne Angabe: Missions-Menü, „weg" streicht es)'],
+   fn:function(m){ missionBefehl(m[1]); }},
   {muster:/^\/ort\s*:?\s*([\s\S]*)$/i,          hilfe:['/ort: …','an einen anderen Ort wechseln (ohne Angabe: Ort-Menü)'],
    fn:function(m){ var t=entkleide(m[1]); if(!t){oeffneOrtMenu();return;} if(S.wartet){sysZeile('— Bitte kurz warten —');return;} ortWechseln(t); }},
   {muster:/^\/perspektive\s*:?\s*([\s\S]*)$/i,   hilfe:['/perspektive: ich|er','Erzählweise wechseln (ohne Angabe: aktuelle anzeigen)'],
@@ -1894,9 +2065,8 @@ function oeffneHilfe(){
     '<div class="hilfeabschnitt">DIE KNÖPFE OBEN</div>';
   [['📖','Chronik: Ort, Handlung und die Figuren'],
    ['👤','Figuren bearbeiten — Name, Aussehen, Kleidung, Stimmung'],
-   ['📍','Ort: Name, Beschreibung, Bildkulisse, Ortswechsel'],
-   ['🎬','Bildstil'],
-   ['🖼','Bild: Prompt, Negativprompt, Seed, neu zeichnen'],
+   ['◉','Ort: Name, Beschreibung, Bildkulisse, Ortswechsel'],
+   ['🖼','Bild: Bildstil, Prompt, Negativprompt, Seed, neu zeichnen'],
    ['⚙','Einstellungen: Bildquelle, Bildgröße, Takt, Schreibtempo'],
    ['💾','Spielstände: vier Plätze, Export und Import'],
    ['⟲','letzten Zug zurücknehmen'],
@@ -2078,7 +2248,7 @@ async function erscheineNPC(hint,still){
     'BISHERIGES GESCHEHEN:\n'+verlaufText(10)+'\n'+
     (hint?'VORGABE fuer die neue Person: '+hint+'\n':'')+
     '\nAntworte NUR mit einem JSON-Objekt, ohne Codeblock:\n'+
-    '{"name":"","rolle":"","aussehen":"constant English visual IDENTITY only, no clothing, no art style","kleidung":"english default outfit","person":"deutscher Satz, warm, frech, frivol, aber respektvoll","stimmung":"EIN deutsches Wort","eroeffnung":"erster deutscher Satz beim Hereinkommen, Handlungen in eckigen Klammern erlaubt"}';
+    '{"name":"","rolle":"","aussehen":"constant English visual IDENTITY only, no clothing, no art style","kleidung":"english default outfit","person":"deutscher Satz, warm, frech, frivol, aber respektvoll","stimmung":"EIN deutsches Wort","beziehung":"Haltung dieser Person zum Helden in ein bis drei deutschen Woertern","beziehungen":"Haltung zu den bereits Anwesenden, Format Name: Haltung; Name: Haltung, sonst leer","eroeffnung":"erster deutscher Satz beim Hereinkommen, Handlungen in eckigen Klammern erlaubt"}';
   try{
     var text=await frageKI(instruction);
     var j=jsonAus(text), z=j?null:felderAus(text);
@@ -2097,6 +2267,8 @@ async function erscheineNPC(hint,still){
     S.stimmung.push(npc.grundstimmung);
     S.kleidung.push(npc.kleidung);
     S.regieAnweisung.push('');
+    setzeBeziehung(npc.name,heldName(),f('beziehung','BEZIEHUNG',''));
+    uebernimmBeziehungen(f('beziehungen','BEZIEHUNGEN',''),npc.name);
     sysZeile('— '+npc.name+' erscheint —');
     npcSagt(idx,npc.eroeffnung);
     S.verlauf.push({rolle:'npc',idx:idx,text:npc.eroeffnung,name:npc.name});
@@ -2131,6 +2303,7 @@ function entferneNPC(idx){
   S.kleidung.splice(idx,1);
   S.regieAnweisung.splice(idx,1);
   S.autoForceIdx=null;
+  beziehungenAufraeumen();
   merkeFakt(name+' hat den Ort verlassen.');
   sysZeile('— '+name+' geht —');
   aktualisiereUI();
@@ -2295,6 +2468,10 @@ function baueChronikNav(){
   b0.onclick=function(){zeigeChronik('ort');};nav.appendChild(b0);
   var b1=document.createElement('button');b1.textContent='HANDLUNG';
   b1.onclick=function(){zeigeChronik('handlung');};nav.appendChild(b1);
+  var bm=document.createElement('button');bm.textContent='MISSION';
+  bm.onclick=function(){zeigeChronik('mission');};nav.appendChild(bm);
+  var bb=document.createElement('button');bb.textContent='BEZIEHUNGEN';
+  bb.onclick=function(){zeigeChronik('beziehungen');};nav.appendChild(bb);
   W.npcs.forEach(function(n,i){
     var b=document.createElement('button');b.textContent=n.name;
     b.onclick=function(){zeigeChronik(i);};nav.appendChild(b);
@@ -2315,11 +2492,38 @@ function zeigeChronik(ziel){
     var t=(S.handlung||'Noch nichts geschehen.');
     if(S.fakten.length)t+='\n\n• '+S.fakten.join('\n• ');
     inhalt.textContent=t;
+  }else if(ziel==='mission'){
+    kopf.textContent='📖 MISSION';
+    inhalt.style.whiteSpace='pre-wrap';
+    inhalt.textContent=(W.mission||'Für diese Geschichte wurde kein Ziel gesetzt.')+
+      (S.missionStand?'\n\nStand: '+S.missionStand:'\n\nNoch nichts geschehen.');
+    var bearbeiten=document.createElement('button');
+    bearbeiten.className='haupt';
+    bearbeiten.textContent=W.mission?'✎ BEARBEITEN':'✦ ZIEL SETZEN';
+    bearbeiten.onclick=function(){ schliesseModal(); oeffneMissionMenu(); };
+    el('chronikNav').appendChild(bearbeiten);
+  }else if(ziel==='beziehungen'){
+    kopf.textContent='📖 BEZIEHUNGEN';
+    inhalt.style.whiteSpace='pre-wrap';
+    beziehungenAufraeumen();
+    var zeilen=W.npcs.map(function(x){
+      var ziele=[heldName()].concat(W.npcs.map(function(a){return a.name;}).filter(function(nm){return nm!==x.name;}));
+      return x.name+'\n'+ziele.map(function(zn){
+        return '   → '+zn+': '+(beziehungZu(x.name,zn)||'noch unbestimmt');
+      }).join('\n');
+    });
+    inhalt.textContent=zeilen.length?zeilen.join('\n\n'):'Noch niemand da.';
   }else{
     var n=W.npcs[ziel];
     if(!n)return;
     kopf.textContent='📖 '+(n.name||'NPC').toUpperCase();
-    inhalt.textContent=n.rolle+'. '+n.person+'  (Stimmung: '+S.stimmung[ziel]+', trägt: '+(S.kleidung[ziel]||n.kleidung)+')';
+    beziehungenAufraeumen();
+    var zieleN=[heldName()].concat(W.npcs.map(function(a){return a.name;}).filter(function(nm){return nm!==n.name;}));
+    inhalt.style.whiteSpace='pre-wrap';
+    inhalt.textContent=n.rolle+'. '+n.person+'  (Stimmung: '+S.stimmung[ziel]+', trägt: '+(S.kleidung[ziel]||n.kleidung)+')'+
+      '\n\nHaltung gegenüber:\n'+zieleN.map(function(zn){
+        return '   → '+zn+': '+(beziehungZu(n.name,zn)||'noch unbestimmt');
+      }).join('\n');
   }
   oeffneModal('mChronik');
 }
@@ -2332,6 +2536,7 @@ function oeffneBildModal(){
   el('bildNegativFeld').value=S.eigenerNegativ||S.letzterNegativ||baueNegativ();
   el('bildSeedFeld').value=S.seed||'';
   el('bildFest').checked=!!S.promptFesthalten;
+  fuelleStilWahl();
   el('bildQuelleInfo').textContent=(S.eigenerPrompt
       ? (S.promptFesthalten
          ? '✎ Prompt festgehalten — das Bild bleibt so, bis du den Haken entfernst oder „AUS SZENE" drückst. '
@@ -2343,6 +2548,7 @@ function oeffneBildModal(){
 function wuerfelSeed(){ el('bildSeedFeld').value=String(neuerSeed()); }
 function bildNeuZeichnen(){
   if(!S.imSpiel)return;
+  if(uebernehmeStil())sysZeile('✦ Stil: '+(S.stilLabel||'unverändert')+' ✦');
   var p=el('bildPromptFeld').value.trim();
   var n=el('bildNegativFeld').value.trim();
   var s=el('bildSeedFeld').value.trim();
@@ -2358,6 +2564,7 @@ function bildNeuZeichnen(){
 // Zurueck zur Automatik: Prompt und Negativprompt entstehen wieder aus der Szene.
 function bildAusSzene(){
   if(!S.imSpiel)return;
+  if(uebernehmeStil())sysZeile('✦ Stil: '+(S.stilLabel||'unverändert')+' ✦');
   S.eigenerPrompt='';S.eigenerNegativ='';S.promptFesthalten=false;
   schliesseModal();
   sysZeile('✦ Bild folgt wieder der Szene ✦');
@@ -2429,9 +2636,11 @@ function speichereFiguren(){
 var STIL_NAMEN={manga:'Manga / Anime',comic:'Westlicher Comic',aquarell:'Aquarell',
                 oel:'Ölgemälde',realistisch:'Fotorealistisch',pixel:'Pixel-Art',
                 illustrious:'Illustrious / Anime-Tags'};
-function oeffneSzeneMenu(){
-  if(!S.imSpiel)return;
+// Der Bildstil stand frueher in einem eigenen Fenster. Er gehoert zum Bild,
+// also steht er jetzt oben im Bildmenue — ein Fenster statt zwei.
+function fuelleStilWahl(){
   var sel=el('szeneStil');
+  if(!sel)return;
   sel.innerHTML='';
   Object.keys(STILE).forEach(function(k){
     var o=document.createElement('option');
@@ -2455,32 +2664,86 @@ function oeffneSzeneMenu(){
   }
   szeneStilGewechselt();
   el('szeneStilHinweis').textContent=S.eigenerPrompt
-    ? 'Ein eigener Prompt ist aktiv — Stil und Kulisse wirken erst, wenn du im Bildmenü „AUS SZENE" drückst.'
+    ? 'Ein eigener Prompt ist aktiv — der Stil greift erst, wenn du unten „AUS SZENE" drückst.'
     : '';
-  oeffneModal('mSzene');
 }
+// Alter Name, damit /stil ohne Text und aeltere Aufrufe weiter greifen.
+function oeffneSzeneMenu(){ oeffneBildModal(); }
 function szeneStilGewechselt(){
   var eigen=el('szeneStilEigen');
   eigen.style.display=(el('szeneStil').value==='eigen')?'block':'none';
 }
-function speichereSzene(){
-  var wahl=el('szeneStil').value;
+// Liest die Stilwahl aus dem Bildmenue. Gibt zurueck, ob sich etwas geaendert
+// hat — dann meldet der Aufrufer es in der Dialogzeile.
+function uebernehmeStil(){
+  var sel=el('szeneStil');
+  if(!sel)return false;
+  var vorher=S.stilLabel;
+  var wahl=sel.value;
   if(wahl==='eigen'){
     var t=el('szeneStilEigen').value.trim();
     if(t){ S.stil=t; S.stilLabel=t; }
   }else if(STILE[wahl]){
     S.stil=STILE[wahl];S.stilLabel=wahl;
   }
-  schliesseModal();
-  sysZeile('✦ Stil: '+(S.stilLabel||'unverändert')+' ✦');
-  autosave();
-  zeichneBild({});
+  return S.stilLabel!==vorher;
 }
 
 // ── ORT ───────────────────────────────────────
 function zeigeRaumtitel(){
   var e=el('raumtitel');
   if(e)e.textContent=((W.ort&&W.ort.name)||'Ort').toUpperCase();
+}
+// ── MISSION VON HAND ──────────────────────────
+// Die Regie schreibt den Stand fort, das Ziel selbst gehoert aber dem Spieler:
+// er soll es jederzeit setzen, umschreiben oder ganz streichen koennen.
+function oeffneMissionMenu(){
+  if(!S.imSpiel)return;
+  el('missionZiel').value=W.mission||'';
+  el('missionStandFeld').value=S.missionStand||'';
+  el('missionHinweis').textContent=W.mission
+    ? 'Das Ziel steht in jeder Anweisung an die KI. Änderst du es, zieht die nächste Antwort nach.'
+    : 'Ohne Ziel verfolgt jede Figur eigene Absichten am Ort — die Szene läuft dann auf nichts Bestimmtes zu.';
+  oeffneModal('mMission');
+}
+function speichereMission(){
+  if(!S.imSpiel)return;
+  var vorher=W.mission;
+  W.mission=kappe(el('missionZiel').value.trim(),400);
+  S.missionStand=kappe(el('missionStandFeld').value.trim(),400);
+  schliesseModal();
+  if(W.mission&&W.mission!==vorher){
+    sysZeile('✦ Mission: '+W.mission);
+    merkeFakt('Das Ziel lautet jetzt: '+W.mission);
+  }else if(!W.mission&&vorher){
+    sysZeile('✦ Ohne Ziel — die Figuren verfolgen eigene Absichten.');
+  }
+  aktualisiereUI();
+  autosave();
+}
+function missionLoeschen(){
+  if(!S.imSpiel)return;
+  el('missionZiel').value='';
+  el('missionStandFeld').value='';
+  speichereMission();
+}
+// Ueber den Befehl: mit Text sofort setzen, ohne Text das Fenster oeffnen.
+function missionBefehl(text){
+  var t=entkleide(String(text||'')).trim();
+  if(!t){ oeffneMissionMenu(); return; }
+  if(/^(weg|keine|loeschen|löschen|aus|nichts)$/i.test(t)){
+    var hatte=!!W.mission;
+    W.mission='';S.missionStand='';
+    sysZeile(hatte?'✦ Ohne Ziel — die Figuren verfolgen eigene Absichten.':'Es gab kein Ziel.');
+    aktualisiereUI();autosave();
+    return;
+  }
+  W.mission=kappe(t,400);
+  S.missionStand='';
+  sysZeile('✦ Mission: '+W.mission);
+  merkeFakt('Das Ziel lautet jetzt: '+W.mission);
+  aktualisiereUI();
+  autosave();
 }
 function oeffneOrtMenu(){
   if(!S.imSpiel)return;
@@ -2597,7 +2860,7 @@ function oeffneEinstellungen(){
 // Seit der Umstellung auf die Ladeschale ist die Frage berechtigt, welcher Stand
 // gerade laeuft. Die Schale legt den geholten Quelltext samt Zweig und Zeitpunkt
 // im localStorage ab; hier wird er nur abgelesen.
-var VERSION = 'V7.29';
+var VERSION = 'V7.32';
 // Ohne Browserkonsole — etwa am Handy — muss der Generator selbst sagen koennen,
 // woran es liegt, wenn ein Plugin von Perchance fehlt.
 function pluginLage(){
@@ -2896,6 +3159,10 @@ function migriere(d){
   if(!Array.isArray(s.regieAnweisung))s.regieAnweisung=[];
   while(s.regieAnweisung.length<w.npcs.length)s.regieAnweisung.push('');
   if(!Array.isArray(s.fakten))s.fakten=[];
+  // Vor V7.31 gab es weder Mission noch Beziehungsregister.
+  if(!s.beziehungen||typeof s.beziehungen!=='object'||Array.isArray(s.beziehungen))s.beziehungen={};
+  if(typeof s.missionStand!=='string')s.missionStand='';
+  if(typeof w.mission!=='string')w.mission='';
   if(!Array.isArray(s.rueckgaengig))s.rueckgaengig=[];
   if(typeof s.handlung!=='string')s.handlung='';
   if(typeof s.autoRegie!=='string')s.autoRegie='';

@@ -162,7 +162,7 @@ den plausibelsten Endpunkt (`generate`, `infer`, `predict` und Aehnliches), sagt
 er genommen hat und merkt ihn sich. Hilfsendpunkte wie `lambda` oder `load_example` waehlt er nie.
 
 Anime-Modelle vom Typ Illustrious oder Pony reagieren auf **Tag-Ketten** deutlich besser als auf
-Prosa. Dafuer gibt es im Menue 🎬 den Stil *Illustrious / Anime-Tags*.
+Prosa. Dafuer gibt es im Bildmenue 🖼 den Stil *Illustrious / Anime-Tags*.
 
 ### Wenn eine Quelle nichts liefert
 
@@ -234,6 +234,46 @@ Zwei Unterschiede sind dagegen hausgemacht und behoben:
 Eine weitere Quelle hinzufügen heißt: einen Eintrag in `BILDQUELLEN` ergänzen. Jede Quelle bekommt
 `{prompt, negativ, seed, breite, hoehe}` und gibt eine Bildadresse zurück — mehr ist der Vertrag nicht.
 
+### Mission, Beziehungen und wer von Anfang an da ist
+
+Drei Dinge halten die Geschichte zusammen, seit V7.31.
+
+**Die Mission.** Die Welterschaffung setzt ein übergeordnetes Ziel: etwas Konkretes, das an diesem
+Tag erreicht, herausgefunden oder geklärt werden soll — und an dem man scheitern kann. Verlieben,
+Erobern und Verführen sind ausdrücklich **keine** Mission. Das Ziel steht in jeder Anweisung an die
+KI, und jeder Zug soll es voranbringen, verzögern oder zeigen, was ihm im Weg steht. Der Stand
+wandert mit; nachzulesen in der Chronik unter **MISSION**.
+
+Das Ziel gehört dem Spieler, nicht der KI: **`/mission: …`** setzt es jederzeit neu, **`/mission: weg`**
+streicht es (dann verfolgt jede Figur eigene Absichten), und **`/mission`** ohne Text öffnet ein
+eigenes Fenster mit Ziel und Stand. Dorthin führt auch die Chronik: 📖 → **MISSION** → *✎ BEARBEITEN*.
+Ein neu gesetztes Ziel landet zugleich im Langzeitgedächtnis, damit die Figuren es nicht übersehen.
+
+**Die Beziehungen.** Jede Figur führt eine eigene Haltung zu jeder anderen und zum Helden:
+
+```
+Marlene → Julian Voss: vertraut, seit zwölf Jahren | Konrad: alte Rivalin
+Konrad  → Julian Voss: schuldbewusst               | Marlene: skeptisch
+```
+
+Das Register geht in jede Anweisung ein und wird nach jedem Zug fortgeschrieben — die Regie meldet
+nur, was sich *wirklich* geändert hat, im Format `Figur > Ziel: Haltung`. Der Held führt kein
+Register über sich selbst: was er empfindet, spielt der Mensch vor dem Bildschirm. Wer den Ort
+verlässt, verschwindet auch aus dem Register. Nachzulesen in der Chronik unter **BEZIEHUNGEN** und
+auf jeder Figurenseite.
+
+**Das Tempo der Annäherung.** Zuneigung, Flirt und Begehren dürfen entstehen — aber sie sind weder
+das Thema noch eine Abkürzung. Sie wachsen aus gemeinsamem Tun und Vertrauen, in kleinen Schritten,
+und nur wenn beide Seiten sie tragen. Aus *höflich* wird nicht im nächsten Zug *verliebt*. Nimmt die
+Szene eine amouröse Wendung, läuft alles andere trotzdem weiter: die Mission, die übrigen
+Anwesenden, der Ort.
+
+**Genannte Personen treten sofort auf.** Steht in der Ausgangsidee „ich bin mit meiner Frau im
+Kino", dann ist die Frau von Anfang an als Figur da — mit Namen, mit der Rolle *Ehefrau des Helden*
+und mit einer entsprechend vertrauten Haltung. Und der Ort ist das Kino, nicht irgendein erfundener
+anderer. Bis zu vier so genannte Personen stehen von der ersten Zeile an im Raum; weitere können
+später dazustoßen.
+
 ### Woher die Bildbeschreibung kommt
 
 In den Einstellungen steht ein Schalter: **Bildregie — eigener KI-Aufruf sucht das Bild zum Moment.**
@@ -251,6 +291,18 @@ sonst würde der Bot die Figuren bei jedem Bild neu erfinden.
 
 Antwortet der Bot nicht oder zu knapp, zeichnet der Generator wie bisher aus der Dialogregie. Ein
 Ausfall kostet also kein Bild. Ein von Hand gesetzter Prompt (`/bild: …`) hat immer Vorrang.
+
+### Die Knöpfe oben
+
+Der Bildstil hatte einmal ein eigenes Fenster. Er gehört zum Bild, also steht er jetzt oben im
+**Bildmenü 🖼** — ein Fenster statt zwei. Der alte Aufruf `oeffneSzeneMenu()` führt dorthin weiter,
+damit `/stil` und ältere Aufrufe nichts merken. Die Stilwahl greift, sobald **NEU ZEICHNEN** oder
+**AUS SZENE** gedrückt wird.
+
+Die Knöpfe stehen in einem festen Raster statt auf Padding: ein Zeichen quadratisch (1:1), die
+beiden beschrifteten (**+ NPC**, **▶ AUTO**) doppelt so breit wie hoch (1:2). Der Ort trägt eine
+gezeichnete Ortsmarke — eine umgekehrte Tropfenform — statt der runden Stecknadel, die auf vielen
+Geräten wie ein Farbklecks aussah.
 
 ## Fallstrick beim Bearbeiten
 
@@ -307,8 +359,8 @@ Er-Perspektive.
 
 ### Der Ort
 
-Das Menue 📍 fuehrt Name, Beschreibung und die **Kulisse fuer Bilder** (englisch). Die Kulisse ist
-von 🎬 hierher gewandert, weil sie zum Ort gehoert; 🎬 fuehrt jetzt nur noch den Bildstil.
+Das **Ort-Menue** (Knopf mit der Ortsmarke) fuehrt Name, Beschreibung und die **Kulisse fuer Bilder**
+(englisch). Die Kulisse steht hier, weil sie zum Ort gehoert; der Bildstil steht im Bildmenue 🖼.
 
 Erzaehlt die Handlung einen **Ortswechsel**, geschieht er wirklich: Name, Beschreibung, Bildkulisse
 und Ankunftsszene werden neu ausformuliert, der Raumtitel wechselt, das Bild wird neu gezeichnet
@@ -318,7 +370,7 @@ neuen Ort dazustoesst, unter `auftritt`; beides regelt dieselbe Antwort der Regi
 Veraendert sich der Ort nur (die Kerzen erloeschen, Regen setzt ein), wird das an die Beschreibung
 angehaengt, statt den Ort zu wechseln. Dieselbe Veraenderung wird nicht doppelt eingetragen.
 
-Von Hand: im Menue 📍 einen neuen Ort beschreiben und **✦ DORTHIN** druecken, oder `/ort: …`
+Von Hand: im Ort-Menue einen neuen Ort beschreiben und **✦ DORTHIN** druecken, oder `/ort: …`
 schreiben. `/ort` ohne Angabe oeffnet das Menue.
 
 ### Kleidung folgt der Handlung
@@ -414,7 +466,8 @@ ein neuer Befehl steht damit automatisch in der Hilfe, ohne Nachpflege. Ein Test
 | `/kleidungN: …` | dauerhaftes Outfit für Figur N (englisch) |
 | `/regie: …` | stehende Regie für die ganze Szene, leer = löschen |
 | `/bild: …` | neues Bild aus eigener Beschreibung |
-| `/stil: …` | Bildstil wechseln (`manga`, `comic`, `aquarell`, `oel`, `realistisch`, `pixel` oder freier Text) — dasselbe geht im Menü 🎬 |
+| `/mission: …` | das Ziel der Geschichte setzen; `weg` streicht es, ohne Angabe öffnet sich das Missions-Menü |
+| `/stil: …` | Bildstil wechseln (`manga`, `comic`, `aquarell`, `oel`, `realistisch`, `pixel` oder freier Text) — dasselbe geht oben im Bildmenü 🖼 |
 | `/ort: …` | an einen anderen Ort wechseln (ohne Angabe: Ort-Menü) |
 | `/perspektive: ich\|er` | Erzählweise wechseln (ohne Angabe: aktuelle anzeigen) |
 | `/roh` | zeigt die letzte Antwort der Regie im Original — zur Fehlersuche |
@@ -457,7 +510,7 @@ ein neuer Befehl steht damit automatisch in der Hilfe, ohne Nachpflege. Ein Test
   auch `**NAME:**`, Aufzählungszeichen und umgebrochene Fließtexte.
 * **Langzeitgedächtnis**: Neben der fortgeschriebenen Handlung sammelt der Generator harte Fakten
   (max. 24) und legt sie jedem Zug bei, damit sich die Figuren nicht widersprechen.
-* **Bildstil auch im laufenden Spiel wählbar** — im Menü 🎬 (Szene & Stil), mit denselben
+* **Bildstil auch im laufenden Spiel wählbar** — im Bildmenü 🖼, mit denselben
   Vorgaben wie auf dem Startbildschirm plus eigenem Text. Vorher ging das nur über `/stil:`.
 * **Einklappbare Kopfleiste**: Der Schalter unter der Titelzeile fährt Werkzeuge, Figurenanzeige
   und Titel nach oben aus dem Bild — das Szenenbild bleibt unverdeckt. Der Zustand wird gemerkt.
