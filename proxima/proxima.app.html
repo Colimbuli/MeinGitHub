@@ -172,7 +172,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.28</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.29</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -438,6 +438,7 @@ var CFG={
   kopfOffen:true,  // Kopfleiste aus- oder eingeklappt
   autoHeld:true,   // im Auto-Modus handelt der Held selbst mit
   autoBesetzung:true, // Figuren treten auf und ab, wenn die Handlung es erzaehlt
+  bildBot:false,   // eigener KI-Aufruf sucht das Bild zum Moment (kostet einen Aufruf je Bild)
   tempo:16,        // ms pro Zeichen im Schreibmaschinen-Effekt (0 = sofort)
   bildTakt:2,      // alle N Zuege ein neues Bild (0 = nur auf Zuruf)
   pollModell:'',
@@ -1689,6 +1690,60 @@ function bauePrompt(opts,max){
   mitte=kuerzeText(mitte,Math.max(0,frei-figuren.length));
   return figuren+mitte+schwanz;
 }
+// ── BILDREGIE-BOT ─────────────────────────────
+// Normalerweise faellt die Bildbeschreibung im selben KI-Aufruf ab wie die
+// Dialogzeile (Feld "bild") - schnell und billig, aber die KI hat dabei den
+// Kopf beim Reden. Ist der Bot eingeschaltet, fragt ein eigener Aufruf nur
+// nach dem Bild: Er liest den letzten Verlauf und sagt, was zu sehen ist.
+// Aussehen der Figuren, Stil und Bildaufbau kommen weiterhin aus bauePrompt --
+// der Bot liefert nur die Szene, sonst wuerde er die Figuren jedes Mal neu
+// erfinden.
+var BILDBOT_MAX=320;
+function letzteZeilen(n){
+  var raus=[];
+  for(var i=Math.max(0,S.verlauf.length-n);i<S.verlauf.length;i++){
+    var v=S.verlauf[i];
+    if(!v||!v.text)continue;
+    raus.push((v.rolle==='ich'?(W.protagonist&&W.protagonist.name||'Held'):(v.name||'Figur'))+': '+v.text);
+  }
+  return raus.join('\n');
+}
+function baueBildRegieAnweisung(){
+  var wer=W.npcs.map(function(n,i){
+    return (n.name||('Figur '+(i+1)))+(S.stimmung[i]?' ('+S.stimmung[i]+')':'');
+  }).join(', ');
+  return 'Du bist die Bildregie eines Comics. Lies den Ausschnitt und sage, WAS IN DIESEM MOMENT ZU SEHEN IST.\n\n'+
+    'Schauplatz: '+((S.szeneGlobal||(W.ort&&W.ort.name)||'unbekannt'))+'\n'+
+    (wer?'Anwesend: '+wer+'\n':'')+
+    (S.handlung?'Bisher: '+kuerzeText(S.handlung,400)+'\n':'')+
+    '\nLetzte Zuege:\n'+(letzteZeilen(4)||'(noch nichts gesprochen)')+'\n\n'+
+    'Antworte mit EINEM englischen Satz, hoechstens 40 Woerter: Handlung, Koerperhaltung, Blickrichtung, '+
+    'Kameraeinstellung (close-up, medium shot, wide shot) und Licht. '+
+    'KEINE Namen, KEINE Beschreibung von Gesicht, Haaren oder Kleidung - die stehen schon fest. '+
+    'Kein Bildstil, keine Anfuehrungszeichen, keine Erklaerung. Nur der Satz.';
+}
+// Die KI haengt gern Anfuehrungszeichen, Codebloecke oder ein "Sure!" davor.
+function saeubereBildIdee(roh){
+  var t=String(roh==null?'':roh).trim();
+  t=t.replace(/^```[a-z]*\s*/i,'').replace(/```\s*$/,'').trim();
+  t=t.split(/\n+/).filter(function(z){return z.trim();}).pop()||'';
+  t=t.replace(/^(scene|image|prompt|bild|szene)\s*[:\-]\s*/i,'').trim();
+  t=entkleide(t).trim().replace(/^[\s"'\u201c\u201e]+|[\s"'\u201d\u201c]+$/g,'');
+  if(t.length>BILDBOT_MAX)t=kuerzeText(t,BILDBOT_MAX);
+  return t;
+}
+async function bildRegie(){
+  try{
+    var roh=await frageKI(baueBildRegieAnweisung(),45000);
+    var idee=saeubereBildIdee(roh);
+    return idee.length>=8?idee:null;
+  }catch(e){
+    // Faellt der Bot aus, uebernimmt die alte Methode - lieber ein Bild aus
+    // der Dialogregie als gar keines.
+    console.warn('Bildregie-Bot ohne Antwort:',e);
+    return null;
+  }
+}
 function baueNegativ(){
   var extra=STIL_NEGATIV[aktuellerStilSchluessel()];
   return CFG.negativ+(extra?', '+extra:'');
@@ -1701,6 +1756,12 @@ async function zeichneBild(opts){
   S.bildLaeuft=true;
   el('szenelade').classList.add('an');
   try{
+    // Der Bot fragt nur, wenn nichts Konkreteres vorliegt: ein eigener Prompt,
+    // ein Override oder eine von Hand gegebene Szene haben Vorrang.
+    if(CFG.bildBot&&opts.promptOverride==null&&!S.eigenerPrompt&&!opts.szene){
+      var idee=await bildRegie();
+      if(idee){ S.szeneText=idee; opts=Object.assign({},opts,{szene:idee}); }
+    }
     // Rangfolge: einmaliger Override → eigener Prompt (überdauert Quellenwechsel)
     // → automatisch aus der Szene gebaut.
     var max=quelle().maxPrompt;
@@ -2519,6 +2580,11 @@ function oeffneEinstellungen(){
     '> Im Auto-Modus handelt der Held selbst mit</label>'+
     '<label class="feldlabel"><input type="checkbox" id="cfgAutoBesetzung"'+(CFG.autoBesetzung?' checked':'')+
     '> Handlung verändert Ort, Besetzung und Kleidung</label>'+
+    '<label class="feldlabel"><input type="checkbox" id="cfgBildBot"'+(CFG.bildBot?' checked':'')+
+    '> Bildregie: eigener KI-Aufruf sucht das Bild zum Moment</label>'+
+    '<div class="hinweis">Aus: Die Bildbeschreibung fällt nebenbei im Dialog-Aufruf ab — schnell und ohne Zusatzkosten. '+
+    'An: Ein zweiter Aufruf liest den letzten Verlauf und beschreibt nur das Bild. Trifft den Moment meist genauer, '+
+    'braucht aber je Bild einen KI-Aufruf mehr. Aussehen der Figuren und Bildstil bleiben in beiden Fällen gleich.</div>'+
     '<label class="feldlabel" for="cfgTempo">SCHREIBTEMPO in ms pro Zeichen (0 = sofort)</label>'+
     '<input id="cfgTempo" class="feld" type="number" min="0" max="120" value="'+(Number(CFG.tempo)||0)+'">'+
     herkunftHtml()+
@@ -2531,7 +2597,7 @@ function oeffneEinstellungen(){
 // Seit der Umstellung auf die Ladeschale ist die Frage berechtigt, welcher Stand
 // gerade laeuft. Die Schale legt den geholten Quelltext samt Zweig und Zeitpunkt
 // im localStorage ab; hier wird er nur abgelesen.
-var VERSION = 'V7.28';
+var VERSION = 'V7.29';
 // Ohne Browserkonsole — etwa am Handy — muss der Generator selbst sagen koennen,
 // woran es liegt, wenn ein Plugin von Perchance fehlt.
 function pluginLage(){
@@ -2737,6 +2803,7 @@ function leseEinstellungen(){
   CFG.tempo=Math.max(0,Math.min(120,parseInt(el('cfgTempo').value,10)||0));
   var ah=el('cfgAutoHeld'); if(ah)CFG.autoHeld=!!ah.checked;
   var ab=el('cfgAutoBesetzung'); if(ab)CFG.autoBesetzung=!!ab.checked;
+  var bb=el('cfgBildBot'); if(bb)CFG.bildBot=!!bb.checked;
   var q=BILDQUELLEN[CFG.quelle];
   (q.felder||[]).forEach(function(f){
     var e=el('q_'+f.k);
