@@ -113,8 +113,15 @@ console.log('\n— Version und Herkunft —');
 // erkennbar, was man vor sich hat.
 pruefe('Version im Skript und im Startbildschirm stimmen ueberein',
   markup.includes(ctx.VERSION), ctx.VERSION);
+pruefe('die Plugin-Lage steht ohne Ladeschale sauber da', ctx.pluginLage() === 'ohne Ladeschale', ctx.pluginLage());
 store['proxima.quelltext'] = JSON.stringify({ zweig: 'main', zeit: Date.now(), text: 'x' });
 ctx.window.PROXIMA_LADER = { cfg: {} };
+ctx.window.PROXIMA_LADER.version = 'V2';
+ctx.window.PROXIMA_LADER.plugins = () => ({ ai: 'direkt vorhanden', image: 'Weiche gesetzt, Plugin noch nicht da' });
+const lageMitSchale = ctx.pluginLage();
+pruefe('die Plugin-Lage nennt Fassung und Befund',
+  lageMitSchale.includes('Ladeschale V2') && lageMitSchale.includes('Weiche gesetzt') && lageMitSchale.includes('ai() '),
+  lageMitSchale);
 const mitSchale = ctx.herkunftHtml();
 pruefe('mit Ladeschale nennt Zweig und Zeitpunkt',
   mitSchale.includes('aus GitHub') && mitSchale.includes('Zweig main') && mitSchale.includes('zuletzt geladen'), mitSchale);
@@ -1000,29 +1007,36 @@ async function ladeschalePruefen() {
 
   console.log('\n— Ladeschale: Plugin-Bruecke —');
   // Perchance reicht ai() und image() im Geltungsbereich des HTML-Bereichs
-  // durch. Der als script-Element eingehaengte Generator sieht nur window —
-  // die Schale muss die Namen also dorthin nachreichen.
+  // durch, und oft erst Sekunden nach dem Laden. Der als script-Element
+  // eingehaengte Generator sieht nur den globalen Namensraum — die Schale muss
+  // die Namen also dorthin nachreichen, und zwar auch dann noch, wenn das
+  // Plugin sich erst spaeter meldet.
   const echtesImage = () => 'bild';
   const schon = ladeUmgebung(netzStummel([{ wenn: 'raw.githubusercontent.com', text: html }]), {});
   schon.ctx.image = echtesImage;
   await warte();
-  pruefe('vorhandenes window.image bleibt unangetastet', schon.ctx.image === echtesImage);
+  pruefe('vorhandenes image bleibt unangetastet', schon.ctx.image === echtesImage);
 
   const ausRoot = ladeUmgebung(netzStummel([{ wenn: 'raw.githubusercontent.com', text: html }]), {});
   ausRoot.ctx.root = { image: echtesImage };
   await warte();
-  pruefe('image aus root wird nach window gebrueckt', typeof ausRoot.ctx.image === 'function');
+  pruefe('image aus root wird gebrueckt', typeof ausRoot.ctx.image === 'function');
   pruefe('die Bruecke ruft die echte Funktion', ausRoot.ctx.image && ausRoot.ctx.image({}) === 'bild');
 
-  const ohne = ladeUmgebung(netzStummel([{ wenn: 'raw.githubusercontent.com', text: html }]), {});
+  const spaet = ladeUmgebung(netzStummel([{ wenn: 'raw.githubusercontent.com', text: html }]), {});
   await warte();
-  pruefe('fehlendes Plugin bekommt einen Platzhalter', typeof ohne.ctx.image === 'function');
-  let gemeldet = '';
-  try { ohne.ctx.image({}); } catch (e) { gemeldet = String(e.message || e); }
-  pruefe('der Platzhalter meldet das fehlende Plugin, statt sich selbst aufzurufen',
-    gemeldet.includes('nicht verfuegbar'), gemeldet);
-  ohne.ctx.root = { image: echtesImage };
-  pruefe('nachgeladenes Plugin wird beim naechsten Aufruf uebernommen', ohne.ctx.image({}) === 'bild');
+  pruefe('fehlendes Plugin fuehrt nicht in eine Endlosschleife', spaet.ctx.image === undefined);
+  spaet.ctx.root = { image: echtesImage };
+  pruefe('spaeter nachgeladenes Plugin wird ohne Zutun gefunden', spaet.ctx.image && spaet.ctx.image({}) === 'bild');
+  pruefe('die Schale nennt ihre Fassung', typeof spaet.ctx.PROXIMA_LADER.version === 'string');
+  const lage = spaet.ctx.PROXIMA_LADER.plugins();
+  pruefe('die Schale sagt, was sie gefunden hat', typeof lage.ai === 'string' && typeof lage.image === 'string',
+    JSON.stringify(lage));
+
+  const meldetSich = ladeUmgebung(netzStummel([{ wenn: 'raw.githubusercontent.com', text: html }]), {});
+  await warte();
+  meldetSich.ctx.image = echtesImage;   // Plugin traegt sich selbst ein
+  pruefe('meldet das Plugin sich selbst an, gilt sein Eintrag', meldetSich.ctx.image === echtesImage);
 
   console.log('\n— Ladeschale: Fehlerfall —');
   const weg = ladeUmgebung(netzStummel([{ wenn: 'http', status: 404 }]), {});

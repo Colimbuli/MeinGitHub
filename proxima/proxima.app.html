@@ -172,7 +172,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.27</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.28</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -469,7 +469,7 @@ var BILDQUELLEN={
     info:'Nutzt das eingebaute Bild-Plugin des Generators. Kein Schlüssel, keine Fremdserver.',
     felder:[],
     zeichne:async function(a){
-      if(typeof image!=='function')throw new Error('image() ist nicht verfügbar — Bild-Plugin im Generator eingebunden?');
+      if(typeof image!=='function')throw new Error('image() ist nicht verfügbar — Bild-Plugin im Generator eingebunden? — '+pluginLage());
       var p=a.prompt+(a.negativ?' (negativePrompt:::'+a.negativ+')':'')+' (seed:::'+a.seed+')';
       var r=await image({prompt:p});
       var src=r&&(r.dataUrl||r.url||r.imageUrl||r.src);
@@ -961,7 +961,7 @@ async function frageKI(prompt,timeoutMs){
     }
   }
   throw new Error('Das Text-Plugin von Perchance war auch nach drei Anläufen nicht bereit ('+
-    ((letzter&&letzter.message)||'unbekannt')+'). Seite neu laden hilft meist.');
+    ((letzter&&letzter.message)||'unbekannt')+'). Seite neu laden hilft meist. — '+pluginLage());
 }
 function frageKIEinmal(prompt,timeoutMs){
   var limit=timeoutMs||90000;
@@ -2531,7 +2531,25 @@ function oeffneEinstellungen(){
 // Seit der Umstellung auf die Ladeschale ist die Frage berechtigt, welcher Stand
 // gerade laeuft. Die Schale legt den geholten Quelltext samt Zweig und Zeitpunkt
 // im localStorage ab; hier wird er nur abgelesen.
-var VERSION = 'V7.27';
+var VERSION = 'V7.28';
+// Ohne Browserkonsole — etwa am Handy — muss der Generator selbst sagen koennen,
+// woran es liegt, wenn ein Plugin von Perchance fehlt.
+function pluginLage(){
+  var L=null;
+  try{ L=window.PROXIMA_LADER||null; }catch(e){}
+  if(!L)return 'ohne Ladeschale';
+  var teile=['Ladeschale '+(L.version||'aeltere Fassung')];
+  try{
+    var b=(typeof L.plugins==='function')?L.plugins():{};
+    Object.keys(b).forEach(function(k){ teile.push(k+': '+b[k]); });
+  }catch(e){}
+  ['ai','image'].forEach(function(k){
+    var da=false;
+    try{ da=typeof window[k]==='function'; }catch(e){}
+    teile.push(k+'() '+(da?'da':'fehlt'));
+  });
+  return teile.join(' · ');
+}
 function herkunftHtml(){
   var ueberSchale=false, zweig='', zeit=0;
   try{ ueberSchale = !!(window && window.PROXIMA_LADER); }catch(e){}
@@ -2549,7 +2567,8 @@ function herkunftHtml(){
     text='Diese Fassung ist '+VERSION+' und steht direkt im HTML-Bereich dieses Generators. '+
       'Ohne Ladeschale kommen Änderungen aus GitHub hier nicht an.';
   }
-  return '<label class="feldlabel">VERSION UND HERKUNFT</label><div class="hinweis">'+text+'</div>';
+  return '<label class="feldlabel">VERSION UND HERKUNFT</label><div class="hinweis">'+text+
+    '<br><br>Plugins: '+escapeHtml(pluginLage())+'</div>';
 }
 // Wer den Generator benutzt, soll ohne Suchen sehen, was sein Geraet verlaesst.
 // Steht am Ende der Einstellungen, gleich unter der Wahl der Bildquelle.
