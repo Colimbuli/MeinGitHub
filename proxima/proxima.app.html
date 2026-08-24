@@ -79,7 +79,13 @@ html,body{width:100%;height:var(--hoehe);background:var(--bg);font-family:var(--
 #kopfreihe{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
 #raumtitel{font-family:var(--schrift-titel);font-size:clamp(0.75rem,1.9vw,1.05rem);font-weight:700;letter-spacing:0.18em;color:var(--gold2);text-shadow:0 0 14px rgba(212,160,51,0.6),0 2px 6px rgba(0,0,0,0.9);text-align:center;padding:8px 4px 0;pointer-events:none;}
 #werkzeuge{flex:0 0 auto;pointer-events:all;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;max-width:62%;}
-#werkzeuge button{background:rgba(42,28,14,0.82);border:1px solid var(--border);color:var(--gold2);font-family:var(--schrift-titel);font-size:0.65rem;letter-spacing:0.08em;padding:4px 8px;cursor:pointer;transition:background 0.15s,border-color 0.15s;}
+/* Festes Raster statt Padding: ein Zeichen quadratisch (1:1), die beiden
+   beschrifteten Knoepfe doppelt so breit wie hoch (1:2). Mit Padding zoege der
+   Text die Breite sonst wieder auseinander. */
+#werkzeuge button{background:rgba(42,28,14,0.82);border:1px solid var(--border);color:var(--gold2);font-family:var(--schrift-titel);font-size:0.65rem;letter-spacing:0.08em;cursor:pointer;transition:background 0.15s,border-color 0.15s;
+  width:30px;height:30px;padding:0;display:inline-flex;align-items:center;justify-content:center;line-height:1;flex:0 0 auto;overflow:hidden;}
+#werkzeuge button.breit{width:60px;}
+#werkzeuge button svg{display:block;}
 #werkzeuge button:hover{background:rgba(212,160,51,0.12);border-color:var(--gold);}
 #werkzeuge button:disabled{opacity:0.3;cursor:default;}
 #autobtn.an{background:var(--gold);color:#2a1c0e;border-color:var(--gold2);}
@@ -172,7 +178,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.29</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.30</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -225,15 +231,14 @@ select.feld option{background:var(--panel);}
     <div id="werkzeuge">
       <button id="chronikbtn" onclick="zeigeChronik('ort')" title="Chronik">📖</button>
       <button id="figurbtn" onclick="oeffneFigurMenu()" title="Figuren bearbeiten">👤</button>
-      <button id="ortbtn" onclick="oeffneOrtMenu()" title="Ort bearbeiten">📍</button>
-      <button id="szenebtn" onclick="oeffneSzeneMenu()" title="Bildstil">🎬</button>
-      <button id="bildbtn" onclick="oeffneBildModal()" title="Bild bearbeiten">🖼</button>
+      <button id="ortbtn" onclick="oeffneOrtMenu()" title="Ort bearbeiten" aria-label="Ort bearbeiten"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false"><path d="M12 2.4c-3.7 0-6.7 3-6.7 6.7 0 4.9 6.7 12.5 6.7 12.5s6.7-7.6 6.7-12.5c0-3.7-3-6.7-6.7-6.7z" fill="currentColor"/><circle cx="12" cy="9" r="2.5" fill="#2a1c0e"/></svg></button>
+      <button id="bildbtn" onclick="oeffneBildModal()" title="Bild: Stil, Prompt, Seed">🖼</button>
       <button id="einstellbtn" onclick="oeffneEinstellungen()" title="Einstellungen">⚙</button>
       <button id="speicherbtn" onclick="oeffneSpeicher()" title="Speichern / Laden">💾</button>
       <button id="hilfebtn" onclick="oeffneHilfe()" title="Befehle und Hilfe">?</button>
       <button id="undobtn" onclick="undo()" title="Letzten Zug zurücknehmen">⟲</button>
-      <button id="npcbtn" onclick="erscheineNPC('')" title="Weitere Person auftreten lassen">+ NPC</button>
-      <button id="autobtn" onclick="autoUmschalten()" title="Figuren spielen allein weiter">▶ AUTO</button>
+      <button id="npcbtn" class="breit" onclick="erscheineNPC('')" title="Weitere Person auftreten lassen">+ NPC</button>
+      <button id="autobtn" class="breit" onclick="autoUmschalten()" title="Figuren spielen allein weiter">▶ AUTO</button>
     </div>
     </div>
     <div id="raumtitel"></div>
@@ -270,6 +275,10 @@ select.feld option{background:var(--panel);}
   <div class="modalBox">
     <div class="modalKopf"><span>🖼 BILD BEARBEITEN</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
     <div class="modalInhalt">
+      <label class="feldlabel" for="szeneStil">BILDSTIL — gilt für alle weiteren Bilder</label>
+      <select id="szeneStil" class="feld" onchange="szeneStilGewechselt()"></select>
+      <input id="szeneStilEigen" class="feld" type="text" placeholder="z.B. noir ink sketch, high contrast" style="display:none">
+      <div class="hinweis" id="szeneStilHinweis"></div>
       <label class="feldlabel" for="bildPromptFeld">PROMPT</label>
       <textarea id="bildPromptFeld" class="feld" rows="6"></textarea>
       <label class="feldlabel" for="bildNegativFeld">NEGATIVPROMPT</label>
@@ -302,26 +311,9 @@ select.feld option{background:var(--panel);}
   </div>
 </div>
 
-<div class="modal" id="mSzene">
-  <div class="modalBox">
-    <div class="modalKopf"><span>🎬 BILDSTIL</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
-    <div class="modalInhalt">
-      <label class="feldlabel" for="szeneStil">BILDSTIL — gilt für alle weiteren Bilder</label>
-      <select id="szeneStil" class="feld" onchange="szeneStilGewechselt()"></select>
-      <input id="szeneStilEigen" class="feld" type="text" placeholder="z.B. noir ink sketch, high contrast" style="display:none">
-      <div class="hinweis">Die Kulisse steht jetzt im Ort-Menü 📍, weil sie zum Ort gehört.</div>
-      <div class="hinweis" id="szeneStilHinweis"></div>
-    </div>
-    <div class="modalNav">
-      <button onclick="schliesseModal()">SCHLIESSEN</button>
-      <button class="haupt" onclick="speichereSzene()">✦ ÜBERNEHMEN</button>
-    </div>
-  </div>
-</div>
-
 <div class="modal" id="mOrt">
   <div class="modalBox">
-    <div class="modalKopf"><span>📍 ORT</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalKopf"><span><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false" style="vertical-align:-2px"><path d="M12 2.4c-3.7 0-6.7 3-6.7 6.7 0 4.9 6.7 12.5 6.7 12.5s6.7-7.6 6.7-12.5c0-3.7-3-6.7-6.7-6.7z" fill="currentColor"/><circle cx="12" cy="9" r="2.5" fill="#2a1c0e"/></svg> ORT</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
     <div class="modalInhalt">
       <label class="feldlabel" for="ortName">NAME DES ORTES</label>
       <input id="ortName" class="feld" type="text">
@@ -1894,9 +1886,8 @@ function oeffneHilfe(){
     '<div class="hilfeabschnitt">DIE KNÖPFE OBEN</div>';
   [['📖','Chronik: Ort, Handlung und die Figuren'],
    ['👤','Figuren bearbeiten — Name, Aussehen, Kleidung, Stimmung'],
-   ['📍','Ort: Name, Beschreibung, Bildkulisse, Ortswechsel'],
-   ['🎬','Bildstil'],
-   ['🖼','Bild: Prompt, Negativprompt, Seed, neu zeichnen'],
+   ['◉','Ort: Name, Beschreibung, Bildkulisse, Ortswechsel'],
+   ['🖼','Bild: Bildstil, Prompt, Negativprompt, Seed, neu zeichnen'],
    ['⚙','Einstellungen: Bildquelle, Bildgröße, Takt, Schreibtempo'],
    ['💾','Spielstände: vier Plätze, Export und Import'],
    ['⟲','letzten Zug zurücknehmen'],
@@ -2332,6 +2323,7 @@ function oeffneBildModal(){
   el('bildNegativFeld').value=S.eigenerNegativ||S.letzterNegativ||baueNegativ();
   el('bildSeedFeld').value=S.seed||'';
   el('bildFest').checked=!!S.promptFesthalten;
+  fuelleStilWahl();
   el('bildQuelleInfo').textContent=(S.eigenerPrompt
       ? (S.promptFesthalten
          ? '✎ Prompt festgehalten — das Bild bleibt so, bis du den Haken entfernst oder „AUS SZENE" drückst. '
@@ -2343,6 +2335,7 @@ function oeffneBildModal(){
 function wuerfelSeed(){ el('bildSeedFeld').value=String(neuerSeed()); }
 function bildNeuZeichnen(){
   if(!S.imSpiel)return;
+  if(uebernehmeStil())sysZeile('✦ Stil: '+(S.stilLabel||'unverändert')+' ✦');
   var p=el('bildPromptFeld').value.trim();
   var n=el('bildNegativFeld').value.trim();
   var s=el('bildSeedFeld').value.trim();
@@ -2358,6 +2351,7 @@ function bildNeuZeichnen(){
 // Zurueck zur Automatik: Prompt und Negativprompt entstehen wieder aus der Szene.
 function bildAusSzene(){
   if(!S.imSpiel)return;
+  if(uebernehmeStil())sysZeile('✦ Stil: '+(S.stilLabel||'unverändert')+' ✦');
   S.eigenerPrompt='';S.eigenerNegativ='';S.promptFesthalten=false;
   schliesseModal();
   sysZeile('✦ Bild folgt wieder der Szene ✦');
@@ -2429,9 +2423,11 @@ function speichereFiguren(){
 var STIL_NAMEN={manga:'Manga / Anime',comic:'Westlicher Comic',aquarell:'Aquarell',
                 oel:'Ölgemälde',realistisch:'Fotorealistisch',pixel:'Pixel-Art',
                 illustrious:'Illustrious / Anime-Tags'};
-function oeffneSzeneMenu(){
-  if(!S.imSpiel)return;
+// Der Bildstil stand frueher in einem eigenen Fenster. Er gehoert zum Bild,
+// also steht er jetzt oben im Bildmenue — ein Fenster statt zwei.
+function fuelleStilWahl(){
   var sel=el('szeneStil');
+  if(!sel)return;
   sel.innerHTML='';
   Object.keys(STILE).forEach(function(k){
     var o=document.createElement('option');
@@ -2455,26 +2451,29 @@ function oeffneSzeneMenu(){
   }
   szeneStilGewechselt();
   el('szeneStilHinweis').textContent=S.eigenerPrompt
-    ? 'Ein eigener Prompt ist aktiv — Stil und Kulisse wirken erst, wenn du im Bildmenü „AUS SZENE" drückst.'
+    ? 'Ein eigener Prompt ist aktiv — der Stil greift erst, wenn du unten „AUS SZENE" drückst.'
     : '';
-  oeffneModal('mSzene');
 }
+// Alter Name, damit /stil ohne Text und aeltere Aufrufe weiter greifen.
+function oeffneSzeneMenu(){ oeffneBildModal(); }
 function szeneStilGewechselt(){
   var eigen=el('szeneStilEigen');
   eigen.style.display=(el('szeneStil').value==='eigen')?'block':'none';
 }
-function speichereSzene(){
-  var wahl=el('szeneStil').value;
+// Liest die Stilwahl aus dem Bildmenue. Gibt zurueck, ob sich etwas geaendert
+// hat — dann meldet der Aufrufer es in der Dialogzeile.
+function uebernehmeStil(){
+  var sel=el('szeneStil');
+  if(!sel)return false;
+  var vorher=S.stilLabel;
+  var wahl=sel.value;
   if(wahl==='eigen'){
     var t=el('szeneStilEigen').value.trim();
     if(t){ S.stil=t; S.stilLabel=t; }
   }else if(STILE[wahl]){
     S.stil=STILE[wahl];S.stilLabel=wahl;
   }
-  schliesseModal();
-  sysZeile('✦ Stil: '+(S.stilLabel||'unverändert')+' ✦');
-  autosave();
-  zeichneBild({});
+  return S.stilLabel!==vorher;
 }
 
 // ── ORT ───────────────────────────────────────
@@ -2597,7 +2596,7 @@ function oeffneEinstellungen(){
 // Seit der Umstellung auf die Ladeschale ist die Frage berechtigt, welcher Stand
 // gerade laeuft. Die Schale legt den geholten Quelltext samt Zweig und Zeitpunkt
 // im localStorage ab; hier wird er nur abgelesen.
-var VERSION = 'V7.29';
+var VERSION = 'V7.30';
 // Ohne Browserkonsole — etwa am Handy — muss der Generator selbst sagen koennen,
 // woran es liegt, wenn ein Plugin von Perchance fehlt.
 function pluginLage(){

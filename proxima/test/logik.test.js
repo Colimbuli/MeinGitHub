@@ -680,6 +680,31 @@ pruefe('/perspektive: ich erkannt', treff('/perspektive: ich').m[1] === 'ich');
 pruefe('/perspektive ohne Angabe erkannt', !!treff('/perspektive'));
 pruefe('kollidiert nicht mit anderen Befehlen', treff('/perspektive: er').b.hilfe[0].indexOf('/perspektive') === 0);
 
+console.log('\n— Werkzeugleiste und Bildmenue —');
+// Bildstil und Bildbearbeitung sind ein Fenster. Zwei Untermenues fuer dieselbe
+// Sache waren einmal zu viel.
+pruefe('kein eigenes Bildstil-Fenster mehr', !html.includes('id="mSzene"') && !html.includes('id="szenebtn"'));
+pruefe('die Stilwahl steht im Bildmenue',
+  html.indexOf('id="szeneStil"') > html.indexOf('id="mBild"') &&
+  html.indexOf('id="szeneStil"') < html.indexOf('id="bildPromptFeld"'));
+pruefe('der alte Aufruf fuehrt ins Bildmenue', /function oeffneSzeneMenu\(\)\{\s*oeffneBildModal\(\);\s*\}/.test(html));
+pruefe('das Bildmenue fuellt die Stilwahl und uebernimmt sie',
+  /fuelleStilWahl\(\);/.test(html) && /if\(uebernehmeStil\(\)\)/.test(html));
+// Die Knoepfe sollen 1:1 oder 1:2 stehen, sonst tanzt die Leiste.
+const werkzeugCss = (html.match(/#werkzeuge button\{[^}]*\}/) || [''])[0];
+const breitCss = (html.match(/#werkzeuge button\.breit\{[^}]*\}/) || [''])[0];
+const hoehe = (werkzeugCss.match(/height:(\d+)px/) || [])[1];
+const breite = (werkzeugCss.match(/width:(\d+)px/) || [])[1];
+const breit = (breitCss.match(/width:(\d+)px/) || [])[1];
+pruefe('Icon-Knopf steht 1:1', hoehe && breite && +hoehe === +breite, breite + 'x' + hoehe);
+pruefe('beschrifteter Knopf steht 1:2', breit && +breit === 2 * +hoehe, breit + 'x' + hoehe);
+pruefe('kein Padding zieht die Breite auseinander', /padding:0/.test(werkzeugCss), werkzeugCss);
+pruefe('beide beschrifteten Knoepfe sind als breit markiert',
+  (html.match(/id="(npcbtn|autobtn)" class="breit"/g) || []).length === 2);
+// Der Ort traegt jetzt eine umgekehrte Tropfenform statt der runden Nadel.
+pruefe('das Ort-Symbol ist gezeichnet, nicht mehr die runde Nadel',
+  !html.includes('\u{1F4CD}') && /id="ortbtn"[^>]*>\s*<svg/.test(html));
+
 console.log('\n— Bildregie-Bot —');
 // Der Bot ist ein zweiter KI-Aufruf, der nur nach dem Bild fragt. Er darf die
 // Figuren nicht neu erfinden und muss ausfallen koennen, ohne das Bild zu
