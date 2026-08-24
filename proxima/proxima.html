@@ -117,43 +117,61 @@
   // globalen Geltungsbereich und saehe sie dort nicht. Also hier nachreichen,
   // bevor der Generator startet.
   var PLUGINS = ['ai', 'image'];
+  var LADER = 'V2';
   var pluginBericht = {};
+  var imGriff = {};
 
   function ausUmgebung(name) {
-    // Direkter eval liest den Namen aus der Perchance-Umgebung dieser Schale.
-    // Eigene Platzhalter werden dabei uebersprungen, sonst rufe sich die
-    // Bruecke selbst auf.
-    try { var f = eval(name); if (typeof f === 'function' && !f.prxBruecke) return f; } catch (e) {}
+    // Der eigene Getter unten landet auch im globalen Namensraum. Ohne diese
+    // Sperre riefe die Suche sich selbst auf.
+    if (imGriff[name]) return null;
+    imGriff[name] = true;
     try {
-      var r = (typeof root !== 'undefined') ? root : null;
-      if (r && typeof r[name] === 'function' && !r[name].prxBruecke) {
-        return function () { return r[name].apply(r, arguments); };
-      }
-    } catch (e) {}
-    return null;
+      // Direkter eval liest den Namen aus der Perchance-Umgebung dieser Schale.
+      try { var f = eval(name); if (typeof f === 'function' && !f.prxBruecke) return f; } catch (e) {}
+      try {
+        var r = (typeof root !== 'undefined') ? root : null;
+        if (r && typeof r[name] === 'function' && !r[name].prxBruecke) {
+          return function () { return r[name].apply(r, arguments); };
+        }
+      } catch (e) {}
+      return null;
+    } finally { imGriff[name] = false; }
+  }
+
+  function bruecke(name) {
+    var da = null;
+    try { da = window[name]; } catch (e) {}
+    if (typeof da === 'function' && !da.prxBruecke) { pluginBericht[name] = 'direkt vorhanden'; return; }
+    var jetzt = ausUmgebung(name);
+    if (jetzt) {
+      try { window[name] = jetzt; pluginBericht[name] = 'aus der Perchance-Umgebung gebrueckt'; return; } catch (e) {}
+    }
+    if (pluginBericht[name] === 'Weiche gesetzt, Plugin noch nicht da') return;
+    // Plugins von Perchance melden sich oft erst Sekunden spaeter. Statt einmal
+    // nachzusehen, haengt hier eine Weiche im globalen Namensraum: Sie sucht bei
+    // JEDEM Zugriff neu. Sobald das Plugin da ist, geht der Aufruf durch, ohne
+    // dass der Generator etwas davon merken muss. Meldet sich das Plugin selbst
+    // mit einer Zuweisung, macht der Setter wieder eine gewoehnliche
+    // Eigenschaft daraus.
+    try {
+      Object.defineProperty(window, name, {
+        configurable: true, enumerable: true,
+        get: function () { return ausUmgebung(name) || undefined; },
+        set: function (wert) {
+          Object.defineProperty(window, name, {
+            configurable: true, enumerable: true, writable: true, value: wert
+          });
+        }
+      });
+      pluginBericht[name] = 'Weiche gesetzt, Plugin noch nicht da';
+    } catch (e) {
+      pluginBericht[name] = 'nicht erreichbar (' + ((e && e.message) || e) + ')';
+    }
   }
 
   function pluginsBruecken() {
-    PLUGINS.forEach(function (name) {
-      var da = window[name];
-      if (typeof da === 'function' && !da.prxBruecke) { pluginBericht[name] = 'global vorhanden'; return; }
-      var f = ausUmgebung(name);
-      if (f) { window[name] = f; pluginBericht[name] = 'aus der Perchance-Umgebung gebrueckt'; return; }
-      if (typeof da === 'function') { pluginBericht[name] = 'Platzhalter steht, Plugin noch nicht geladen'; return; }
-      // Plugins melden sich manchmal erst spaeter. Der Platzhalter sieht beim
-      // ersten Aufruf noch einmal nach und tauscht sich dann selbst aus.
-      var platz = function () {
-        var spaet = ausUmgebung(name);
-        if (typeof spaet !== 'function') {
-          throw new Error(name + '() ist nicht verfuegbar — Plugin im Generator eingebunden?');
-        }
-        window[name] = spaet;
-        return spaet.apply(this, arguments);
-      };
-      platz.prxBruecke = true;
-      window[name] = platz;
-      pluginBericht[name] = 'Platzhalter gesetzt, Plugin noch nicht geladen';
-    });
+    PLUGINS.forEach(bruecke);
     return pluginBericht;
   }
 
@@ -264,6 +282,7 @@
   // Zum Nachsehen und Nachhelfen aus der Konsole.
   window.PROXIMA_LADER = {
     cfg: CFG, teile: teile, zweig: zweig, rohUrl: rohUrl, spiegelUrl: spiegelUrl, start: start,
+    version: LADER,
     plugins: function () { return pluginsBruecken(); },
     neu: function () { return start(true); },
     vergiss: function () { try { localStorage.removeItem(K_TEXT); } catch (e) {} return true; }
