@@ -172,7 +172,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.26</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.27</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -2521,11 +2521,35 @@ function oeffneEinstellungen(){
     '> Handlung verändert Ort, Besetzung und Kleidung</label>'+
     '<label class="feldlabel" for="cfgTempo">SCHREIBTEMPO in ms pro Zeichen (0 = sofort)</label>'+
     '<input id="cfgTempo" class="feld" type="number" min="0" max="120" value="'+(Number(CFG.tempo)||0)+'">'+
+    herkunftHtml()+
     datenschutzHtml();
   el('einstellInhalt').innerHTML=html;
   el('cfgNegativ').value=CFG.negativ||'';
   zeichneQuellenFelder();
   oeffneModal('mEinstellungen');
+}
+// Seit der Umstellung auf die Ladeschale ist die Frage berechtigt, welcher Stand
+// gerade laeuft. Die Schale legt den geholten Quelltext samt Zweig und Zeitpunkt
+// im localStorage ab; hier wird er nur abgelesen.
+var VERSION = 'V7.27';
+function herkunftHtml(){
+  var ueberSchale=false, zweig='', zeit=0;
+  try{ ueberSchale = !!(window && window.PROXIMA_LADER); }catch(e){}
+  try{
+    var roh=localStorage.getItem('proxima.quelltext');
+    if(roh){ var d=JSON.parse(roh)||{}; zweig=d.zweig||''; zeit=Number(d.zeit)||0; }
+  }catch(e){}
+  var text;
+  if(ueberSchale){
+    text='Diese Fassung ist '+VERSION+'. Der Quelltext kommt bei jedem Start aus GitHub'+
+      (zweig?', Zweig '+escapeHtml(zweig):'')+
+      (zeit?', zuletzt geladen am '+new Date(zeit).toLocaleString():'')+
+      '. Eine Änderung dort steht nach spätestens einer Minute hier — neu laden genügt.';
+  }else{
+    text='Diese Fassung ist '+VERSION+' und steht direkt im HTML-Bereich dieses Generators. '+
+      'Ohne Ladeschale kommen Änderungen aus GitHub hier nicht an.';
+  }
+  return '<label class="feldlabel">VERSION UND HERKUNFT</label><div class="hinweis">'+text+'</div>';
 }
 // Wer den Generator benutzt, soll ohne Suchen sehen, was sein Geraet verlaesst.
 // Steht am Ende der Einstellungen, gleich unter der Wahl der Bildquelle.
