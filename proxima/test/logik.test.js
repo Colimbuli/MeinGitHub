@@ -680,6 +680,104 @@ pruefe('/perspektive: ich erkannt', treff('/perspektive: ich').m[1] === 'ich');
 pruefe('/perspektive ohne Angabe erkannt', !!treff('/perspektive'));
 pruefe('kollidiert nicht mit anderen Befehlen', treff('/perspektive: er').b.hilfe[0].indexOf('/perspektive') === 0);
 
+console.log('\n— Mission und Beziehungen —');
+// Eine Szene braucht ein Ziel und klare Haltungen, sonst laeuft jedes Gespraech
+// in dieselbe Richtung. Beides steht im Zustand und geht in jede Anweisung ein.
+const weltMitDreien = JSON.stringify({
+  held: { name: 'Julian Voss', herkunft: 'Graz', beruf: 'Apotheker', eigenart: 'summt' },
+  stadt: 'Wien',
+  mission: 'Julian will vor Mitternacht die Unterschrift seines Bruders bekommen.',
+  rahmenhandlung: 'Julian kommt mit seiner Frau ins Kino.',
+  ort: { name: 'Kino Urania', geschichte: 'Roter Samt.', bild: 'they wait in the foyer' },
+  npcs: [
+    { name: 'Marlene', rolle: 'Ehefrau des Helden', aussehen: 'dark hair', kleidung: 'a wool coat',
+      person: 'Trocken.', stimmung: 'gelassen', beziehung: 'vertraut, seit zwölf Jahren',
+      beziehungen: 'Konrad: alte Rivalin', eroeffnung: 'Zwei Karten, wie immer?' },
+    { name: 'Konrad', rolle: 'Bruder', aussehen: 'grey beard', kleidung: 'a suit',
+      person: 'Ausweichend.', stimmung: 'nervoes', beziehung: 'schuldbewusst',
+      beziehungen: 'Marlene: skeptisch', eroeffnung: 'Ich habe wenig Zeit.' }
+  ]
+});
+frischeWelt(); ctx.verarbeiteWelt(weltMitDreien);
+pruefe('genannte Personen treten sofort auf', ctx.W.npcs.length === 2 &&
+  ctx.W.npcs[0].name === 'Marlene' && ctx.W.npcs[1].name === 'Konrad',
+  ctx.W.npcs.map(x => x.name).join(','));
+pruefe('der genannte Ort wird uebernommen', ctx.W.ort.name === 'Kino Urania');
+pruefe('die Mission steht in der Welt', /Unterschrift/.test(ctx.W.mission));
+pruefe('Stimmungen gehoeren zur richtigen Figur', ctx.S.stimmung[1] === 'nervoes', ctx.S.stimmung.join(','));
+pruefe('Haltung zum Helden aus der Welterschaffung',
+  ctx.beziehungZu('Marlene', 'Julian Voss') === 'vertraut, seit zwölf Jahren', JSON.stringify(ctx.S.beziehungen));
+pruefe('Haltung zwischen zwei Figuren', ctx.beziehungZu('Konrad', 'Marlene') === 'skeptisch');
+pruefe('mehr als MAX_NPCS werden nicht aufgestellt', (function(){
+  const viele = JSON.parse(weltMitDreien);
+  viele.npcs = Array.from({ length: ctx.MAX_NPCS + 3 }, (_, i) => ({ name: 'P' + i, rolle: 'Gast', stimmung: 'ruhig' }));
+  frischeWelt(); ctx.verarbeiteWelt(JSON.stringify(viele));
+  return ctx.W.npcs.length === ctx.MAX_NPCS;
+})(), String(ctx.W.npcs.length));
+
+frischeWelt(); ctx.verarbeiteWelt(weltMitDreien);
+pruefe('Register nennt Ziel und Haltung fuer jede Figur', (function(){
+  const t = ctx.beziehungText();
+  return /Marlene → Julian Voss: vertraut/.test(t) && /Konrad → Julian Voss: schuldbewusst/.test(t) &&
+         /Marlene: skeptisch/.test(t);
+})(), ctx.beziehungText());
+// Fehlt eine Haltung, soll das Register das zeigen statt sie zu erfinden.
+delete ctx.S.beziehungen.Konrad.Marlene;
+pruefe('offene Haltungen werden als offen ausgewiesen',
+  /Konrad → Julian Voss: schuldbewusst \| Marlene: noch unbestimmt/.test(ctx.beziehungText()), ctx.beziehungText());
+ctx.setzeBeziehung('Konrad', 'Marlene', 'skeptisch');
+const kontext = ctx.weltKontext();
+pruefe('Mission steht im Weltkontext', /MISSION \(das uebergeordnete Ziel/.test(kontext));
+pruefe('Beziehungen stehen im Weltkontext', /BEZIEHUNGEN/.test(kontext) && /Marlene →/.test(kontext));
+
+// Der Held fuehrt kein Register ueber sich selbst, und Unsinn faellt durch.
+pruefe('Haltung des Helden wird nicht gespeichert', !ctx.setzeBeziehung('Julian Voss', 'Marlene', 'verliebt'));
+pruefe('unbekannte Figur wird abgewiesen', !ctx.setzeBeziehung('Niemand', 'Marlene', 'neugierig'));
+pruefe('Haltung zu sich selbst wird abgewiesen', !ctx.setzeBeziehung('Marlene', 'Marlene', 'zufrieden'));
+pruefe('leere Angabe aendert nichts', !ctx.setzeBeziehung('Marlene', 'Konrad', 'keine'));
+
+// Antwortformat der Regie: "Figur > Ziel: Haltung", mehrere mit Semikolon.
+const gelesen = ctx.beziehungenAus('Marlene > HELD: belustigt; Konrad -> Marlene : versoehnlich');
+pruefe('Zeile mit > wird gelesen', gelesen.length === 2 && gelesen[0].zu.trim() === 'HELD', JSON.stringify(gelesen));
+ctx.uebernimmBeziehungen('Marlene > HELD: belustigt; Konrad > Marlene: versoehnlich');
+pruefe('HELD trifft den Helden', ctx.beziehungZu('Marlene', 'Julian Voss') === 'belustigt');
+pruefe('Haltung zwischen Figuren wird fortgeschrieben', ctx.beziehungZu('Konrad', 'Marlene') === 'versoehnlich');
+ctx.uebernimmBeziehungen([{ von: 'Konrad', zu: 'HELD', wert: 'offener' }]);
+pruefe('auch eine Liste von Objekten wird verstanden', ctx.beziehungZu('Konrad', 'Julian Voss') === 'offener');
+ctx.uebernimmBeziehungen('Bo: neugierig', 'Marlene');
+pruefe('abwesende Ziele werden nicht eingetragen', !ctx.beziehungZu('Marlene', 'Bo'));
+
+ctx.S.missionStand = '';
+ctx.folgeBeziehungen('Marlene > Konrad: eisig', 'Konrad hat die Unterschrift verweigert.');
+pruefe('der Missionsstand wird fortgeschrieben', /verweigert/.test(ctx.S.missionStand));
+pruefe('und die Haltung gleich mit', ctx.beziehungZu('Marlene', 'Konrad') === 'eisig');
+ctx.folgeBeziehungen('', 'keine');
+pruefe('Leerangaben lassen den Stand stehen', /verweigert/.test(ctx.S.missionStand));
+
+// Geht jemand, verschwindet er auch aus dem Register.
+ctx.W.npcs = ctx.W.npcs.slice(0, 1);
+ctx.beziehungenAufraeumen();
+pruefe('Abgegangene stehen nicht mehr im Register',
+  !ctx.S.beziehungen.Konrad && !ctx.beziehungZu('Marlene', 'Konrad'), JSON.stringify(ctx.S.beziehungen));
+
+// Die Anweisung an die KI muss das Tempo der Annaeherung vorgeben.
+pruefe('die Zug-Anweisung bremst den Sprung ins Amouroese',
+  /ANNAEHERUNG/.test(html) && /Ueberspringe keine Stufe/.test(html) && /nur, wenn BEIDE Seiten/.test(html));
+pruefe('die Zug-Anweisung fragt Beziehungen und Mission ab',
+  /"beziehungen": "nur was sich JETZT/.test(html) && /"mission": "ein kurzer Satz/.test(html));
+pruefe('die Welt-Anweisung verlangt genannte Personen und den genannten Ort',
+  /Nennt sie PERSONEN/.test(html) && /Nennt sie einen ORT/.test(html));
+pruefe('die Mission darf kein Liebesziel sein', /KEIN Liebesziel/.test(html));
+
+// Alte Spielstaende kennen weder Mission noch Register.
+const altStand = ctx.migriere({
+  welt: { protagonist: { name: 'Egon' }, ort: { name: 'Taverne' }, npcs: [{ name: 'Ida', grundstimmung: 'heiter', kleidung: 'apron' }] },
+  stand: { verlauf: [], imSpiel: false }
+});
+pruefe('alter Stand bekommt ein leeres Register', altStand.stand.beziehungen && !Object.keys(altStand.stand.beziehungen).length);
+pruefe('alter Stand bekommt Mission und Stand als Text',
+  altStand.welt.mission === '' && altStand.stand.missionStand === '');
+
 console.log('\n— Werkzeugleiste und Bildmenue —');
 // Bildstil und Bildbearbeitung sind ein Fenster. Zwei Untermenues fuer dieselbe
 // Sache waren einmal zu viel.

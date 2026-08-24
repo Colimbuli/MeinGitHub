@@ -234,6 +234,41 @@ Zwei Unterschiede sind dagegen hausgemacht und behoben:
 Eine weitere Quelle hinzufügen heißt: einen Eintrag in `BILDQUELLEN` ergänzen. Jede Quelle bekommt
 `{prompt, negativ, seed, breite, hoehe}` und gibt eine Bildadresse zurück — mehr ist der Vertrag nicht.
 
+### Mission, Beziehungen und wer von Anfang an da ist
+
+Drei Dinge halten die Geschichte zusammen, seit V7.31.
+
+**Die Mission.** Die Welterschaffung setzt ein übergeordnetes Ziel: etwas Konkretes, das an diesem
+Tag erreicht, herausgefunden oder geklärt werden soll — und an dem man scheitern kann. Verlieben,
+Erobern und Verführen sind ausdrücklich **keine** Mission. Das Ziel steht in jeder Anweisung an die
+KI, und jeder Zug soll es voranbringen, verzögern oder zeigen, was ihm im Weg steht. Der Stand
+wandert mit; nachzulesen in der Chronik unter **MISSION**.
+
+**Die Beziehungen.** Jede Figur führt eine eigene Haltung zu jeder anderen und zum Helden:
+
+```
+Marlene → Julian Voss: vertraut, seit zwölf Jahren | Konrad: alte Rivalin
+Konrad  → Julian Voss: schuldbewusst               | Marlene: skeptisch
+```
+
+Das Register geht in jede Anweisung ein und wird nach jedem Zug fortgeschrieben — die Regie meldet
+nur, was sich *wirklich* geändert hat, im Format `Figur > Ziel: Haltung`. Der Held führt kein
+Register über sich selbst: was er empfindet, spielt der Mensch vor dem Bildschirm. Wer den Ort
+verlässt, verschwindet auch aus dem Register. Nachzulesen in der Chronik unter **BEZIEHUNGEN** und
+auf jeder Figurenseite.
+
+**Das Tempo der Annäherung.** Zuneigung, Flirt und Begehren dürfen entstehen — aber sie sind weder
+das Thema noch eine Abkürzung. Sie wachsen aus gemeinsamem Tun und Vertrauen, in kleinen Schritten,
+und nur wenn beide Seiten sie tragen. Aus *höflich* wird nicht im nächsten Zug *verliebt*. Nimmt die
+Szene eine amouröse Wendung, läuft alles andere trotzdem weiter: die Mission, die übrigen
+Anwesenden, der Ort.
+
+**Genannte Personen treten sofort auf.** Steht in der Ausgangsidee „ich bin mit meiner Frau im
+Kino", dann ist die Frau von Anfang an als Figur da — mit Namen, mit der Rolle *Ehefrau des Helden*
+und mit einer entsprechend vertrauten Haltung. Und der Ort ist das Kino, nicht irgendein erfundener
+anderer. Bis zu vier so genannte Personen stehen von der ersten Zeile an im Raum; weitere können
+später dazustoßen.
+
 ### Woher die Bildbeschreibung kommt
 
 In den Einstellungen steht ein Schalter: **Bildregie — eigener KI-Aufruf sucht das Bild zum Moment.**
