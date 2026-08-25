@@ -274,6 +274,55 @@ und mit einer entsprechend vertrauten Haltung. Und der Ort ist das Kino, nicht i
 anderer. Bis zu vier so genannte Personen stehen von der ersten Zeile an im Raum; weitere können
 später dazustoßen.
 
+### Widerstand: Akte, Absichten, Proben
+
+Eine Geschichte ohne Widerstand läuft in die bequemste Richtung. Vier Dinge halten dagegen.
+
+**Akte.** Die Mission zerfällt in Etappen. Die Welterschaffung setzt die erste; ist sie erreicht — oder
+endgültig gescheitert — ruft die Regie die nächste aus, der Akt zählt hoch, ein neues Bild entsteht
+sofort und die erledigte Etappe wandert als schwerer Fakt ins Gedächtnis. Nachzulesen unter 📖 → MISSION.
+
+**Verdeckte Absichten.** Jede Figur will etwas für sich und verbirgt etwas. Beides steht in der
+Anweisung an die KI, nicht auf dem Schirm: gespielt wird es als Andeutung, Ausweichen, kleiner
+Widerspruch. Wird ein Geheimnis wirklich ausgesprochen, gilt es als aufgedeckt und steht ab dann in
+der Chronik. **`/gedanken`** zeigt dir alles auf einmal — bewusst ein Befehl und kein Knopf: wer ihn
+tippt, nimmt sich die Überraschung.
+
+**Würfelproben.** Steht in deiner Eingabe eine Handlung in eckigen Klammern, entscheidet ein Wurf
+gegen 11, ob sie gelingt. Wie die angesprochene Figur zu dir steht, gibt bis zu vier Punkte dazu oder
+ab — aus dem Beziehungsregister, keine zweite Buchhaltung. Die 20 gelingt immer, die 1 nie. Das
+Ergebnis steht in der Anweisung fest, damit die KI keinen anderen Ausgang erfindet. Abschaltbar.
+
+**Zeit und Frist.** Eine Uhr läuft mit den Zügen; die Regie meldet, wie viele Minuten ein Moment
+gekostet hat. Tageszeit und Wetter stehen im Bildprompt und im Raumtitel. Legt die Ausgangsidee eine
+Frist nahe (letzte Vorstellung, Zug, Ladenschluss), setzt die Welterschaffung sie — und „noch 18
+Minuten" steht ab dann in jeder Anweisung.
+
+### Gedächtnis mit Gewicht
+
+Früher fiel der älteste Fakt heraus, egal wie wichtig er war. Jetzt trägt jeder Fakt ein Gewicht —
+Versprechen, Konflikte und Vereinbarungen schwer, Small Talk leicht — und den Zug seiner letzten
+Erwähnung. Verdrängt wird der mit dem kleinsten Wert aus `Gewicht × 40 − Alter`; ein Versprechen
+überlebt damit rund achtzig Züge Vernachlässigung, eine Beiläufigkeit rund vierzig. Wird ein Fakt im
+Gespräch berührt, altert er nicht weiter. In die Anweisung gehen die wichtigsten, aber in
+Erzählreihenfolge.
+
+### Charakterblatt
+
+Gesichter wandern von Panel zu Panel. Im Figurenmenü erzeugt **✎ CHARAKTERBLATT** (oder `/blatt 2`)
+ein Porträt der Figur: Identität und Kleidung vor neutralem Grund, mit einem eigenen Seed, der aus
+dem Seed der Partie abgeleitet ist — dieselbe Partie ergibt dieselben Gesichter, verschiedene Figuren
+verschiedene. Die Bilder liegen **neben** dem Spielstand im `localStorage`, nicht darin; ein
+Spielstand bleibt damit klein genug zum Exportieren.
+
+### Lektor
+
+Ein zweiter, stiller KI-Aufruf liest jede Antwort, bevor du sie siehst, und prüft vier Dinge:
+wiederholte Formulierungen, zu schnelle Beziehungssprünge, ignorierte Mission, Widerspruch zur
+Würfelprobe. Findet er nichts, antwortet er `OK` und die Zeile bleibt, wie sie war. Findet er etwas,
+schreibt er sie neu — aber nur, wenn die Korrektur nicht länger als das Doppelte des Originals ist,
+sonst gilt sie als Aufsatz und wird verworfen. Kostet einen KI-Aufruf je Zug, ab Werk aus.
+
 ### Woher die Bildbeschreibung kommt
 
 In den Einstellungen steht ein Schalter: **Bildregie — eigener KI-Aufruf sucht das Bild zum Moment.**
@@ -466,6 +515,8 @@ ein neuer Befehl steht damit automatisch in der Hilfe, ohne Nachpflege. Ein Test
 | `/kleidungN: …` | dauerhaftes Outfit für Figur N (englisch) |
 | `/regie: …` | stehende Regie für die ganze Szene, leer = löschen |
 | `/bild: …` | neues Bild aus eigener Beschreibung |
+| `/gedanken` | verdeckte Absichten aller Figuren zeigen — verrät die Geheimnisse |
+| `/blatt N` | Charakterblatt für Figur N zeichnen (ohne Zahl: Figurenmenü) |
 | `/mission: …` | das Ziel der Geschichte setzen; `weg` streicht es, ohne Angabe öffnet sich das Missions-Menü |
 | `/stil: …` | Bildstil wechseln (`manga`, `comic`, `aquarell`, `oel`, `realistisch`, `pixel` oder freier Text) — dasselbe geht oben im Bildmenü 🖼 |
 | `/ort: …` | an einen anderen Ort wechseln (ohne Angabe: Ort-Menü) |
