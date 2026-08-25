@@ -178,7 +178,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.34</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.35</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -197,6 +197,15 @@ select.feld option{background:var(--panel);}
       <option value="eigen">Eigener Stil…</option>
     </select>
     <input id="stilEigen" type="text" placeholder="z.B. noir ink sketch, high contrast" style="display:none">
+  </div>
+  <div class="startreihe">
+    <label for="geschlechtwahl">DU BIST</label>
+    <select id="geschlechtwahl" class="feld" style="flex:1;min-width:150px">
+      <option value="">egal — die KI entscheidet</option>
+      <option value="maennlich">männlich</option>
+      <option value="weiblich">weiblich</option>
+      <option value="divers">divers</option>
+    </select>
   </div>
   <div class="startreihe">
     <label for="perspektive">ERZÄHLWEISE</label>
@@ -453,6 +462,7 @@ var CFG={
   tempo:16,        // ms pro Zeichen im Schreibmaschinen-Effekt (0 = sofort)
   bildTakt:2,      // alle N Zuege ein neues Bild (0 = nur auf Zuruf)
   wuerfel:true,    // Handlungen des Helden koennen misslingen
+  geschlecht:'',   // zuletzt gewaehltes Geschlecht des Helden (leer = KI entscheidet)
   pollModell:'',
   hordeKey:'0000000000', hordeModell:'', hordeSchritte:25,
   apiUrl:'https://api.openai.com/v1', apiKey:'', apiModell:'gpt-image-1',
@@ -1091,7 +1101,7 @@ function einWort(s){ return String(s||'').toLowerCase().trim().split(/[\s,.;:]/)
 
 // ── ZUSTAND ───────────────────────────────────
 var W = {
-  protagonist:{name:'',herkunft:'',beruf:'',eigenart:'',aussehen:'',kleidung:''},
+  protagonist:{name:'',herkunft:'',beruf:'',eigenart:'',geschlecht:'',aussehen:'',kleidung:''},
   stadt:'', rahmenhandlung:'', rahmenhandlungOriginal:'',
   mission:'',         // das uebergeordnete Ziel, dem die Szene folgt
   perspektive:'er',   // 'er' = Held im Bild, 'ich' = Blick durch seine Augen
@@ -1159,6 +1169,8 @@ async function wuerfeln(){
 
 // ── WELT ERSCHAFFEN ───────────────────────────
 async function weltErstellen(){
+  var gwahlEl=el('geschlechtwahl');
+  if(gwahlEl){ CFG.geschlecht=geschlechtSchluessel(gwahlEl.value); speichereCfg(); }
   var begriffe=el('begriffe').value.trim();
   if(!begriffe){
     begriffe=zufall(WOERTER1)+', '+zufall(WOERTER2)+', '+zufall(WOERTER3);
@@ -1173,7 +1185,10 @@ async function weltErstellen(){
 
   var p=
     'Du bist Autor eines lebendigen deutschen Dialog-Adventures.'+
-    ' Ausgangsidee des Spielers: '+begriffe+'.\n\n'+
+    ' Ausgangsidee des Spielers: '+begriffe+'.\n'+
+    (geschlechtSchluessel(CFG.geschlecht)
+      ? ' Der Held ist '+GESCHLECHTER[geschlechtSchluessel(CFG.geschlecht)].label+' — das steht fest, richte Name und Beschreibung danach.\n\n'
+      : '\n')+
     'LIES DIE AUSGANGSIDEE GENAU:\n'+
     '- Nennt sie PERSONEN ("meine Frau", "mein Chef", "zwei alte Freunde"), dann sind genau diese Personen von Anfang an anwesend. Jede bekommt einen eigenen Eintrag in "npcs", einen Namen und eine Rolle, die das Verhaeltnis festhaelt ("Ehefrau des Helden"). Sie sind KEINE Fremden: wer den Helden kennt, spricht ihn auch so an.\n'+
     '- Nennt sie einen ORT (Kino, Bahnhof, Werkstatt), dann ist DAS der Ort. Erfinde keinen anderen.\n'+
@@ -1183,7 +1198,7 @@ async function weltErstellen(){
     'DER TON: Die Figuren sind warm, offen und zugewandt; frivol und frech duerfen sie sein, aber nie unfreundlich, herablassend oder abweisend. Zuneigung darf entstehen, sie ist aber nicht der Zweck der Szene.\n\n'+
     'Antworte NUR mit einem JSON-Objekt, ohne Codeblock, ohne Text davor oder danach, in genau dieser Form:\n'+
     '{\n'+
-    '  "held": {"name":"Vor- und Nachname","herkunft":"Geburtsstadt","beruf":"Beruf","eigenart":"schrullige Eigenart"},\n'+
+    '  "held": {"name":"Vor- und Nachname","herkunft":"Geburtsstadt","beruf":"Beruf","eigenart":"schrullige Eigenart","geschlecht":"maennlich, weiblich oder divers","aussehen":"constant English visual IDENTITY of the hero: age, face, hair, build. NO clothing, no art style."},\n'+
     '  "stadt": "europaeische Stadt",\n'+
     '  "mission": "das uebergeordnete Ziel in EINEM deutschen Satz, konkret und ueberpruefbar",\n'+
     '  "etappe": "die ERSTE Etappe auf dem Weg zur Mission in einem deutschen Satz — was JETZT gleich ansteht",\n'+
@@ -1255,7 +1270,11 @@ function verarbeiteWelt(text){
   W.protagonist.herkunft = f(['held','herkunft'],'HERKUNFT','Hameln');
   W.protagonist.beruf    = f(['held','beruf'],'BERUF','Reisender');
   W.protagonist.eigenart = f(['held','eigenart'],'EIGENART','spricht in Sprichwoertern');
-  W.protagonist.aussehen = W.protagonist.aussehen||'';
+  // Die Wahl auf dem Startbildschirm schlaegt die Erfindung der KI.
+  var gwunsch=geschlechtSchluessel(CFG.geschlecht);
+  W.protagonist.geschlecht = gwunsch||geschlechtSchluessel(f(['held','geschlecht'],'GESCHLECHT',''));
+  W.protagonist.aussehen = entkleide(f(['held','aussehen'],'HELD_AUSSEHEN',''))||W.protagonist.aussehen||'';
+  if(leerAngabe(W.protagonist.aussehen))W.protagonist.aussehen='';
   W.protagonist.kleidung = W.protagonist.kleidung||'';
   W.stadt                = f(['stadt'],'STADT','Wien');
   W.rahmenhandlung       = f(['rahmenhandlung'],'RAHMENHANDLUNG','');
@@ -1542,6 +1561,43 @@ function folgeZug(minutenRoh,wetterRoh,antwort,aufdeckRoh,etappeRoh){
   S.probe=null;
   zeigeRaumtitel();
 }
+// ── GESCHLECHT DES HELDEN ─────────────────────
+// Es steht in der Anweisung (damit die Figuren richtig ansprechen) und im
+// Bildprompt (damit der Held nicht bei jedem Panel das Geschlecht wechselt).
+var GESCHLECHTER={
+  maennlich:{label:'männlich',  bild:'a man',                 wort:'er'},
+  weiblich: {label:'weiblich',  bild:'a woman',               wort:'sie'},
+  divers:   {label:'divers',    bild:'an androgynous person', wort:'they'}
+};
+function geschlechtSchluessel(wert){
+  var t=String(wert||'').trim().toLowerCase();
+  if(/^(m|mann|maennlich|männlich|male|herr)$/.test(t))return 'maennlich';
+  if(/^(w|f|frau|weiblich|female|dame)$/.test(t))return 'weiblich';
+  if(/^(d|divers|nichtbinaer|nichtbinär|nonbinary|enby|neutral)$/.test(t))return 'divers';
+  return '';
+}
+function geschlechtLabel(){
+  var g=GESCHLECHTER[geschlechtSchluessel(W.protagonist.geschlecht)];
+  return g?g.label:'nicht festgelegt';
+}
+function geschlechtFuerBild(){
+  var g=GESCHLECHTER[geschlechtSchluessel(W.protagonist.geschlecht)];
+  return g?g.bild:'';
+}
+// Fehlt eine Beschreibung, entsteht eine aus dem, was ueber den Helden
+// feststeht - und sie wird festgehalten, damit sie nicht jedes Mal anders ist.
+function heldAussehen(schreiben){
+  var P=W.protagonist;
+  var a=(P.aussehen||'').trim();
+  if(a)return a;
+  var teile=[geschlechtFuerBild()||'a person'];
+  if(P.beruf)teile.push('a '+String(P.beruf).toLowerCase());
+  teile.push('an ordinary but memorable face');
+  var neu=teile.join(', ');
+  if(schreiben)P.aussehen=neu;
+  return neu;
+}
+
 // ── CHARAKTERBLATT ────────────────────────────
 // Gesichter wandern von Panel zu Panel. Ein einmal erzeugtes Portraet gibt der
 // Figur ein festes Bild: als Anhalt fuer den Spieler und als eigener Seed, der
@@ -1560,28 +1616,41 @@ function blattSchreiben(name,url){
     return true;
   }catch(e){ return false; }
 }
+function heldSeed(){ return ((S.seed||1)+104729)%2147483647; }
 function figurSeed(i){
   // Ein eigener, aber aus dem Szenen-Seed abgeleiteter Wert: dieselbe Partie
   // ergibt dieselben Gesichter, verschiedene Figuren aber verschiedene.
   return ((S.seed||1)+ (i+1)*7919)%2147483647;
 }
+var BLATT_RAHMEN=', character reference sheet, head and shoulders portrait, '+
+  'neutral grey background, even soft light, facing the viewer, neutral expression, ';
 function blattPrompt(i){
-  var n=W.npcs[i];
-  if(!n)return '';
-  var a=(n.aussehen||'a person').trim().replace(/[.\s]+$/,'');
-  var k=(S.kleidung[i]||n.kleidung||'').trim().replace(/[.\s]+$/,'');
-  return a+(k?', wearing '+k:'')+', character reference sheet, head and shoulders portrait, '+
-    'neutral grey background, even soft light, facing the viewer, neutral expression, '+aktuellerStil();
+  var a,k;
+  if(i==='held'){
+    a=heldAussehen(false).trim().replace(/[.\s]+$/,'');
+    var g=geschlechtFuerBild();
+    if(g&&a.toLowerCase().indexOf(g)<0)a=g+', '+a;
+    k=(W.protagonist.kleidung||'').trim().replace(/[.\s]+$/,'');
+  }else{
+    var n=W.npcs[i];
+    if(!n)return '';
+    a=(n.aussehen||'a person').trim().replace(/[.\s]+$/,'');
+    k=(S.kleidung[i]||n.kleidung||'').trim().replace(/[.\s]+$/,'');
+  }
+  return a+(k?', wearing '+k:'')+BLATT_RAHMEN+aktuellerStil();
 }
 async function zeichneBlatt(i){
-  if(!S.imSpiel||!W.npcs[i])return;
-  var n=W.npcs[i];
+  if(!S.imSpiel)return;
+  var held=(i==='held');
+  if(!held&&!W.npcs[i])return;
+  if(held)heldAussehen(true);              // fehlende Beschreibung einmal festhalten
+  var n=held?W.protagonist:W.npcs[i];
   sysZeile('✎ Charakterblatt für '+n.name+' entsteht…');
   try{
     var src=await quelle().zeichne({
       prompt:kappe(blattPrompt(i),quelle().maxPrompt||1500),
       negativ:baueNegativ(),
-      seed:figurSeed(i),
+      seed:held?heldSeed():figurSeed(i),
       breite:auf64(CFG.breite),hoehe:auf64(CFG.hoehe)
     });
     if(!blattSchreiben(n.name,src)){
@@ -1755,7 +1824,9 @@ function missionText(){
 }
 function weltKontext(){
   var k='WELT: Das Geschehen spielt in '+W.stadt+'.\n'+
-    'HELD: '+W.protagonist.name+', '+W.protagonist.beruf+' aus '+W.protagonist.herkunft+'. Eigenart: '+W.protagonist.eigenart+'.\n';
+    'HELD: '+W.protagonist.name+', '+W.protagonist.beruf+' aus '+W.protagonist.herkunft+
+      (geschlechtSchluessel(W.protagonist.geschlecht)?', '+geschlechtLabel():'')+
+      '. Eigenart: '+W.protagonist.eigenart+'.\n';
   if(W.rahmenhandlung)k+='VORGESCHICHTE: '+kappe(W.rahmenhandlung,S.kurzKontext?260:400)+'\n';
   k+=(W.perspektive==='ich')
     ? 'ERZAEHLWEISE: Ich-Perspektive. Handlungen des Helden werden in der ICH-Form geschrieben ("\x5Bich greife nach dem Glas\x5D"). Die Figuren sprechen ihn direkt an. Das Geschehen wird durch SEINE Augen erlebt.\n'
@@ -2191,6 +2262,8 @@ function bauePrompt(opts,max){
   // die Kamera ist sein Blick.
   if(!ichSicht&&P&&(P.aussehen||'').trim()){
     var pa=P.aussehen.trim().replace(/[.\s]+$/,'');
+    var pg=geschlechtFuerBild();
+    if(pg&&pa.toLowerCase().indexOf(pg)<0)pa=pg+', '+pa;
     var pk=(P.kleidung||'').trim().replace(/[.\s]+$/,'');
     figurenArr.push(pa+(pk?', wearing '+pk:''));
   }
@@ -2361,8 +2434,14 @@ var BEFEHLE=[
    fn:function(m){ quelleBefehl(m[1]); }},
   {muster:/^\/roh\b/i,                          hilfe:['/roh','zeigt die letzte Antwort der Regie im Original — zur Fehlersuche'],
    fn:function(){ zeigeRohantwort(); }},
-  {muster:/^\/blatt\s*:?\s*(\d*)\s*$/i,          hilfe:['/blatt N','Charakterblatt für Figur N zeichnen (ohne Zahl: Figurenmenü)'],
-   fn:function(m){ var i=parseInt(m[1],10); if(!isFinite(i)){oeffneFigurMenu();return;} zeichneBlatt(i-1); }},
+  {muster:/^\/blatt\s*:?\s*([a-zA-Zäöü0-9]*)\s*$/i,  hilfe:['/blatt N','Charakterblatt zeichnen — N ist die Figurennummer, „held" der Held (ohne Angabe: Figurenmenü)'],
+   fn:function(m){
+     var t=String(m[1]||'').toLowerCase();
+     if(/^(held|ich|0)$/.test(t)){ zeichneBlatt('held'); return; }
+     var i=parseInt(t,10);
+     if(!isFinite(i)){ oeffneFigurMenu(); return; }
+     zeichneBlatt(i-1);
+   }},
   {muster:/^\/gedanken\b/i,                     hilfe:['/gedanken','verdeckte Absichten aller Figuren zeigen — verrät die Geheimnisse'],
    fn:function(){ zeigeGedanken(); }},
   {muster:/^\/mission\s*:?\s*([\s\S]*)$/i,      hilfe:['/mission: …','das Ziel der Geschichte setzen (ohne Angabe: Missions-Menü, „weg" streicht es)'],
@@ -2963,8 +3042,17 @@ function oeffneFigurMenu(){
       (multi?'<textarea id="'+id+'" class="feld" rows="2"></textarea>':'<input id="'+id+'" class="feld" type="text">');
   }
   var P=W.protagonist;
+  var heldBlatt=blattLesen(P.name);
+  var gwahl=['','maennlich','weiblich','divers'].map(function(k){
+    var sel=(geschlechtSchluessel(P.geschlecht)===k)?' selected':'';
+    return '<option value="'+k+'"'+sel+'>'+(k?GESCHLECHTER[k].label:'nicht festgelegt')+'</option>';
+  }).join('');
   var html='<div class="figblock"><div class="figtitel">HELD</div>'+
+    (heldBlatt?'<img src="'+heldBlatt+'" alt="Charakterblatt" style="width:120px;max-width:40%;border:1px solid var(--border);display:block;margin:0 0 8px;">':'')+
+    '<div class="reihe"><button onclick="zeichneBlatt(\'held\')" title="Porträt des Helden erzeugen">✎ '+(heldBlatt?'BLATT NEU':'CHARAKTERBLATT')+'</button></div>'+
     feld('fig_held_name','Name',P.name,false)+
+    '<label class="feldlabel" for="fig_held_geschlecht">Geschlecht</label>'+
+    '<select id="fig_held_geschlecht" class="feld">'+gwahl+'</select>'+
     feld('fig_held_herkunft','Herkunft',P.herkunft,false)+
     feld('fig_held_beruf','Beruf',P.beruf,false)+
     feld('fig_held_eigenart','Eigenart',P.eigenart,true)+
@@ -2995,6 +3083,8 @@ function speichereFiguren(){
   P.herkunft=g('fig_held_herkunft')||P.herkunft;
   P.beruf=g('fig_held_beruf')||P.beruf;
   P.eigenart=g('fig_held_eigenart')||P.eigenart;
+  var gs=el('fig_held_geschlecht');
+  if(gs){ P.geschlecht=geschlechtSchluessel(gs.value); CFG.geschlecht=P.geschlecht; speichereCfg(); }
   P.aussehen=g('fig_held_aussehen');   // leer erlaubt: dann erscheint der Held nicht im Bild
   P.kleidung=g('fig_held_kleidung');
   W.npcs.forEach(function(n,i){
@@ -3264,7 +3354,7 @@ function oeffneEinstellungen(){
 // Seit der Umstellung auf die Ladeschale ist die Frage berechtigt, welcher Stand
 // gerade laeuft. Die Schale legt den geholten Quelltext samt Zweig und Zeitpunkt
 // im localStorage ab; hier wird er nur abgelesen.
-var VERSION = 'V7.34';
+var VERSION = 'V7.35';
 // Ohne Browserkonsole — etwa am Handy — muss der Generator selbst sagen koennen,
 // woran es liegt, wenn ein Plugin von Perchance fehlt.
 function pluginLage(){
@@ -3602,6 +3692,8 @@ function migriere(d){
   if(!s.seed)s.seed=(w.ort&&parseInt(w.ort.seed,10))||neuerSeed();   // V6 hielt den Seed am Ort
   if(w.perspektive!=='ich'&&w.perspektive!=='er')w.perspektive='er';
   if(w.protagonist){
+    if(typeof w.protagonist.geschlecht!=='string')w.protagonist.geschlecht='';
+    w.protagonist.geschlecht=(typeof geschlechtSchluessel==='function')?geschlechtSchluessel(w.protagonist.geschlecht):w.protagonist.geschlecht;
     if(typeof w.protagonist.aussehen!=='string')w.protagonist.aussehen='';
     if(typeof w.protagonist.kleidung!=='string')w.protagonist.kleidung='';
   }

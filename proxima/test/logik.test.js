@@ -818,6 +818,48 @@ pruefe('dieselbe Zeile gilt als keine Korrektur', ctx.lektorAntwort('Gleiche Zei
 pruefe('Leeres ändert nichts', ctx.lektorAntwort('', 'Original') === '' && ctx.lektorAntwort(null, 'Original') === '');
 pruefe('der Schalter steht in den Einstellungen', html.includes('id="cfgLektor"') && html.includes('CFG.lektor=!!lk.checked'));
 
+console.log('\n— Geschlecht des Helden —');
+// Es steht in der Anweisung, damit die Figuren richtig ansprechen, und im
+// Bildprompt, damit der Held nicht in jedem Panel wechselt.
+pruefe('gängige Schreibweisen werden verstanden',
+  ctx.geschlechtSchluessel('männlich') === 'maennlich' && ctx.geschlechtSchluessel('W') === 'weiblich' &&
+  ctx.geschlechtSchluessel('nichtbinär') === 'divers' && ctx.geschlechtSchluessel('Kürbis') === '',
+  ctx.geschlechtSchluessel('Kürbis'));
+frischeWelt(); ctx.verarbeiteWelt(weltJson);
+ctx.W.protagonist.geschlecht = 'weiblich';
+pruefe('es steht in der Anweisung', /weiblich/.test(ctx.weltKontext()), ctx.weltKontext().split('\n')[1]);
+pruefe('es wird zum Bildwort', ctx.geschlechtFuerBild() === 'a woman');
+ctx.W.protagonist.geschlecht = '';
+pruefe('ohne Festlegung steht nichts da', !/nicht festgelegt/.test(ctx.weltKontext()) && ctx.geschlechtFuerBild() === '');
+ctx.W.protagonist.geschlecht = 'maennlich';
+ctx.W.protagonist.aussehen = 'in his forties, grey at the temples';
+ctx.W.perspektive = 'er';
+const heldBild = ctx.bauePrompt({});
+pruefe('der Held erscheint mit Geschlecht im Bild', /a man, in his forties/.test(heldBild), heldBild.slice(0, 80));
+ctx.W.protagonist.aussehen = 'a man with a beard';
+pruefe('doppelt wird es nicht gesetzt', !/a man, a man/.test(ctx.bauePrompt({})));
+ctx.W.protagonist.aussehen = '';
+pruefe('fehlt die Beschreibung, entsteht eine aus Beruf und Geschlecht',
+  /a man/.test(ctx.heldAussehen(false)) && /apotheker/i.test(ctx.heldAussehen(false)), ctx.heldAussehen(false));
+pruefe('lesen allein schreibt sie nicht fest', ctx.W.protagonist.aussehen === '');
+ctx.heldAussehen(true);
+pruefe('beim Zeichnen wird sie festgehalten', ctx.W.protagonist.aussehen.length > 0);
+pruefe('die Wahl steht auf dem Startbildschirm', html.includes('id="geschlechtwahl"') && html.includes('CFG.geschlecht'));
+pruefe('und im Figurenmenü', html.includes('id="fig_held_geschlecht"'));
+
+console.log('\n— Charakterblatt des Helden —');
+ctx.S.seed = 12345;
+pruefe('der Held hat einen eigenen Seed',
+  ctx.heldSeed() !== ctx.figurSeed(0) && ctx.heldSeed() !== ctx.figurSeed(1));
+ctx.W.protagonist.aussehen = 'in his forties, grey at the temples';
+ctx.W.protagonist.kleidung = 'a worn linen jacket';
+const hb = ctx.blattPrompt('held');
+pruefe('sein Blatt nennt Geschlecht, Identität und Kleidung',
+  /a man/.test(hb) && /grey at the temples/.test(hb) && /wearing a worn linen jacket/.test(hb), hb);
+pruefe('es ist derselbe Rahmen wie bei den Figuren',
+  /character reference sheet/.test(hb) && /neutral grey background/.test(hb));
+pruefe('/blatt held ist ein Weg dorthin', /held\|ich\|0/.test(html));
+
 console.log('\n— Verdeckte Absichten —');
 // Jede Figur will etwas fuer sich und verbirgt etwas. Der Spieler sieht das
 // nicht, die KI schon.

@@ -307,10 +307,21 @@ Erwähnung. Verdrängt wird der mit dem kleinsten Wert aus `Gewicht × 40 − Al
 Gespräch berührt, altert er nicht weiter. In die Anweisung gehen die wichtigsten, aber in
 Erzählreihenfolge.
 
+### Wer der Held ist
+
+Auf dem Startbildschirm steht neben Bildstil und Erzählweise **DU BIST**: männlich, weiblich, divers
+oder *egal — die KI entscheidet*. Die Wahl bleibt gemerkt, geht in die Welterschaffung ein und steht
+danach in jeder Anweisung (damit die Figuren richtig ansprechen) und im Bildprompt (damit der Held
+nicht von Panel zu Panel wechselt). Ändern lässt sie sich jederzeit im Figurenmenü 👤.
+
+Der Held hat dort auch ein Feld **Aussehen**. Bleibt es leer, baut PROXIMA beim ersten Charakterblatt
+eine Beschreibung aus Geschlecht und Beruf — und hält sie fest, damit sie nicht bei jedem Bild anders
+ausfällt.
+
 ### Charakterblatt
 
-Gesichter wandern von Panel zu Panel. Im Figurenmenü erzeugt **✎ CHARAKTERBLATT** (oder `/blatt 2`)
-ein Porträt der Figur: Identität und Kleidung vor neutralem Grund, mit einem eigenen Seed, der aus
+Gesichter wandern von Panel zu Panel. Im Figurenmenü erzeugt **✎ CHARAKTERBLATT** (oder `/blatt 2`,
+für den Helden `/blatt held`) ein Porträt der Figur: Identität und Kleidung vor neutralem Grund, mit einem eigenen Seed, der aus
 dem Seed der Partie abgeleitet ist — dieselbe Partie ergibt dieselben Gesichter, verschiedene Figuren
 verschiedene. Die Bilder liegen **neben** dem Spielstand im `localStorage`, nicht darin; ein
 Spielstand bleibt damit klein genug zum Exportieren.
@@ -516,7 +527,7 @@ ein neuer Befehl steht damit automatisch in der Hilfe, ohne Nachpflege. Ein Test
 | `/regie: …` | stehende Regie für die ganze Szene, leer = löschen |
 | `/bild: …` | neues Bild aus eigener Beschreibung |
 | `/gedanken` | verdeckte Absichten aller Figuren zeigen — verrät die Geheimnisse |
-| `/blatt N` | Charakterblatt für Figur N zeichnen (ohne Zahl: Figurenmenü) |
+| `/blatt N` | Charakterblatt zeichnen — N ist die Figurennummer, `held` der Held (ohne Angabe: Figurenmenü) |
 | `/mission: …` | das Ziel der Geschichte setzen; `weg` streicht es, ohne Angabe öffnet sich das Missions-Menü |
 | `/stil: …` | Bildstil wechseln (`manga`, `comic`, `aquarell`, `oel`, `realistisch`, `pixel` oder freier Text) — dasselbe geht oben im Bildmenü 🖼 |
 | `/ort: …` | an einen anderen Ort wechseln (ohne Angabe: Ort-Menü) |
