@@ -330,7 +330,7 @@ const laufen = async () => {
   pruefe('angekündigter Abgang entfernt die Figur', ctx.W.npcs.length === 1 && ctx.W.npcs[0].name === 'Ida Berger',
     ctx.W.npcs.map(n => n.name).join(','));
   pruefe('Stimmungen und Kleidung ziehen mit', ctx.S.stimmung.length === 1 && ctx.S.kleidung.length === 1);
-  pruefe('der Abgang steht im Gedächtnis', ctx.S.fakten.some(f => /Marcelle/.test(f)), JSON.stringify(ctx.S.fakten.slice(-2)));
+  pruefe('der Abgang steht im Gedächtnis', ctx.faktenTexte().some(f => /Marcelle/.test(f)), ctx.faktenTexte().slice(-2).join(' | '));
 
   await ctx.besetzungAendern({ abgang: 'Ida', auftritt: '' });
   pruefe('die letzte Figur bleibt', ctx.W.npcs.length === 1);
@@ -407,7 +407,7 @@ const laufen = async () => {
   pruefe('Beschreibung übernommen', /Wilder Wein/.test(ctx.W.ort.geschichte), ctx.W.ort.geschichte);
   pruefe('Kulisse für Bilder mitgewechselt', /overgrown courtyard/.test(ctx.S.szeneGlobal), ctx.S.szeneGlobal);
   pruefe('Ankunftsszene gesetzt', /step out/.test(ctx.S.szeneText), ctx.S.szeneText);
-  pruefe('Ortswechsel steht im Gedächtnis', ctx.S.fakten.some(f => /Innenhof/.test(f)));
+  pruefe('Ortswechsel steht im Gedächtnis', ctx.faktenTexte().some(f => /Innenhof/.test(f)));
 
   // Der gemeldete Ablauf komplett: Ort wechseln, Alte bleibt zurück, Neue kommt dazu
   ctx.W.npcs.push({ name: 'Marcelle', rolle: 'Gast', aussehen: 'd', kleidung: 'e', person: 'f', grundstimmung: 'müde' });
@@ -778,6 +778,82 @@ pruefe('alter Stand bekommt ein leeres Register', altStand.stand.beziehungen && 
 pruefe('alter Stand bekommt Mission und Stand als Text',
   altStand.welt.mission === '' && altStand.stand.missionStand === '');
 
+console.log('\n— Gedaechtnis mit Gewicht —');
+// Frueher fiel der aelteste Fakt heraus. Jetzt zaehlt Gewicht mal Frische:
+// ein Versprechen ueberlebt zwanzig Belanglosigkeiten.
+ctx.S.fakten = []; ctx.S.zug = 0;
+ctx.merkeFakt('Ida hat versprochen, den Schlüssel zu bringen.');
+ctx.merkeFakt('Es regnet draußen.');
+pruefe('ein Versprechen wiegt schwer', ctx.S.fakten[0].g === 3, JSON.stringify(ctx.S.fakten[0]));
+pruefe('Beiläufiges wiegt leicht', ctx.S.fakten[1].g === 1, JSON.stringify(ctx.S.fakten[1]));
+ctx.S.zug = 30;
+for (let i = 0; i < ctx.MAX_FAKTEN + 6; i++) ctx.merkeFakt('Belangloser Fakt Nummer ' + i);
+pruefe('das Gedächtnis bleibt gedeckelt', ctx.S.fakten.length === ctx.MAX_FAKTEN);
+pruefe('das Versprechen hat überlebt', ctx.faktenTexte().some(t => /versprochen/.test(t)), ctx.faktenTexte().join(' | '));
+pruefe('das Beiläufige ist verdrängt', !ctx.faktenTexte().some(t => /Es regnet/.test(t)));
+ctx.S.fakten = []; ctx.S.zug = 5;
+ctx.merkeFakt('Konrad schuldet dem Wirt Geld.');
+ctx.S.zug = 40;
+ctx.frischeFakten('Der Wirt fragte, ob Konrad das Geld nun bringe.');
+pruefe('eine Erwähnung frischt den Fakt auf', ctx.S.fakten[0].z === 40, JSON.stringify(ctx.S.fakten[0]));
+ctx.merkeFakt('Konrad schuldet dem Wirt Geld.', 3);
+pruefe('derselbe Fakt wird nicht doppelt abgelegt', ctx.S.fakten.length === 1);
+pruefe('ein schwereres Gewicht setzt sich durch', ctx.S.fakten[0].g === 3);
+
+console.log('\n— Uhr, Wetter und Frist —');
+ctx.S.startUhr = 19 * 60 + 30; ctx.S.minuten = 0; ctx.S.wetter = 'Nieselregen'; ctx.S.frist = 0;
+pruefe('die Uhr beginnt beim Startwert', ctx.uhrzeit() === '19:30');
+ctx.zeitWeiter(45);
+pruefe('Minuten laufen weiter', ctx.uhrzeit() === '20:15');
+ctx.zeitWeiter('unsinn');
+pruefe('unlesbare Angaben gelten als drei Minuten', ctx.uhrzeit() === '20:18');
+ctx.zeitWeiter(-5);
+pruefe('die Uhr läuft nie rückwärts', ctx.uhrzeit() === '20:21');
+pruefe('Abend wird als Abend gemalt', /evening/.test(ctx.tageszeit()), ctx.tageszeit());
+ctx.S.minuten = 0; ctx.S.startUhr = 7 * 60;
+pruefe('Morgen wird als Morgen gemalt', /morning/.test(ctx.tageszeit()), ctx.tageszeit());
+pruefe('Wetter geht ins Bild', /nieselregen/.test(ctx.zeitFuerBild()), ctx.zeitFuerBild());
+ctx.S.frist = 60; ctx.S.minuten = 42;
+pruefe('die Restfrist wird gerechnet', ctx.restFrist() === 18);
+pruefe('die Frist steht in der Anweisung', /noch 18 Minuten/.test(ctx.zeitText()), ctx.zeitText());
+ctx.S.minuten = 75;
+pruefe('abgelaufene Frist wird deutlich benannt', /ABGELAUFEN/.test(ctx.zeitText()));
+ctx.S.frist = 0; ctx.S.minuten = 0; ctx.S.startUhr = 19 * 60 + 30;
+pruefe('ohne Frist steht keine in der Anweisung', !/FRIST/.test(ctx.zeitText()));
+
+console.log('\n— Würfelproben —');
+// Eine Handlung in eckigen Klammern wird gewürfelt, blosses Reden nicht.
+pruefe('Handlung in Klammern wird erkannt', ctx.wagnisAus('Ich sage nichts. \x5Bgreife nach dem Schlüssel\x5D') === 'greife nach dem Schlüssel');
+pruefe('blosses Reden ist kein Wagnis', ctx.wagnisAus('Guten Abend, wie geht es dir?') === '');
+pruefe('zu kurze Klammern zählen nicht', ctx.wagnisAus('\x5Bhm\x5D') === '');
+ctx.W.npcs = [{ name: 'Ida', rolle: 'Wirtin', aussehen: 'a woman', kleidung: 'apron' }];
+ctx.S.stimmung = ['heiter']; ctx.S.beziehungen = {};
+ctx.setzeBeziehung('Ida', ctx.heldName(), 'verliebt');
+pruefe('Zuneigung hilft', ctx.beziehungsBonus('Ida') === 4, String(ctx.beziehungsBonus('Ida')));
+ctx.setzeBeziehung('Ida', ctx.heldName(), 'eisig');
+pruefe('Ablehnung steht im Weg', ctx.beziehungsBonus('Ida') === -4);
+ctx.setzeBeziehung('Ida', ctx.heldName(), 'nachdenklich');
+pruefe('Unbekanntes ist neutral', ctx.beziehungsBonus('Ida') === 0);
+const echterZufall = ctx.Math.random;
+ctx.Math.random = () => 0.999;                    // Wurf 20
+let p20 = ctx.wuerfle('den Schlüssel nehmen', 0);
+pruefe('die Zwanzig gelingt immer', p20.gelungen && p20.glanz && p20.wurf === 20, JSON.stringify(p20));
+ctx.Math.random = () => 0;                        // Wurf 1
+ctx.setzeBeziehung('Ida', ctx.heldName(), 'verliebt');
+let p1 = ctx.wuerfle('den Schlüssel nehmen', 0);
+pruefe('die Eins misslingt auch mit Bonus', !p1.gelungen && p1.patzer, JSON.stringify(p1));
+ctx.Math.random = () => 0.45;                     // Wurf 10
+let p10 = ctx.wuerfle('den Schlüssel nehmen', 0);
+pruefe('Bonus entscheidet den Grenzfall', p10.wurf === 10 && p10.bonus === 4 && p10.gelungen, JSON.stringify(p10));
+ctx.setzeBeziehung('Ida', ctx.heldName(), 'eisig');
+let pMinus = ctx.wuerfle('den Schlüssel nehmen', 0);
+pruefe('Ablehnung kippt denselben Wurf', !pMinus.gelungen, JSON.stringify(pMinus));
+ctx.Math.random = echterZufall;
+const text = ctx.probeText(p10);
+pruefe('das Ergebnis steht in der Anweisung fest', /GELUNGEN/.test(text) && /Erfinde keinen anderen Ausgang/.test(text));
+pruefe('Misserfolg wird nicht abgemildert', /MISSLINGT spuerbar/.test(ctx.probeText(pMinus)));
+pruefe('der Schalter steht in den Einstellungen', html.includes('id="cfgWuerfel"') && html.includes('CFG.wuerfel=!!wf.checked'));
+
 console.log('\n— Mission von Hand —');
 // Das Ziel gehoert dem Spieler: per Befehl und ueber ein eigenes Fenster,
 // erreichbar aus der Chronik.
@@ -792,7 +868,7 @@ ctx.S.missionStand = 'alter Stand';
 ctx.missionBefehl('Den Brief vor Mitternacht finden');
 pruefe('Text setzt das Ziel', ctx.W.mission === 'Den Brief vor Mitternacht finden');
 pruefe('ein neues Ziel setzt den Stand zurueck', ctx.S.missionStand === '');
-pruefe('das neue Ziel steht im Gedaechtnis', ctx.S.fakten.some(f => /Das Ziel lautet jetzt/.test(f)), ctx.S.fakten.join(' | '));
+pruefe('das neue Ziel steht im Gedaechtnis', ctx.faktenTexte().some(f => /Das Ziel lautet jetzt/.test(f)), ctx.faktenTexte().join(' | '));
 pruefe('das Ziel steht danach im Weltkontext', /Den Brief vor Mitternacht/.test(ctx.weltKontext()));
 ctx.missionBefehl('weg');
 pruefe('„weg" streicht das Ziel', ctx.W.mission === '' && ctx.S.missionStand === '');
