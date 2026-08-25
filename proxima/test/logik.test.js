@@ -1036,11 +1036,50 @@ const breit = (breitCss.match(/width:(\d+)px/) || [])[1];
 pruefe('Icon-Knopf steht 1:1', hoehe && breite && +hoehe === +breite, breite + 'x' + hoehe);
 pruefe('beschrifteter Knopf steht 1:2', breit && +breit === 2 * +hoehe, breit + 'x' + hoehe);
 pruefe('kein Padding zieht die Breite auseinander', /padding:0/.test(werkzeugCss), werkzeugCss);
-pruefe('beide beschrifteten Knoepfe sind als breit markiert',
-  (html.match(/id="(npcbtn|autobtn)" class="breit"/g) || []).length === 2);
-// Der Ort traegt jetzt eine umgekehrte Tropfenform statt der runden Nadel.
-pruefe('das Ort-Symbol ist gezeichnet, nicht mehr die runde Nadel',
-  !html.includes('\u{1F4CD}') && /id="ortbtn"[^>]*>\s*<svg/.test(html));
+pruefe('der beschriftete Knopf ist als breit markiert',
+  /id="autobtn" class="breit"/.test(html) && !/id="npcbtn" class="breit"/.test(html));
+
+// Alle Symbole kommen aus einem Satz und nehmen die Farbe des Knopfes an.
+console.log('\n— Goldener Symbolsatz —');
+pruefe('jeder Knopf holt sein Symbol aus dem Satz',
+  ['chronik','figuren','ort','bild','einstellungen','speichern','npcplus'].every(k => html.includes('data-sym="' + k + '"')),
+  ['chronik','figuren','ort','bild','einstellungen','speichern','npcplus'].filter(k => !html.includes('data-sym="' + k + '"')).join(','));
+pruefe('der Satz kennt jedes davon',
+  ['chronik','figuren','ort','bild','einstellungen','speichern','npcplus','mission','wuerfel','regie'].every(k => ctx.SYM[k]),
+  Object.keys(ctx.SYM).join(','));
+pruefe('gezeichnet wird in der Farbe des Knopfes', /fill="currentColor"/.test(ctx.sym('chronik')));
+pruefe('unbekannte Namen ergeben ein leeres, aber gültiges Symbol',
+  /<svg[\s\S]*<\/svg>/.test(ctx.sym('gibtsnicht')));
+pruefe('die Größe lässt sich vorgeben', /width="22"/.test(ctx.sym('bild', 22)));
+pruefe('die Symbole werden beim Start eingesetzt', /symboleEinsetzen\(\);/.test(html));
+// Farbige Emoji haben in einer goldenen Leiste nichts verloren.
+const emoji = (html.match(/[\u{1F300}-\u{1FAFF}]/gu) || []);
+pruefe('kein farbiges Emoji mehr im Generator', emoji.length === 0, emoji.join(' '));
+
+console.log('\n— Formular für neue Figuren —');
+// Der Knopf fuehrt zuerst in ein leeres Formular.
+pruefe('der Knopf öffnet das Formular', /id="npcbtn"[^>]*onclick="oeffneNeueFigur\(\)"/.test(html));
+pruefe('das Formular steht im Markup',
+  html.includes('id="mNeueFigur"') && ['name','rolle','aussehen','kleidung','person','stimmung','beziehung','ziel','geheimnis','eroeffnung','hinweis']
+    .every(k => html.includes('id="nf_' + k + '"')));
+pruefe('es führt beide Wege', /neueFigurUebernehmen\(false\)/.test(html) && /neueFigurUebernehmen\(true\)/.test(html));
+const vorgabe = { name: 'Elsa Brandt', rolle: 'Platzanweiserin', aussehen: '', kleidung: '', person: '',
+  stimmung: 'genervt', beziehung: 'misstrauisch', ziel: 'Feierabend machen.', geheimnis: '', eroeffnung: '', hinweis: 'kommt mit Taschenlampe' };
+const vt = ctx.vorgabeText(vorgabe);
+pruefe('die Vorgaben stehen als verbindlich in der Anweisung',
+  /VORGABEN DES SPIELERS/.test(vt) && /WOERTLICH/.test(vt) && /Elsa Brandt/.test(vt) && /Taschenlampe/.test(vt), vt);
+pruefe('leere Felder tauchen dort nicht auf', !/Aussehen/.test(vt) && !/Was sie verbirgt/.test(vt));
+pruefe('ohne jede Eingabe bleibt die Anweisung frei', ctx.vorgabeText({}) === '' && ctx.vorgabeText(null) === '');
+const gemischt = ctx.mischeFigur(vorgabe, {
+  name: 'Frei Erfunden', rolle: 'Gast', aussehen: 'a tall woman', kleidung: 'a uniform',
+  person: 'knapp', grundstimmung: 'heiter', ziel: 'etwas anderes', geheimnis: 'ein Geheimnis', eroeffnung: 'Hallo.'
+});
+pruefe('eingetragene Angaben schlagen die KI',
+  gemischt.name === 'Elsa Brandt' && gemischt.grundstimmung === 'genervt' && gemischt.ziel === 'Feierabend machen.');
+pruefe('für leere Felder gilt die KI',
+  gemischt.aussehen === 'a tall woman' && gemischt.person === 'knapp' && gemischt.geheimnis === 'ein Geheimnis');
+pruefe('die Stimmung wird auf ein Wort gebracht',
+  ctx.mischeFigur({ stimmung: 'ziemlich genervt heute' }, { grundstimmung: 'heiter' }).grundstimmung === 'ziemlich');
 
 console.log('\n— Bildregie-Bot —');
 // Der Bot ist ein zweiter KI-Aufruf, der nur nach dem Bild fragt. Er darf die

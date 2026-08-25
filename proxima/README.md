@@ -307,6 +307,26 @@ Erwähnung. Verdrängt wird der mit dem kleinsten Wert aus `Gewicht × 40 − Al
 Gespräch berührt, altert er nicht weiter. In die Anweisung gehen die wichtigsten, aber in
 Erzählreihenfolge.
 
+### Eine neue Figur von Hand
+
+Der Knopf **+ NPC** führt jetzt zuerst in ein leeres Formular: Name, Rolle, Aussehen, Kleidung,
+Persönlichkeit, Stimmung, Haltung zum Helden, was sie will, was sie verbirgt, ihr erster Satz — und
+ein freies Feld für alles, was sonst nirgends hinpasst. Alles ist freiwillig.
+
+Zwei Wege hinaus: **✦ ERSCHEINEN LASSEN** gibt deine Angaben als verbindliche Vorgabe an die KI, die
+nur die Lücken füllt — was du eingetragen hast, wird wörtlich übernommen. **NUR MEINE ANGABEN**
+kommt ganz ohne KI-Aufruf aus und nimmt genau das, was dasteht.
+
+Der alte Weg bleibt: `/npc3: kommt mit einer Taschenlampe` erfindet die Figur wie bisher direkt.
+
+### Alle Symbole in einem Stil
+
+Emoji malt jedes Gerät in eigenen Farben — mitten in einer goldenen Leiste sehen sie aus wie
+hineingefallen. Alle Symbole sind deshalb gezeichnet (Inline-SVG mit `fill="currentColor"`) und
+nehmen die Farbe des Knopfes an, auch beim Überfahren. Sie stehen genau einmal im Quelltext, im
+Objekt `SYM`; jedes Element mit `data-sym="chronik"` bekommt seines beim Start eingesetzt. Ein Test
+schlägt an, sobald wieder ein farbiges Emoji in die Datei gerät.
+
 ### Wer der Held ist
 
 Auf dem Startbildschirm steht neben Bildstil und Erzählweise **DU BIST**: männlich, weiblich, divers
