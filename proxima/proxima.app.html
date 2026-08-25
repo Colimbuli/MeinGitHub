@@ -178,7 +178,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.32</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.34</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -449,8 +449,10 @@ var CFG={
   autoHeld:true,   // im Auto-Modus handelt der Held selbst mit
   autoBesetzung:true, // Figuren treten auf und ab, wenn die Handlung es erzaehlt
   bildBot:false,   // eigener KI-Aufruf sucht das Bild zum Moment (kostet einen Aufruf je Bild)
+  lektor:false,    // zweiter KI-Aufruf prueft die Antwort, bevor sie erscheint
   tempo:16,        // ms pro Zeichen im Schreibmaschinen-Effekt (0 = sofort)
   bildTakt:2,      // alle N Zuege ein neues Bild (0 = nur auf Zuruf)
+  wuerfel:true,    // Handlungen des Helden koennen misslingen
   pollModell:'',
   hordeKey:'0000000000', hordeModell:'', hordeSchritte:25,
   apiUrl:'https://api.openai.com/v1', apiKey:'', apiModell:'gpt-image-1',
@@ -1003,6 +1005,48 @@ function frageKIEinmal(prompt,timeoutMs){
   });
 }
 
+// ── LEKTOR ────────────────────────────────────
+// Ein zweiter, stiller Aufruf liest die Antwort, bevor der Spieler sie sieht:
+// Wiederholt sie sich? Springt eine Beziehung? Ignoriert sie Mission oder
+// Probe? Nur wenn er etwas findet, schreibt er die Zeile neu.
+function baueLektorAnweisung(antwort,name){
+  return 'Du bist Lektor eines deutschen Dialog-Adventures. Pruefe die folgende Zeile, die '+name+' gleich sagen soll.\n\n'+
+    (W.mission?'MISSION: '+kappe(W.mission,200)+'\n':'')+
+    (S.aktZiel?'ANSTEHENDE ETAPPE: '+kappe(S.aktZiel,160)+'\n':'')+
+    (S.probe?'PROBE: Der Versuch des Helden ist '+(S.probe.gelungen?'GELUNGEN':'MISSLUNGEN')+'.\n':'')+
+    'BISHER GESAGT:\n'+verlaufText(4,160)+'\n\n'+
+    'ZU PRUEFENDE ZEILE:\n'+antwort+'\n\n'+
+    'Pruefe genau vier Dinge:\n'+
+    '1. Wiederholung: Kommt eine Formulierung oder ein Bild aus den letzten Zeilen noch einmal?\n'+
+    '2. Beziehungssprung: Wird aus Hoeflichkeit ploetzlich Vertrautheit oder Verliebtheit?\n'+
+    '3. Mission: Wird das Ziel voellig ignoriert, obwohl es sich anboete?\n'+
+    '4. Probe: Widerspricht die Zeile dem feststehenden Ausgang?\n\n'+
+    'Ist alles in Ordnung, antworte NUR mit: OK\n'+
+    'Sonst antworte NUR mit der verbesserten Zeile auf Deutsch, gleiche Laenge, gleiche Figur, '+
+    'Handlungen in eckigen Klammern. Keine Erklaerung, keine Anfuehrungszeichen.';
+}
+function lektorAntwort(roh,original){
+  var t=String(roh==null?'':roh).trim();
+  t=t.replace(/^```[a-z]*\s*/i,'').replace(/```\s*$/,'').trim();
+  if(!t||/^ok\b/i.test(t))return '';
+  t=entkleide(t).trim();
+  if(t.length<8)return '';
+  if(t.length>original.length*2.2)return '';   // ein Aufsatz ist keine Korrektur
+  if(t.toLowerCase()===original.toLowerCase())return '';
+  return t;
+}
+async function lektor(antwort,name){
+  if(!CFG.lektor||!antwort)return antwort;
+  try{
+    var roh=await frageKI(baueLektorAnweisung(antwort,name),45000);
+    var besser=lektorAntwort(roh,antwort);
+    if(besser){ S.lektorGriff=(S.lektorGriff||0)+1; return besser; }
+  }catch(e){
+    console.warn('Lektor ohne Antwort:',e);
+  }
+  return antwort;
+}
+
 // ── ANTWORT-PARSER ────────────────────────────
 // Die KI wird um JSON gebeten. Kommt trotzdem "KEY: wert" zurueck (oder Markdown
 // drumherum), faengt der Zeilen-Parser das ab, statt die Runde zu verlieren.
@@ -1060,6 +1104,11 @@ var S = {
   stimmung:[], kleidung:[], regieAnweisung:[],
   handlung:'', fakten:[],           // Kurzzeit-Zusammenfassung + Langzeitgedaechtnis
   missionStand:'',                  // wie weit die Mission gediehen ist
+  zug:0,                            // Zaehler fuer das Alter der Fakten
+  akt:1, aktZiel:'', akteVorbei:[],  // Etappen der Mission
+  minuten:0, startUhr:19*60+30,     // vergangene Spielzeit und Beginn der Szene
+  wetter:'', frist:0,               // Wetter und Frist in Minuten (0 = keine)
+  probe:null,                       // Ergebnis des letzten Wurfs, bis der Zug es liest
   beziehungen:{},                   // wer wie zu wem steht: {Figur:{Ziel:'Haltung'}}
   seed:0,                           // fest, damit Figuren wiedererkennbar bleiben
   bildGeneriert:false, bildZaehler:0, bildLaeuft:false, bildAusstehend:null, bildPauseBis:0,
@@ -1137,12 +1186,16 @@ async function weltErstellen(){
     '  "held": {"name":"Vor- und Nachname","herkunft":"Geburtsstadt","beruf":"Beruf","eigenart":"schrullige Eigenart"},\n'+
     '  "stadt": "europaeische Stadt",\n'+
     '  "mission": "das uebergeordnete Ziel in EINEM deutschen Satz, konkret und ueberpruefbar",\n'+
+    '  "etappe": "die ERSTE Etappe auf dem Weg zur Mission in einem deutschen Satz — was JETZT gleich ansteht",\n'+
     '  "rahmenhandlung": "deutsche Einfuehrung, 5 bis 7 Saetze, die auch die Mission und die anwesenden Personen erklaert",\n'+
     '  "ort": {\n'+
     '    "name": "Name des Ortes",\n'+
     '    "geschichte": "atmosphaerische deutsche Beschreibung des Ortes, 3 bis 5 Saetze",\n'+
-    '    "bild": "english description of the OPENING scene - what the people are DOING, plus setting, objects and lighting. An action, NOT the appearance. No art style."\n'+
+    '    "bild": "english description of the OPENING scene - what the people are DOING, plus setting, objects and lighting. An action, NOT the appearance. No art style.",\n'+
+    '    "zeit": "Uhrzeit zu Beginn im Format HH:MM",\n'+
+    '    "wetter": "Wetter oder Licht in zwei bis drei deutschen Woertern"\n'+
     '  },\n'+
+    '  "frist": 0,\n'+
     '  "npcs": [\n'+
     '    {\n'+
     '      "name": "Name der Person",\n'+
@@ -1153,10 +1206,13 @@ async function weltErstellen(){
     '      "stimmung": "Grundstimmung in EINEM deutschen Wort",\n'+
     '      "beziehung": "Haltung DIESER Person zum Helden in ein bis drei deutschen Woertern (vertraut, alte Freundin, hoeflich distanziert, skeptisch, verliebt, dankbar)",\n'+
     '      "beziehungen": "Haltung zu den ANDEREN Personen in dieser Liste, Format Name: Haltung; Name: Haltung. Bei nur einer Person leer.",\n'+
+    '      "ziel": "was DIESE Person in dieser Szene fuer sich erreichen will — ein deutscher Satz. Sie spricht es nicht aus.",\n'+
+    '      "geheimnis": "etwas, das sie verbirgt und das die Szene aendern wuerde, waere es bekannt — ein deutscher Satz. Sie spricht es nicht aus.",\n'+
     '      "eroeffnung": "Der erste deutsche Satz dieser Person. Nur die ERSTE Person in der Liste spricht ihn wirklich."\n'+
     '    }\n'+
     '  ]\n'+
     '}\n\n'+
+    '"frist": Minuten, die fuer die Mission bleiben — 0, wenn es keine gibt. Setze sie nur, wenn die Idee eine nahelegt (letzte Vorstellung, Zug, Ladenschluss), dann zwischen 20 und 120.\n'+
     'Die Beziehungen muessen zur Ausgangsidee passen: Eine Ehefrau ist dem Helden vertraut, ein Fremder nicht. Nicht alle Figuren moegen einander gleich — Unterschiede machen die Szene lebendig.';
 
   // Ohne Rueckmeldung sieht ein langer Aufruf aus wie ein Absturz.
@@ -1204,7 +1260,18 @@ function verarbeiteWelt(text){
   W.stadt                = f(['stadt'],'STADT','Wien');
   W.rahmenhandlung       = f(['rahmenhandlung'],'RAHMENHANDLUNG','');
   W.mission              = entkleide(f(['mission'],'MISSION',''));
+  S.akt=1;
+  S.akteVorbei=[];
+  S.aktZiel=entkleide(f(['etappe'],'ETAPPE',''));
+  if(leerAngabe(S.aktZiel))S.aktZiel='';
 
+  var uhr=String(f(['ort','zeit'],'ORT_ZEIT','')).match(/(\d{1,2})\s*[:.]\s*(\d{2})/);
+  S.startUhr=uhr?((parseInt(uhr[1],10)%24)*60+(parseInt(uhr[2],10)%60)):19*60+30;
+  S.minuten=0;
+  S.wetter=entkleide(f(['ort','wetter'],'ORT_WETTER',''));
+  if(leerAngabe(S.wetter))S.wetter='';
+  var fristRoh=parseInt(f(['frist'],'FRIST','0'),10);
+  S.frist=(isFinite(fristRoh)&&fristRoh>0)?Math.min(600,fristRoh):0;
   W.ort={
     name:       f(['ort','name'],'ORT_NAME','Ein Ort','Name des Ortes'),
     geschichte: f(['ort','geschichte'],'ORT_GESCHICHTE','Dieser Ort birgt Geschichten.'),
@@ -1228,6 +1295,9 @@ function verarbeiteWelt(text){
       kleidung:     g('kleidung','NPC_KLEIDUNG','simple everyday clothing'),
       person:       g('person','NPC_PERSON','zurueckhaltend, aber vielschichtig'),
       grundstimmung:einWort(g('stimmung','NPC_STIMMUNG','neugierig')),
+      ziel:         e?entkleide(String(e.ziel==null?'':e.ziel)).trim():'',
+      geheimnis:    e?entkleide(String(e.geheimnis==null?'':e.geheimnis)).trim():'',
+      aufgedeckt:   false,
       eroeffnung:   g('eroeffnung','NPC_EROEFFNUNG','Oh – Besuch. Das passiert hier selten.','Eröffnungssatz'),
       startBeziehung:  e?entkleide(String(e.beziehung==null?'':e.beziehung)).trim():'',
       startBeziehungen:e?String(e.beziehungen==null?'':e.beziehungen):''
@@ -1255,6 +1325,7 @@ function verarbeiteWelt(text){
   S.seed=neuerSeed();
   S.szeneText=W.ort.bildPrompt;
   S.handlung='';S.fakten=[];S.verlauf=[];S.rueckgaengig=[];S.missionStand='';
+  S.zug=0;S.probe=null;
 
   var rahmen=W.rahmenhandlung||(W.protagonist.name+' aus '+W.protagonist.herkunft+' kommt nach '+W.stadt+'.');
   W.rahmenhandlung=rahmen;
@@ -1349,7 +1420,7 @@ function betreteSpiel(){
   },500);
 }
 function starteOrt(){
-  el('raumtitel').textContent=(W.ort.name||'Ort').toUpperCase();
+  zeigeRaumtitel();
   aktualisiereUI();
   var g=el('gespraech');g.innerHTML='';
   if(S.verlauf.length){
@@ -1459,6 +1530,224 @@ function folgeBeziehungen(bezRoh,missionRoh){
   uebernimmBeziehungen(bezRoh);
   if(missionRoh&&!leerAngabe(missionRoh))S.missionStand=kappe(missionRoh,300);
 }
+// Jeder Zug laesst Zeit vergehen, frischt beruehrte Fakten auf und verbraucht
+// die Probe - sie gilt genau fuer diesen einen Moment.
+function folgeZug(minutenRoh,wetterRoh,antwort,aufdeckRoh,etappeRoh){
+  if(aufdeckRoh)deckeAuf(aufdeckRoh);
+  if(etappeRoh)naechsteEtappe(etappeRoh);
+  S.zug=(S.zug||0)+1;
+  zeitWeiter(minutenRoh===''?3:minutenRoh);
+  if(wetterRoh&&!leerAngabe(wetterRoh))S.wetter=kappe(wetterRoh,60);
+  frischeFakten(antwort);
+  S.probe=null;
+  zeigeRaumtitel();
+}
+// ── CHARAKTERBLATT ────────────────────────────
+// Gesichter wandern von Panel zu Panel. Ein einmal erzeugtes Portraet gibt der
+// Figur ein festes Bild: als Anhalt fuer den Spieler und als eigener Seed, der
+// bei jedem weiteren Blatt dieselbe Person trifft. Die Bilder liegen NICHT im
+// Spielstand -- sie waeren dort zu gross -- sondern je Figur im localStorage.
+var BLATT_KEY='proxima_blatt_';
+function blattSchluessel(name){ return BLATT_KEY+String(name||'').toLowerCase().replace(/[^a-z0-9]+/g,'_'); }
+function blattLesen(name){
+  try{ return localStorage.getItem(blattSchluessel(name))||''; }catch(e){ return ''; }
+}
+function blattSchreiben(name,url){
+  try{
+    if(!url){ localStorage.removeItem(blattSchluessel(name)); return true; }
+    if(String(url).length>700000)return false;   // ein zu grosses Bild sprengt den Speicher
+    localStorage.setItem(blattSchluessel(name),url);
+    return true;
+  }catch(e){ return false; }
+}
+function figurSeed(i){
+  // Ein eigener, aber aus dem Szenen-Seed abgeleiteter Wert: dieselbe Partie
+  // ergibt dieselben Gesichter, verschiedene Figuren aber verschiedene.
+  return ((S.seed||1)+ (i+1)*7919)%2147483647;
+}
+function blattPrompt(i){
+  var n=W.npcs[i];
+  if(!n)return '';
+  var a=(n.aussehen||'a person').trim().replace(/[.\s]+$/,'');
+  var k=(S.kleidung[i]||n.kleidung||'').trim().replace(/[.\s]+$/,'');
+  return a+(k?', wearing '+k:'')+', character reference sheet, head and shoulders portrait, '+
+    'neutral grey background, even soft light, facing the viewer, neutral expression, '+aktuellerStil();
+}
+async function zeichneBlatt(i){
+  if(!S.imSpiel||!W.npcs[i])return;
+  var n=W.npcs[i];
+  sysZeile('✎ Charakterblatt für '+n.name+' entsteht…');
+  try{
+    var src=await quelle().zeichne({
+      prompt:kappe(blattPrompt(i),quelle().maxPrompt||1500),
+      negativ:baueNegativ(),
+      seed:figurSeed(i),
+      breite:auf64(CFG.breite),hoehe:auf64(CFG.hoehe)
+    });
+    if(!blattSchreiben(n.name,src)){
+      sysZeile('Das Blatt ist zu groß für den Browserspeicher — es gilt nur für diese Sitzung.');
+    }
+    n.blattDa=true;
+    sysZeile('✦ Charakterblatt für '+n.name+' liegt vor — im Figurenmenü zu sehen.');
+    autosave();
+  }catch(e){
+    zeigeFehler('Charakterblatt',e);
+  }
+}
+
+// ── VERDECKTE ABSICHTEN ───────────────────────
+// Jede Figur will etwas fuer sich und verbirgt etwas. Der Spieler sieht davon
+// nichts - die KI schon, und sie spielt danach. Erst wenn es im Gespraech
+// wirklich ausgesprochen wird, gilt es als aufgedeckt.
+function absichtenText(){
+  var zeilen=[];
+  W.npcs.forEach(function(x,i){
+    var t=[];
+    if(x.ziel)t.push('will: '+kappe(x.ziel,140));
+    if(x.geheimnis&&!x.aufgedeckt)t.push('verbirgt: '+kappe(x.geheimnis,140));
+    if(x.geheimnis&&x.aufgedeckt)t.push('bereits offen: '+kappe(x.geheimnis,140));
+    if(t.length)zeilen.push('- '+x.name+' (NPC'+(i+1)+') '+t.join(' | '));
+  });
+  if(!zeilen.length)return '';
+  return 'NUR FUER DICH — VERDECKTE ABSICHTEN (der Spieler kennt sie nicht):\n'+zeilen.join('\n')+'\n'+
+    'Spiele danach: Andeutungen, Ausweichen, kleine Widersprueche. Sage nichts davon geradeheraus, '+
+    'solange es nicht wirklich verdient ist. Wird ein Geheimnis JETZT ausgesprochen, trage es in "aufdeckung" ein.\n';
+}
+function deckeAuf(text){
+  var t=entkleide(String(text||'')).trim();
+  if(!t||leerAngabe(t))return false;
+  var m=t.match(/^\s*([^:]{1,44}?)\s*:\s*(.+)$/);
+  var name=m?m[1]:t, was=m?m[2]:'';
+  var i=findeNpc(name);
+  if(i<0)return false;
+  if(W.npcs[i].aufgedeckt)return false;
+  W.npcs[i].aufgedeckt=true;
+  sysZeile('✦ '+W.npcs[i].name+' hat etwas preisgegeben ✦');
+  merkeFakt(W.npcs[i].name+' hat offengelegt: '+(was||W.npcs[i].geheimnis||'etwas Verborgenes'),3);
+  return true;
+}
+
+// ── AKTE ──────────────────────────────────────
+// Eine Szene, die nie endet, franst aus. Die Mission zerfaellt deshalb in
+// Etappen: Ist eine erreicht, wird sie sichtbar abgeschlossen und die naechste
+// ausgerufen.
+function aktText(){
+  if(!W.mission)return '';
+  return 'AKT '+(S.akt||1)+(S.aktZiel?' — JETZT ANSTEHENDE ETAPPE: '+kappe(S.aktZiel,200):'')+'\n'+
+    (S.akteVorbei&&S.akteVorbei.length?'ERLEDIGTE ETAPPEN: '+S.akteVorbei.map(function(x){return kappe(x,90);}).join(' · ')+'\n':'')+
+    'Ist die Etappe in diesem Zug WIRKLICH erreicht (oder endgueltig gescheitert), trage die naechste in "etappe" ein — sonst lass das Feld leer.\n';
+}
+function naechsteEtappe(text){
+  var t=entkleide(String(text||'')).trim();
+  if(!t||leerAngabe(t))return false;
+  if(S.aktZiel){
+    S.akteVorbei=(S.akteVorbei||[]).concat([S.aktZiel]);
+    if(S.akteVorbei.length>8)S.akteVorbei=S.akteVorbei.slice(-8);
+    merkeFakt('Erledigt: '+S.aktZiel,3);
+  }
+  S.akt=(S.akt||1)+1;
+  S.aktZiel=kappe(t,240);
+  sysZeile('— AKT '+S.akt+' — '+S.aktZiel+' —');
+  S.bildZaehler=0;
+  return true;
+}
+
+// ── PROBEN ────────────────────────────────────
+// Ohne Widerstand gelingt alles, und dann ist nichts eine Entscheidung. Eine
+// Handlung des Helden in eckigen Klammern wird deshalb gewuerfelt - und wie
+// die Figur zu ihm steht, hilft oder steht im Weg.
+var BEZ_BONUS=[
+  [/verlieb|vertraut|liebevoll|dankbar|treu|innig|zugetan/i, 4],
+  [/freund|warm|neugierig|zugewandt|offen|belustigt|interessiert|versoehn/i, 2],
+  [/skeptisch|kuehl|kühl|reserviert|distanziert|misstrauisch|genervt/i, -2],
+  [/eisig|feindselig|wuetend|wütend|veraecht|verächt|hasst|abweisend/i, -4]
+];
+function beziehungsBonus(name){
+  var w=beziehungZu(name,heldName());
+  for(var i=0;i<BEZ_BONUS.length;i++){ if(BEZ_BONUS[i][0].test(w))return BEZ_BONUS[i][1]; }
+  return 0;
+}
+// Eine Handlung steht in eckigen Klammern; blosses Reden wird nicht gewuerfelt.
+function wagnisAus(text){
+  var m=String(text||'').match(/\x5B([^\x5D]{4,})\x5D/);
+  return m?m[1].trim():'';
+}
+function letzterNpcIdx(){
+  for(var i=S.verlauf.length-1;i>=0;i--){
+    if(S.verlauf[i].rolle==='npc'&&S.verlauf[i].idx>=0&&S.verlauf[i].idx<W.npcs.length)return S.verlauf[i].idx;
+  }
+  return W.npcs.length?0:-1;
+}
+function wuerfle(versuch,idx){
+  var name=(idx>=0&&W.npcs[idx])?W.npcs[idx].name:'';
+  var bonus=name?beziehungsBonus(name):0;
+  var wurf=1+Math.floor(Math.random()*20);
+  var schwelle=11;
+  var gesamt=wurf+bonus;
+  var gelungen=(wurf===20)||(wurf!==1&&gesamt>=schwelle);
+  return {versuch:versuch,gegenueber:name,wurf:wurf,bonus:bonus,schwelle:schwelle,gesamt:gesamt,
+          gelungen:gelungen,knapp:Math.abs(gesamt-schwelle)<=1,patzer:wurf===1,glanz:wurf===20};
+}
+function probeText(p){
+  if(!p)return '';
+  return 'PROBE auf den Versuch des Helden: „'+kappe(p.versuch,120)+'\u201c — Wurf '+p.wurf+
+    (p.bonus?(p.bonus>0?' + '+p.bonus:' '+p.bonus)+' (Haltung von '+p.gegenueber+')':'')+
+    ' gegen '+p.schwelle+' → '+(p.gelungen?'GELUNGEN':'MISSLUNGEN')+'.\n'+
+    (p.gelungen
+      ? (p.glanz?'Es gelingt besser als erhofft; gib dem Moment etwas Zusaetzliches.\n'
+               :'Der Versuch gelingt. Schreibe die Folge, ohne sie zu ueberhoehen.\n')
+      : (p.patzer?'Es geht gruendlich schief und macht etwas kaputt oder peinlich. Das bleibt stehen.\n'
+                :'Der Versuch MISSLINGT spuerbar: Die Figur weicht aus, versteht falsch, lehnt ab oder es kommt etwas dazwischen. Schreibe das Scheitern aus, statt es abzumildern.\n'))+
+    'Das Ergebnis steht fest. Erfinde keinen anderen Ausgang.\n';
+}
+function sysProbe(p){
+  sysZeile('🎲 '+p.wurf+(p.bonus?(p.bonus>0?' + '+p.bonus:' − '+Math.abs(p.bonus)):'')+
+    ' gegen '+p.schwelle+' — '+
+    (p.patzer?'Patzer':p.glanz?'Glanzwurf':p.gelungen?(p.knapp?'knapp gelungen':'gelungen'):(p.knapp?'knapp misslungen':'misslungen')));
+}
+
+// ── ZEIT UND WETTER ───────────────────────────
+// Eine Szene, in der nie etwas vergeht, hat keinen Druck. Die Uhr laeuft mit
+// den Zuegen, das Wetter steht im Bild, und eine Frist macht aus einem Ziel
+// eine Aufgabe.
+function uhrzeit(){
+  var m=((S.startUhr||0)+(S.minuten||0))%1440;
+  if(m<0)m+=1440;
+  return ('0'+Math.floor(m/60)).slice(-2)+':'+('0'+(m%60)).slice(-2);
+}
+function tageszeit(){
+  var st=Math.floor((((S.startUhr||0)+(S.minuten||0))%1440)/60);
+  if(st<5)return 'deep night';
+  if(st<9)return 'early morning';
+  if(st<12)return 'late morning';
+  if(st<15)return 'midday';
+  if(st<18)return 'afternoon';
+  if(st<21)return 'evening, golden hour fading';
+  return 'night';
+}
+function restFrist(){
+  if(!S.frist)return null;
+  return S.frist-(S.minuten||0);
+}
+function zeitText(){
+  var t='ZEIT: '+uhrzeit()+(S.wetter?', '+S.wetter:'')+'.';
+  var rest=restFrist();
+  if(rest!==null){
+    t+=rest>0
+      ? ' FRIST: noch '+rest+' Minuten, dann ist es zu spaet. Die Figuren spueren den Druck.'
+      : ' FRIST ABGELAUFEN: Die Zeit ist um — das hat Folgen, und die Szene zeigt sie.';
+  }
+  return t+'\n';
+}
+// Was die Uhr fuer das Bild bedeutet, auf Englisch.
+function zeitFuerBild(){
+  return tageszeit()+(S.wetter?', '+S.wetter.toLowerCase():'');
+}
+function zeitWeiter(minuten){
+  var m=parseInt(minuten,10);
+  if(!isFinite(m)||m<0)m=3;
+  S.minuten=(S.minuten||0)+Math.min(120,m);
+}
 function missionText(){
   if(!W.mission)return '';
   return 'MISSION (das uebergeordnete Ziel dieser Geschichte): '+kappe(W.mission,S.kurzKontext?200:320)+'\n'+
@@ -1472,23 +1761,83 @@ function weltKontext(){
     ? 'ERZAEHLWEISE: Ich-Perspektive. Handlungen des Helden werden in der ICH-Form geschrieben ("\x5Bich greife nach dem Glas\x5D"). Die Figuren sprechen ihn direkt an. Das Geschehen wird durch SEINE Augen erlebt.\n'
     : 'ERZAEHLWEISE: Er-Perspektive. Handlungen des Helden werden mit seinem NAMEN geschrieben ("\x5B'+W.protagonist.name+' greift nach dem Glas\x5D"). Das Geschehen wird von aussen beobachtet.\n';
   // Nur die juengsten Fakten mitschicken - gespeichert bleiben alle.
-  var f=S.fakten.slice(-(S.kurzKontext?8:14));
+  var f=wichtigsteFakten(S.kurzKontext?8:14);
   if(f.length)k+='WAS BISHER FESTSTEHT:\n- '+f.map(function(x){return kappe(x,140);}).join('\n- ')+'\n';
   if(S.handlung)k+='BISHERIGE HANDLUNG: '+kappe(S.handlung,S.kurzKontext?220:360)+'\n';
+  k+=zeitText();
   k+=missionText();
+  k+=aktText();
   var bez=beziehungText();
   if(bez)k+='BEZIEHUNGEN (Haltung jeder Figur zu jeder anderen — so spricht sie mit ihr):\n'+bez+'\n';
   return k;
 }
-function merkeFakt(f){
+// ── GEDAECHTNIS ───────────────────────────────
+// Frueher fiel der aelteste Fakt heraus, egal wie wichtig er war - ein
+// Versprechen verschwand hinter Small Talk. Jetzt traegt jeder Fakt ein
+// Gewicht und den Zug seiner letzten Erwaehnung; verdraengt wird der mit dem
+// kleinsten Wert.
+var FAKT_SCHWER=/verspr|schwoer|schwör|geschworen|verabred|abgemacht|vereinbart|geheim|droh|streit|gestand|zugesagt|verraten|vertrag|frist|bedingung|schuld|liebt|hasst/i;
+function faktGewicht(t){
+  if(FAKT_SCHWER.test(t))return 3;
+  return String(t).length>60?2:1;
+}
+function faktObjekt(x){
+  if(x&&typeof x==='object')return x;
+  return {t:String(x||''),g:faktGewicht(x),z:0};
+}
+// Gewicht mal 40 gegen das Alter in Zuegen: Ein Versprechen ueberlebt rund
+// achtzig Zuege Vernachlaessigung, eine Beilaeufigkeit rund vierzig.
+function faktWert(x){
+  x=faktObjekt(x);
+  return (x.g||1)*40-Math.max(0,(S.zug||0)-(x.z||0));
+}
+function faktenTexte(){ return S.fakten.map(function(x){ return faktObjekt(x).t; }); }
+// Fuer die Anweisung: die wichtigsten, aber wieder in Erzaehlreihenfolge.
+function wichtigsteFakten(anzahl){
+  // Bei gleichem Wert gewinnt der juengere Fakt; ausgegeben wird wieder in
+  // Erzaehlreihenfolge, damit die Anweisung lesbar bleibt.
+  var mit=S.fakten.map(function(x,i){ return {x:x,i:i}; });
+  mit.sort(function(a,b){ return (faktWert(b.x)-faktWert(a.x))||(b.i-a.i); });
+  return mit.slice(0,anzahl)
+    .sort(function(a,b){ return a.i-b.i; })
+    .map(function(e){ return faktObjekt(e.x).t; });
+}
+function merkeFakt(f,gewicht){
   f=entkleide(f);
   if(!f||f.length<4)return;
   if(/^(kein|keine|nichts|none|n\/a|-)$/i.test(f))return;
   var klein=f.toLowerCase();
-  if(S.fakten.some(function(x){return x.toLowerCase()===klein;}))return;
-  S.fakten.push(f);
-  while(S.fakten.length>MAX_FAKTEN)S.fakten.shift();
+  var schon=null;
+  S.fakten.forEach(function(x,i){ if(faktObjekt(x).t.toLowerCase()===klein)schon=i; });
+  if(schon!==null){                      // schon bekannt: nur auffrischen
+    var alt=faktObjekt(S.fakten[schon]);
+    alt.z=S.zug||0;
+    if(gewicht&&gewicht>alt.g)alt.g=gewicht;
+    S.fakten[schon]=alt;
+    return;
+  }
+  S.fakten.push({t:f,g:gewicht||faktGewicht(f),z:S.zug||0});
+  faktenEinkuerzen();
 }
+function faktenEinkuerzen(){
+  while(S.fakten.length>MAX_FAKTEN){
+    var schwaechster=0;
+    for(var i=1;i<S.fakten.length;i++){
+      if(faktWert(S.fakten[i])<faktWert(S.fakten[schwaechster]))schwaechster=i;
+    }
+    S.fakten.splice(schwaechster,1);
+  }
+}
+// Wird ein Fakt im Gespraech beruehrt, altert er nicht weiter.
+function frischeFakten(text){
+  var t=' '+String(text||'').toLowerCase()+' ';
+  S.fakten.forEach(function(x,i){
+    var o=faktObjekt(x);
+    var kern=o.t.toLowerCase().split(/[^a-zäöüß0-9]+/).filter(function(w){return w.length>5;});
+    if(kern.some(function(w){ return t.indexOf(w)>=0; })){ o.z=S.zug||0; S.fakten[i]=o; }
+  });
+}
+
 // Der Verlauf ist der groesste Block in der Anweisung. Zeilenzahl UND
 // Zeilenlaenge deckeln, sonst waechst er mit jedem Zug weiter.
 function verlaufText(n,maxZeile){
@@ -1554,7 +1903,7 @@ async function naechsterZug(erzwinge,autoModus){
     '- Reagiere KONKRET auf das zuletzt Gesagte. Wiederhole keine Formulierungen aus frueheren Zeilen.\n'+
     '- Widersprich nichts, was unter WAS BISHER FESTSTEHT aufgefuehrt ist.\n'+
     '- Stimmungen duerfen sich durch das Gespraech aendern, zum Guten wie zum Schlechten.\n\n'+
-    szeneRegie+regieZeilen+altern+zwang+
+    absichtenText()+szeneRegie+regieZeilen+altern+zwang+probeText(S.probe)+
     'BISHERIGES GESCHEHEN:\n'+verlaufText(S.kurzKontext?6:10)+'\n\n'+
     'Antworte NUR mit einem gueltigen JSON-Objekt, ohne Codeblock, ohne Kommentare, ohne Text davor oder danach:\n'+
     '{\n'+
@@ -1563,6 +1912,10 @@ async function naechsterZug(erzwinge,autoModus){
     '  "stimmung": "Stimmung DIESER Figur nach dem Moment, EIN deutsches Wort",\n'+
     '  "beziehungen": "nur was sich JETZT wirklich geaendert hat, Format Figur > Ziel: Haltung, mehrere durch Semikolon getrennt. Kleine Schritte, keine Spruenge. Sonst leer.",\n'+
     '  "mission": "ein kurzer Satz, was die Mission JETZT vorangebracht, verzoegert oder verkompliziert hat. Sonst leer.",\n'+
+    '  "minuten": 3,\n'+
+    '  "wetter": "nur wenn sich Wetter oder Licht JETZT merklich aendern, in zwei bis drei deutschen Woertern. Sonst leer.",\n'+
+    '  "aufdeckung": "Name: was diese Figur JETZT wirklich preisgegeben hat. Sonst leer.",\n'+
+    '  "etappe": "die naechste Etappe, wenn die jetzige in diesem Zug erreicht oder endgueltig gescheitert ist. Sonst leer.",\n'+
     '  "weiter": false,\n'+
     '  "auftritt": "Person, die JETZT dazustoesst: Name und Rolle. Sonst leer.",\n'+
     '  "abgang": "Anwesende Person, die JETZT weggeht: ihr Name. Sonst leer.",\n'+
@@ -1573,6 +1926,7 @@ async function naechsterZug(erzwinge,autoModus){
     '  "handlung": "1 bis 2 Saetze, die die Handlung fortschreiben",\n'+
     '  "fakt": "ein kurzer neuer Fakt, der spaeter gelten soll, sonst leer"\n'+
     '}\n\n'+
+    '"minuten": wie viel Zeit dieser Moment gekostet hat, meist 1 bis 5 — ein langes Gespraech oder ein Weg auch mehr.\n'+
     'Die vier Felder auftritt, abgang, ortwechsel und kleidung veraendern das Spiel wirklich: Was dort nicht steht, geschieht nicht. Kommt in deiner Antwort jemand herein, MUSST du "auftritt" ausfuellen. Eine blosse Ankuendigung gehoert nicht hinein.\n'+
     'Anwesend: '+W.npcs.map(function(n){return n.name;}).join(', ')+'. '+
     (autoModus?'"wer": Es MUSS eine Figur sprechen, niemals STOP.':'"wer": STOP heisst, der Held ist wieder dran.')+
@@ -1594,6 +1948,10 @@ async function naechsterZug(erzwinge,autoModus){
   var ortaenderung= entkleide(j2?hole(j2,['ortaenderung'],''):(z['ORTAENDERUNG']||''));
   var kleidungNeu = entkleide(j2?hole(j2,['kleidung'],''):(z['KLEIDUNG']||''));
   var bezRoh   = j2?(j2.beziehungen==null?'':j2.beziehungen):(z['BEZIEHUNGEN']||'');
+  var minutenRoh=j2?hole(j2,['minuten'],''):(z['MINUTEN']||'');
+  var aufdeckRoh=entkleide(j2?hole(j2,['aufdeckung'],''):(z['AUFDECKUNG']||''));
+  var etappeRoh =entkleide(j2?hole(j2,['etappe'],''):(z['ETAPPE']||''));
+  var wetterRoh=entkleide(j2?hole(j2,['wetter'],''):(z['WETTER']||''));
   var missionRoh=entkleide(j2?hole(j2,['mission'],''):(z['MISSION']||''));
   var auftritt = entkleide(j2?hole(j2,['auftritt'],''):(z['AUFTRITT']||''));
   var abgang   = entkleide(j2?hole(j2,['abgang'],''):(z['ABGANG']||''));
@@ -1605,7 +1963,9 @@ async function naechsterZug(erzwinge,autoModus){
     if(handlung)S.handlung=handlung;
     if(fakt)merkeFakt(fakt);
     if(bild)S.szeneText=bild;
+    antwort=await lektor(antwort,W.protagonist.name);
     folgeBeziehungen(bezRoh,missionRoh);
+    folgeZug(minutenRoh,wetterRoh,antwort,aufdeckRoh,etappeRoh);
     return {stop:false,held:true,text:antwort,weiter:false,auftritt:auftritt,abgang:abgang,
             ortwechsel:ortwechsel,ortaenderung:ortaenderung,kleidung:kleidungNeu};
   }
@@ -1618,7 +1978,9 @@ async function naechsterZug(erzwinge,autoModus){
   if(handlung)S.handlung=handlung;
   if(fakt)merkeFakt(fakt);
   if(bild)S.szeneText=bild;
+  antwort=await lektor(antwort,(W.npcs[idx]&&W.npcs[idx].name)||'die Figur');
   folgeBeziehungen(bezRoh,missionRoh);
+  folgeZug(minutenRoh,wetterRoh,antwort,aufdeckRoh,etappeRoh);
 
   return {stop:false,idx:idx,text:antwort,stimmung:stimmung,weiter:(weiter&&W.npcs.length>1),
           auftritt:auftritt,abgang:abgang,ortwechsel:ortwechsel,ortaenderung:ortaenderung,
@@ -1847,7 +2209,7 @@ function bauePrompt(opts,max){
   var sicht=ichSicht
     ? ', first person point of view, seen through the protagonist eyes, the viewer is the protagonist, protagonist himself not visible'
     : '';
-  var schwanz=', '+aktuellerStil()+', '+anzahl+sicht+', comic panel composition, dramatic lighting, detailed background';
+  var schwanz=', '+aktuellerStil()+', '+anzahl+sicht+', '+zeitFuerBild()+', comic panel composition, dramatic lighting, detailed background';
   var mitte=(setting?'. Setting: '+setting:'')+(szene?'. Scene: '+szene:'')+(stimmungen?', mood: '+stimmungen:'');
   var ganz=figuren+mitte+schwanz;
   if(!max||ganz.length<=max)return ganz;
@@ -1999,6 +2361,10 @@ var BEFEHLE=[
    fn:function(m){ quelleBefehl(m[1]); }},
   {muster:/^\/roh\b/i,                          hilfe:['/roh','zeigt die letzte Antwort der Regie im Original — zur Fehlersuche'],
    fn:function(){ zeigeRohantwort(); }},
+  {muster:/^\/blatt\s*:?\s*(\d*)\s*$/i,          hilfe:['/blatt N','Charakterblatt für Figur N zeichnen (ohne Zahl: Figurenmenü)'],
+   fn:function(m){ var i=parseInt(m[1],10); if(!isFinite(i)){oeffneFigurMenu();return;} zeichneBlatt(i-1); }},
+  {muster:/^\/gedanken\b/i,                     hilfe:['/gedanken','verdeckte Absichten aller Figuren zeigen — verrät die Geheimnisse'],
+   fn:function(){ zeigeGedanken(); }},
   {muster:/^\/mission\s*:?\s*([\s\S]*)$/i,      hilfe:['/mission: …','das Ziel der Geschichte setzen (ohne Angabe: Missions-Menü, „weg" streicht es)'],
    fn:function(m){ missionBefehl(m[1]); }},
   {muster:/^\/ort\s*:?\s*([\s\S]*)$/i,          hilfe:['/ort: …','an einen anderen Ort wechseln (ohne Angabe: Ort-Menü)'],
@@ -2094,6 +2460,11 @@ function spielerSagt(txt){
   merkeSchnappschuss();
   ichSage(txt);
   S.verlauf.push({rolle:'ich',text:txt});
+  var versuch=CFG.wuerfel?wagnisAus(txt):'';
+  if(versuch){
+    S.probe=wuerfle(versuch,letzterNpcIdx());
+    sysProbe(S.probe);
+  }
   fuehreSchlagabtausch(-1);
 }
 function regieBefehl(idx,hintRaw){
@@ -2248,7 +2619,7 @@ async function erscheineNPC(hint,still){
     'BISHERIGES GESCHEHEN:\n'+verlaufText(10)+'\n'+
     (hint?'VORGABE fuer die neue Person: '+hint+'\n':'')+
     '\nAntworte NUR mit einem JSON-Objekt, ohne Codeblock:\n'+
-    '{"name":"","rolle":"","aussehen":"constant English visual IDENTITY only, no clothing, no art style","kleidung":"english default outfit","person":"deutscher Satz, warm, frech, frivol, aber respektvoll","stimmung":"EIN deutsches Wort","beziehung":"Haltung dieser Person zum Helden in ein bis drei deutschen Woertern","beziehungen":"Haltung zu den bereits Anwesenden, Format Name: Haltung; Name: Haltung, sonst leer","eroeffnung":"erster deutscher Satz beim Hereinkommen, Handlungen in eckigen Klammern erlaubt"}';
+    '{"name":"","rolle":"","aussehen":"constant English visual IDENTITY only, no clothing, no art style","kleidung":"english default outfit","person":"deutscher Satz, warm, frech, frivol, aber respektvoll","stimmung":"EIN deutsches Wort","ziel":"was sie hier fuer sich erreichen will, ein deutscher Satz","geheimnis":"was sie verbirgt, ein deutscher Satz","beziehung":"Haltung dieser Person zum Helden in ein bis drei deutschen Woertern","beziehungen":"Haltung zu den bereits Anwesenden, Format Name: Haltung; Name: Haltung, sonst leer","eroeffnung":"erster deutscher Satz beim Hereinkommen, Handlungen in eckigen Klammern erlaubt"}';
   try{
     var text=await frageKI(instruction);
     var j=jsonAus(text), z=j?null:felderAus(text);
@@ -2260,6 +2631,9 @@ async function erscheineNPC(hint,still){
       kleidung:     f('kleidung','KLEIDUNG','simple clothing'),
       person:       f('person','PERSON','zurueckhaltend'),
       grundstimmung:einWort(f('stimmung','STIMMUNG','neugierig')),
+      ziel:         f('ziel','ZIEL',''),
+      geheimnis:    f('geheimnis','GEHEIMNIS',''),
+      aufgedeckt:   false,
       eroeffnung:   f('eroeffnung','EROEFFNUNG','\x5Btritt ein\x5D Störe ich?')
     };
     var idx=W.npcs.length;
@@ -2490,12 +2864,14 @@ function zeigeChronik(ziel){
   }else if(ziel==='handlung'){
     kopf.textContent='📖 HANDLUNG';
     var t=(S.handlung||'Noch nichts geschehen.');
-    if(S.fakten.length)t+='\n\n• '+S.fakten.join('\n• ');
+    if(S.fakten.length)t+='\n\n• '+faktenTexte().join('\n• ');
     inhalt.textContent=t;
   }else if(ziel==='mission'){
     kopf.textContent='📖 MISSION';
     inhalt.style.whiteSpace='pre-wrap';
     inhalt.textContent=(W.mission||'Für diese Geschichte wurde kein Ziel gesetzt.')+
+      (S.aktZiel?'\n\nAkt '+(S.akt||1)+': '+S.aktZiel:'')+
+      (S.akteVorbei&&S.akteVorbei.length?'\n\nErledigt:\n• '+S.akteVorbei.join('\n• '):'')+
       (S.missionStand?'\n\nStand: '+S.missionStand:'\n\nNoch nichts geschehen.');
     var bearbeiten=document.createElement('button');
     bearbeiten.className='haupt';
@@ -2521,6 +2897,7 @@ function zeigeChronik(ziel){
     var zieleN=[heldName()].concat(W.npcs.map(function(a){return a.name;}).filter(function(nm){return nm!==n.name;}));
     inhalt.style.whiteSpace='pre-wrap';
     inhalt.textContent=n.rolle+'. '+n.person+'  (Stimmung: '+S.stimmung[ziel]+', trägt: '+(S.kleidung[ziel]||n.kleidung)+')'+
+      (n.geheimnis?'\n\n'+(n.aufgedeckt?'Hat preisgegeben: '+n.geheimnis:'Verbirgt etwas — noch nicht heraus.'):'')+
       '\n\nHaltung gegenüber:\n'+zieleN.map(function(zn){
         return '   → '+zn+': '+(beziehungZu(n.name,zn)||'noch unbestimmt');
       }).join('\n');
@@ -2595,7 +2972,10 @@ function oeffneFigurMenu(){
     feld('fig_held_kleidung','Kleidung (englisch)',P.kleidung,true)+
     '</div>';
   W.npcs.forEach(function(n,i){
+    var blatt=blattLesen(n.name);
     html+='<div class="figblock"><div class="figtitel">'+escapeHtml(n.name||('NPC'+(i+1)))+'</div>'+
+      (blatt?'<img src="'+blatt+'" alt="Charakterblatt" style="width:120px;max-width:40%;border:1px solid var(--border);display:block;margin:0 0 8px;">':'')+
+      '<div class="reihe"><button onclick="zeichneBlatt('+i+')" title="Porträt mit eigenem Seed erzeugen">✎ '+(blatt?'BLATT NEU':'CHARAKTERBLATT')+'</button></div>'+
       feld('fig_npc'+i+'_name','Name',n.name,false)+
       feld('fig_npc'+i+'_rolle','Rolle',n.rolle,false)+
       feld('fig_npc'+i+'_stimmung','Stimmung (ein Wort)',S.stimmung[i]||n.grundstimmung,false)+
@@ -2692,7 +3072,11 @@ function uebernehmeStil(){
 // ── ORT ───────────────────────────────────────
 function zeigeRaumtitel(){
   var e=el('raumtitel');
-  if(e)e.textContent=((W.ort&&W.ort.name)||'Ort').toUpperCase();
+  if(!e)return;
+  var rest=restFrist();
+  e.textContent=((W.ort&&W.ort.name)||'Ort').toUpperCase()+' · '+uhrzeit()+
+    (S.wetter?' · '+S.wetter:'')+
+    (rest===null?'':(rest>0?' · noch '+rest+' Min':' · Zeit abgelaufen'));
 }
 // ── MISSION VON HAND ──────────────────────────
 // Die Regie schreibt den Stand fort, das Ziel selbst gehoert aber dem Spieler:
@@ -2728,6 +3112,17 @@ function missionLoeschen(){
   speichereMission();
 }
 // Ueber den Befehl: mit Text sofort setzen, ohne Text das Fenster oeffnen.
+// Der Blick des Autors hinter die Kulissen. Bewusst ein Befehl und kein Knopf:
+// wer ihn tippt, weiss, dass er sich die Ueberraschung nimmt.
+function zeigeGedanken(){
+  if(!S.imSpiel)return;
+  if(!W.npcs.length){ sysZeile('Niemand da.'); return; }
+  sysZeile('🎬 REGIE-BLICK — das verraten die Figuren nicht von selbst:');
+  W.npcs.forEach(function(x){
+    sysZeile('· '+x.name+': '+(x.ziel||'kein eigenes Ziel')+
+      (x.geheimnis?(x.aufgedeckt?' — Geheimnis (bereits offen): ':' — verbirgt: ')+x.geheimnis:''));
+  });
+}
 function missionBefehl(text){
   var t=entkleide(String(text||'')).trim();
   if(!t){ oeffneMissionMenu(); return; }
@@ -2843,6 +3238,15 @@ function oeffneEinstellungen(){
     '> Im Auto-Modus handelt der Held selbst mit</label>'+
     '<label class="feldlabel"><input type="checkbox" id="cfgAutoBesetzung"'+(CFG.autoBesetzung?' checked':'')+
     '> Handlung verändert Ort, Besetzung und Kleidung</label>'+
+    '<label class="feldlabel"><input type="checkbox" id="cfgWuerfel"'+(CFG.wuerfel?' checked':'')+
+    '> Handlungen des Helden können misslingen (Würfelprobe)</label>'+
+    '<div class="hinweis">Steht in deiner Eingabe eine Handlung in eckigen Klammern, entscheidet ein Wurf, ob sie gelingt. '+
+    'Wie die angesprochene Figur zu dir steht, hilft oder steht im Weg. Aus ist alles wie früher: Es gelingt, was du schreibst.</div>'+
+    '<label class="feldlabel"><input type="checkbox" id="cfgLektor"'+(CFG.lektor?' checked':'')+
+    '> Lektor: prüft jede Antwort, bevor sie erscheint</label>'+
+    '<div class="hinweis">Ein zweiter Aufruf liest die Zeile gegen vier Dinge: Wiederholung, zu schneller Beziehungssprung, '+
+    'ignorierte Mission, Widerspruch zur Würfelprobe. Nur wenn er etwas findet, schreibt er sie neu — kostet dafür je Zug '+
+    'einen KI-Aufruf mehr.</div>'+
     '<label class="feldlabel"><input type="checkbox" id="cfgBildBot"'+(CFG.bildBot?' checked':'')+
     '> Bildregie: eigener KI-Aufruf sucht das Bild zum Moment</label>'+
     '<div class="hinweis">Aus: Die Bildbeschreibung fällt nebenbei im Dialog-Aufruf ab — schnell und ohne Zusatzkosten. '+
@@ -2860,7 +3264,7 @@ function oeffneEinstellungen(){
 // Seit der Umstellung auf die Ladeschale ist die Frage berechtigt, welcher Stand
 // gerade laeuft. Die Schale legt den geholten Quelltext samt Zweig und Zeitpunkt
 // im localStorage ab; hier wird er nur abgelesen.
-var VERSION = 'V7.32';
+var VERSION = 'V7.34';
 // Ohne Browserkonsole — etwa am Handy — muss der Generator selbst sagen koennen,
 // woran es liegt, wenn ein Plugin von Perchance fehlt.
 function pluginLage(){
@@ -3067,6 +3471,8 @@ function leseEinstellungen(){
   var ah=el('cfgAutoHeld'); if(ah)CFG.autoHeld=!!ah.checked;
   var ab=el('cfgAutoBesetzung'); if(ab)CFG.autoBesetzung=!!ab.checked;
   var bb=el('cfgBildBot'); if(bb)CFG.bildBot=!!bb.checked;
+  var wf=el('cfgWuerfel'); if(wf)CFG.wuerfel=!!wf.checked;
+  var lk=el('cfgLektor'); if(lk)CFG.lektor=!!lk.checked;
   var q=BILDQUELLEN[CFG.quelle];
   (q.felder||[]).forEach(function(f){
     var e=el('q_'+f.k);
@@ -3159,6 +3565,25 @@ function migriere(d){
   if(!Array.isArray(s.regieAnweisung))s.regieAnweisung=[];
   while(s.regieAnweisung.length<w.npcs.length)s.regieAnweisung.push('');
   if(!Array.isArray(s.fakten))s.fakten=[];
+  // Vor V7.33 waren Fakten blosse Zeichenketten ohne Gewicht.
+  s.fakten=s.fakten.map(function(x){
+    if(x&&typeof x==='object'&&typeof x.t==='string')return x;
+    return {t:String(x||''),g:2,z:0};
+  }).filter(function(x){ return x.t; });
+  if(typeof s.zug!=='number')s.zug=0;
+  if(typeof s.akt!=='number')s.akt=1;
+  if(typeof s.aktZiel!=='string')s.aktZiel='';
+  if(!Array.isArray(s.akteVorbei))s.akteVorbei=[];
+  w.npcs.forEach(function(x){
+    if(typeof x.ziel!=='string')x.ziel='';
+    if(typeof x.geheimnis!=='string')x.geheimnis='';
+    x.aufgedeckt=!!x.aufgedeckt;
+  });
+  if(typeof s.minuten!=='number')s.minuten=0;
+  if(typeof s.startUhr!=='number')s.startUhr=19*60+30;
+  if(typeof s.wetter!=='string')s.wetter='';
+  if(typeof s.frist!=='number')s.frist=0;
+  s.probe=null;
   // Vor V7.31 gab es weder Mission noch Beziehungsregister.
   if(!s.beziehungen||typeof s.beziehungen!=='object'||Array.isArray(s.beziehungen))s.beziehungen={};
   if(typeof s.missionStand!=='string')s.missionStand='';

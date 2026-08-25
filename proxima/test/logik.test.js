@@ -330,7 +330,7 @@ const laufen = async () => {
   pruefe('angekündigter Abgang entfernt die Figur', ctx.W.npcs.length === 1 && ctx.W.npcs[0].name === 'Ida Berger',
     ctx.W.npcs.map(n => n.name).join(','));
   pruefe('Stimmungen und Kleidung ziehen mit', ctx.S.stimmung.length === 1 && ctx.S.kleidung.length === 1);
-  pruefe('der Abgang steht im Gedächtnis', ctx.S.fakten.some(f => /Marcelle/.test(f)), JSON.stringify(ctx.S.fakten.slice(-2)));
+  pruefe('der Abgang steht im Gedächtnis', ctx.faktenTexte().some(f => /Marcelle/.test(f)), ctx.faktenTexte().slice(-2).join(' | '));
 
   await ctx.besetzungAendern({ abgang: 'Ida', auftritt: '' });
   pruefe('die letzte Figur bleibt', ctx.W.npcs.length === 1);
@@ -407,7 +407,7 @@ const laufen = async () => {
   pruefe('Beschreibung übernommen', /Wilder Wein/.test(ctx.W.ort.geschichte), ctx.W.ort.geschichte);
   pruefe('Kulisse für Bilder mitgewechselt', /overgrown courtyard/.test(ctx.S.szeneGlobal), ctx.S.szeneGlobal);
   pruefe('Ankunftsszene gesetzt', /step out/.test(ctx.S.szeneText), ctx.S.szeneText);
-  pruefe('Ortswechsel steht im Gedächtnis', ctx.S.fakten.some(f => /Innenhof/.test(f)));
+  pruefe('Ortswechsel steht im Gedächtnis', ctx.faktenTexte().some(f => /Innenhof/.test(f)));
 
   // Der gemeldete Ablauf komplett: Ort wechseln, Alte bleibt zurück, Neue kommt dazu
   ctx.W.npcs.push({ name: 'Marcelle', rolle: 'Gast', aussehen: 'd', kleidung: 'e', person: 'f', grundstimmung: 'müde' });
@@ -778,6 +778,171 @@ pruefe('alter Stand bekommt ein leeres Register', altStand.stand.beziehungen && 
 pruefe('alter Stand bekommt Mission und Stand als Text',
   altStand.welt.mission === '' && altStand.stand.missionStand === '');
 
+console.log('\n— Charakterblatt —');
+// Ein Portraet je Figur mit eigenem, aber aus der Partie abgeleitetem Seed.
+frischeWelt(); ctx.verarbeiteWelt(weltJson);
+ctx.S.seed = 12345;
+pruefe('jede Figur hat einen eigenen Seed', ctx.figurSeed(0) !== ctx.figurSeed(1));
+pruefe('derselbe Seed bei derselben Partie', ctx.figurSeed(0) === (12345 + 7919) % 2147483647);
+const bp = ctx.blattPrompt(0);
+pruefe('das Blatt zeigt Identität und Kleidung', /dark hair/.test(bp) && /wearing a silk robe/.test(bp), bp);
+pruefe('es ist ein Porträt, keine Szene', /character reference sheet/.test(bp) && /neutral grey background/.test(bp));
+pruefe('der Bildstil gilt auch hier', /manga|anime|comic|watercolor|oil|photo|pixel/i.test(bp), bp);
+pruefe('Blätter liegen neben dem Spielstand, nicht darin',
+  ctx.blattSchreiben('Marcelle', 'data:image/png;base64,AAA') === true &&
+  ctx.blattLesen('Marcelle') === 'data:image/png;base64,AAA' &&
+  !JSON.stringify(ctx.standObjekt()).includes('data:image/png;base64,AAA'));
+pruefe('ein zu großes Blatt wird abgelehnt', ctx.blattSchreiben('Marcelle', 'x'.repeat(700001)) === false);
+ctx.blattSchreiben('Marcelle', '');
+pruefe('und lässt sich wieder löschen', ctx.blattLesen('Marcelle') === '');
+pruefe('/blatt ist ein Befehl', !!ctx.BEFEHLE.find(b => /blatt/.test(String(b.muster))));
+
+console.log('\n— Lektor —');
+// Ein zweiter Aufruf prueft die Zeile. Er darf nur eingreifen, wenn er etwas
+// findet — und niemals einen Aufsatz daraus machen.
+ctx.W.mission = 'Die Unterschrift bekommen.';
+ctx.S.aktZiel = 'Konrad ansprechen.';
+ctx.S.probe = { gelungen: false, versuch: 'nach dem Stift greifen' };
+const lAnw = ctx.baueLektorAnweisung('Sie lächelt und reicht ihm den Stift.', 'Marcelle');
+pruefe('die Anweisung nennt Mission, Etappe und Probe',
+  /Die Unterschrift/.test(lAnw) && /Konrad ansprechen/.test(lAnw) && /MISSLUNGEN/.test(lAnw));
+pruefe('sie prüft genau vier Dinge', /1\. Wiederholung/.test(lAnw) && /4\. Probe/.test(lAnw));
+pruefe('OK lässt die Zeile stehen', ctx.lektorAntwort('OK', 'Der Originalsatz.') === '');
+pruefe('auch mit Beiwerk', ctx.lektorAntwort('ok\n', 'Der Originalsatz.') === '');
+pruefe('eine Korrektur kommt durch',
+  ctx.lektorAntwort('Sie zieht die Hand zurück.', 'Sie lächelt und reicht ihm den Stift.') === 'Sie zieht die Hand zurück.');
+pruefe('Codeblöcke fallen weg',
+  ctx.lektorAntwort('```\nSie zieht die Hand zurück.\n```', 'Sie lächelt.') === 'Sie zieht die Hand zurück.');
+pruefe('ein Aufsatz wird verworfen', ctx.lektorAntwort('x'.repeat(400), 'kurze Zeile') === '');
+pruefe('dieselbe Zeile gilt als keine Korrektur', ctx.lektorAntwort('Gleiche Zeile.', 'gleiche zeile.') === '');
+pruefe('Leeres ändert nichts', ctx.lektorAntwort('', 'Original') === '' && ctx.lektorAntwort(null, 'Original') === '');
+pruefe('der Schalter steht in den Einstellungen', html.includes('id="cfgLektor"') && html.includes('CFG.lektor=!!lk.checked'));
+
+console.log('\n— Verdeckte Absichten —');
+// Jede Figur will etwas fuer sich und verbirgt etwas. Der Spieler sieht das
+// nicht, die KI schon.
+const weltMitGeheimnis = JSON.stringify({
+  held: { name: 'Julian Voss', herkunft: 'Graz', beruf: 'Apotheker', eigenart: 'summt' },
+  stadt: 'Wien', mission: 'Die Unterschrift bekommen.', etappe: 'Konrad überhaupt ansprechen.',
+  rahmenhandlung: 'Im Kino.',
+  ort: { name: 'Kino Urania', geschichte: 'Roter Samt.', bild: 'they wait', zeit: '20:05', wetter: 'Schneeregen' },
+  frist: 45,
+  npcs: [
+    { name: 'Marlene', rolle: 'Ehefrau', aussehen: 'dark hair', kleidung: 'a coat', person: 'Trocken.',
+      stimmung: 'gelassen', beziehung: 'vertraut', ziel: 'Den Abend retten.', geheimnis: 'Sie hat die Karten verfallen lassen.',
+      eroeffnung: 'Zwei Karten?' },
+    { name: 'Konrad', rolle: 'Bruder', aussehen: 'grey beard', kleidung: 'a suit', person: 'Ausweichend.',
+      stimmung: 'nervoes', beziehung: 'schuldbewusst', ziel: 'Nicht unterschreiben.', geheimnis: 'Er hat das Geld längst ausgegeben.',
+      eroeffnung: 'Wenig Zeit.' }
+  ]
+});
+frischeWelt(); ctx.verarbeiteWelt(weltMitGeheimnis);
+pruefe('Ziel und Geheimnis werden übernommen',
+  ctx.W.npcs[1].ziel === 'Nicht unterschreiben.' && /Geld längst ausgegeben/.test(ctx.W.npcs[1].geheimnis));
+const absicht = ctx.absichtenText();
+pruefe('die Absichten stehen nur in der Anweisung', /NUR FUER DICH/.test(absicht) && /verbirgt: Sie hat die Karten/.test(absicht));
+pruefe('sie werden nicht geradeheraus gespielt', /Andeutungen, Ausweichen/.test(absicht));
+pruefe('eine Aufdeckung setzt das Geheimnis offen',
+  ctx.deckeAuf('Konrad: Er gesteht, dass das Geld weg ist.') === true && ctx.W.npcs[1].aufgedeckt === true);
+pruefe('sie landet als schwerer Fakt im Gedächtnis',
+  ctx.S.fakten.some(f => f.g === 3 && /offengelegt/.test(f.t)), ctx.faktenTexte().join(' | '));
+pruefe('zweimal aufdecken ändert nichts', ctx.deckeAuf('Konrad: nochmal') === false);
+pruefe('unbekannte Namen werden abgewiesen', ctx.deckeAuf('Niemand: irgendwas') === false);
+pruefe('nach der Aufdeckung steht es als offen in der Anweisung', /bereits offen/.test(ctx.absichtenText()));
+pruefe('der Regie-Blick ist ein Befehl, kein Knopf', /\/gedanken/.test(html) && /REGIE-BLICK/.test(html));
+
+console.log('\n— Akte —');
+// Die Mission zerfaellt in Etappen; erreichte werden abgeschlossen.
+frischeWelt(); ctx.verarbeiteWelt(weltMitGeheimnis);
+pruefe('die erste Etappe kommt aus der Welterschaffung', ctx.S.aktZiel === 'Konrad überhaupt ansprechen.' && ctx.S.akt === 1);
+pruefe('die Uhrzeit der Welt wird übernommen', ctx.uhrzeit() === '20:05', ctx.uhrzeit());
+pruefe('Wetter und Frist ebenso', ctx.S.wetter === 'Schneeregen' && ctx.S.frist === 45);
+pruefe('der Akt steht in der Anweisung', /AKT 1 — JETZT ANSTEHENDE ETAPPE: Konrad/.test(ctx.aktText()), ctx.aktText());
+pruefe('eine neue Etappe zählt den Akt hoch',
+  ctx.naechsteEtappe('Ihn zum Reden bringen.') === true && ctx.S.akt === 2 && ctx.S.aktZiel === 'Ihn zum Reden bringen.');
+pruefe('die erledigte Etappe wird aufbewahrt', ctx.S.akteVorbei.length === 1 && /ansprechen/.test(ctx.S.akteVorbei[0]));
+pruefe('sie steht als schwerer Fakt im Gedächtnis', ctx.S.fakten.some(f => f.g === 3 && /^Erledigt:/.test(f.t)));
+pruefe('das nächste Bild kommt sofort', ctx.S.bildZaehler === 0);
+pruefe('leere Angaben ändern den Akt nicht', ctx.naechsteEtappe('') === false && ctx.naechsteEtappe('keine') === false && ctx.S.akt === 2);
+pruefe('erledigte Etappen stehen in der Anweisung', /ERLEDIGTE ETAPPEN/.test(ctx.aktText()));
+pruefe('ohne Mission gibt es keine Akte', (function(){ const m = ctx.W.mission; ctx.W.mission = ''; const t = ctx.aktText(); ctx.W.mission = m; return t === ''; })());
+
+console.log('\n— Gedaechtnis mit Gewicht —');
+// Frueher fiel der aelteste Fakt heraus. Jetzt zaehlt Gewicht mal Frische:
+// ein Versprechen ueberlebt zwanzig Belanglosigkeiten.
+ctx.S.fakten = []; ctx.S.zug = 0;
+ctx.merkeFakt('Ida hat versprochen, den Schlüssel zu bringen.');
+ctx.merkeFakt('Es regnet draußen.');
+pruefe('ein Versprechen wiegt schwer', ctx.S.fakten[0].g === 3, JSON.stringify(ctx.S.fakten[0]));
+pruefe('Beiläufiges wiegt leicht', ctx.S.fakten[1].g === 1, JSON.stringify(ctx.S.fakten[1]));
+ctx.S.zug = 30;
+for (let i = 0; i < ctx.MAX_FAKTEN + 6; i++) ctx.merkeFakt('Belangloser Fakt Nummer ' + i);
+pruefe('das Gedächtnis bleibt gedeckelt', ctx.S.fakten.length === ctx.MAX_FAKTEN);
+pruefe('das Versprechen hat überlebt', ctx.faktenTexte().some(t => /versprochen/.test(t)), ctx.faktenTexte().join(' | '));
+pruefe('das Beiläufige ist verdrängt', !ctx.faktenTexte().some(t => /Es regnet/.test(t)));
+ctx.S.fakten = []; ctx.S.zug = 5;
+ctx.merkeFakt('Konrad schuldet dem Wirt Geld.');
+ctx.S.zug = 40;
+ctx.frischeFakten('Der Wirt fragte, ob Konrad das Geld nun bringe.');
+pruefe('eine Erwähnung frischt den Fakt auf', ctx.S.fakten[0].z === 40, JSON.stringify(ctx.S.fakten[0]));
+ctx.merkeFakt('Konrad schuldet dem Wirt Geld.', 3);
+pruefe('derselbe Fakt wird nicht doppelt abgelegt', ctx.S.fakten.length === 1);
+pruefe('ein schwereres Gewicht setzt sich durch', ctx.S.fakten[0].g === 3);
+
+console.log('\n— Uhr, Wetter und Frist —');
+ctx.S.startUhr = 19 * 60 + 30; ctx.S.minuten = 0; ctx.S.wetter = 'Nieselregen'; ctx.S.frist = 0;
+pruefe('die Uhr beginnt beim Startwert', ctx.uhrzeit() === '19:30');
+ctx.zeitWeiter(45);
+pruefe('Minuten laufen weiter', ctx.uhrzeit() === '20:15');
+ctx.zeitWeiter('unsinn');
+pruefe('unlesbare Angaben gelten als drei Minuten', ctx.uhrzeit() === '20:18');
+ctx.zeitWeiter(-5);
+pruefe('die Uhr läuft nie rückwärts', ctx.uhrzeit() === '20:21');
+pruefe('Abend wird als Abend gemalt', /evening/.test(ctx.tageszeit()), ctx.tageszeit());
+ctx.S.minuten = 0; ctx.S.startUhr = 7 * 60;
+pruefe('Morgen wird als Morgen gemalt', /morning/.test(ctx.tageszeit()), ctx.tageszeit());
+pruefe('Wetter geht ins Bild', /nieselregen/.test(ctx.zeitFuerBild()), ctx.zeitFuerBild());
+ctx.S.frist = 60; ctx.S.minuten = 42;
+pruefe('die Restfrist wird gerechnet', ctx.restFrist() === 18);
+pruefe('die Frist steht in der Anweisung', /noch 18 Minuten/.test(ctx.zeitText()), ctx.zeitText());
+ctx.S.minuten = 75;
+pruefe('abgelaufene Frist wird deutlich benannt', /ABGELAUFEN/.test(ctx.zeitText()));
+ctx.S.frist = 0; ctx.S.minuten = 0; ctx.S.startUhr = 19 * 60 + 30;
+pruefe('ohne Frist steht keine in der Anweisung', !/FRIST/.test(ctx.zeitText()));
+
+console.log('\n— Würfelproben —');
+// Eine Handlung in eckigen Klammern wird gewürfelt, blosses Reden nicht.
+pruefe('Handlung in Klammern wird erkannt', ctx.wagnisAus('Ich sage nichts. \x5Bgreife nach dem Schlüssel\x5D') === 'greife nach dem Schlüssel');
+pruefe('blosses Reden ist kein Wagnis', ctx.wagnisAus('Guten Abend, wie geht es dir?') === '');
+pruefe('zu kurze Klammern zählen nicht', ctx.wagnisAus('\x5Bhm\x5D') === '');
+ctx.W.npcs = [{ name: 'Ida', rolle: 'Wirtin', aussehen: 'a woman', kleidung: 'apron' }];
+ctx.S.stimmung = ['heiter']; ctx.S.beziehungen = {};
+ctx.setzeBeziehung('Ida', ctx.heldName(), 'verliebt');
+pruefe('Zuneigung hilft', ctx.beziehungsBonus('Ida') === 4, String(ctx.beziehungsBonus('Ida')));
+ctx.setzeBeziehung('Ida', ctx.heldName(), 'eisig');
+pruefe('Ablehnung steht im Weg', ctx.beziehungsBonus('Ida') === -4);
+ctx.setzeBeziehung('Ida', ctx.heldName(), 'nachdenklich');
+pruefe('Unbekanntes ist neutral', ctx.beziehungsBonus('Ida') === 0);
+const echterZufall = ctx.Math.random;
+ctx.Math.random = () => 0.999;                    // Wurf 20
+let p20 = ctx.wuerfle('den Schlüssel nehmen', 0);
+pruefe('die Zwanzig gelingt immer', p20.gelungen && p20.glanz && p20.wurf === 20, JSON.stringify(p20));
+ctx.Math.random = () => 0;                        // Wurf 1
+ctx.setzeBeziehung('Ida', ctx.heldName(), 'verliebt');
+let p1 = ctx.wuerfle('den Schlüssel nehmen', 0);
+pruefe('die Eins misslingt auch mit Bonus', !p1.gelungen && p1.patzer, JSON.stringify(p1));
+ctx.Math.random = () => 0.45;                     // Wurf 10
+let p10 = ctx.wuerfle('den Schlüssel nehmen', 0);
+pruefe('Bonus entscheidet den Grenzfall', p10.wurf === 10 && p10.bonus === 4 && p10.gelungen, JSON.stringify(p10));
+ctx.setzeBeziehung('Ida', ctx.heldName(), 'eisig');
+let pMinus = ctx.wuerfle('den Schlüssel nehmen', 0);
+pruefe('Ablehnung kippt denselben Wurf', !pMinus.gelungen, JSON.stringify(pMinus));
+ctx.Math.random = echterZufall;
+const text = ctx.probeText(p10);
+pruefe('das Ergebnis steht in der Anweisung fest', /GELUNGEN/.test(text) && /Erfinde keinen anderen Ausgang/.test(text));
+pruefe('Misserfolg wird nicht abgemildert', /MISSLINGT spuerbar/.test(ctx.probeText(pMinus)));
+pruefe('der Schalter steht in den Einstellungen', html.includes('id="cfgWuerfel"') && html.includes('CFG.wuerfel=!!wf.checked'));
+
 console.log('\n— Mission von Hand —');
 // Das Ziel gehoert dem Spieler: per Befehl und ueber ein eigenes Fenster,
 // erreichbar aus der Chronik.
@@ -792,7 +957,7 @@ ctx.S.missionStand = 'alter Stand';
 ctx.missionBefehl('Den Brief vor Mitternacht finden');
 pruefe('Text setzt das Ziel', ctx.W.mission === 'Den Brief vor Mitternacht finden');
 pruefe('ein neues Ziel setzt den Stand zurueck', ctx.S.missionStand === '');
-pruefe('das neue Ziel steht im Gedaechtnis', ctx.S.fakten.some(f => /Das Ziel lautet jetzt/.test(f)), ctx.S.fakten.join(' | '));
+pruefe('das neue Ziel steht im Gedaechtnis', ctx.faktenTexte().some(f => /Das Ziel lautet jetzt/.test(f)), ctx.faktenTexte().join(' | '));
 pruefe('das Ziel steht danach im Weltkontext', /Den Brief vor Mitternacht/.test(ctx.weltKontext()));
 ctx.missionBefehl('weg');
 pruefe('„weg" streicht das Ziel', ctx.W.mission === '' && ctx.S.missionStand === '');
@@ -1143,6 +1308,26 @@ const eingehaengt = (angehaengt, tag) => angehaengt.filter(e => e.tag === tag);
 // Der Bot haengt an frageKI und ist damit asynchron: Faellt der Aufruf aus,
 // muss null herauskommen — dann zeichnet der Generator wie bisher aus der
 // Dialogregie weiter.
+// Der Lektor ist asynchron: eingeschaltet fragt er, ausgeschaltet nicht, und
+// ein Ausfall darf die Zeile nicht kosten.
+async function lektorPruefen() {
+  console.log('\n— Lektor: Aufruf —');
+  const echtLekt = ctx.frageKI;
+  ctx.CFG.lektor = false;
+  pruefe('ausgeschaltet fragt er gar nicht',
+    (await ctx.lektor('Originalzeile.', 'Marcelle')) === 'Originalzeile.');
+  ctx.CFG.lektor = true;
+  ctx.frageKI = () => Promise.resolve('OK');
+  pruefe('sagt er OK, bleibt die Zeile', (await ctx.lektor('Originalzeile.', 'Marcelle')) === 'Originalzeile.');
+  ctx.frageKI = () => Promise.resolve('Bessere Zeile.');
+  pruefe('sonst schreibt er sie neu', (await ctx.lektor('Originalzeile.', 'Marcelle')) === 'Bessere Zeile.');
+  const stillLekt = ctx.console.warn; ctx.console.warn = function(){};
+  ctx.frageKI = () => Promise.reject(new Error('kein Plugin'));
+  pruefe('faellt er aus, bleibt die Zeile unangetastet', (await ctx.lektor('Originalzeile.', 'Marcelle')) === 'Originalzeile.');
+  ctx.console.warn = stillLekt;
+  ctx.frageKI = echtLekt; ctx.CFG.lektor = false; ctx.S.probe = null;
+}
+
 async function bildRegiePruefen() {
   console.log('\n— Bildregie-Bot: Aufruf —');
   const echteFrage = ctx.frageKI, echteWarnung = ctx.console.warn;
@@ -1252,7 +1437,7 @@ async function ladeschalePruefen() {
 
 // Der asynchrone Teil (Quellenwechsel, dann die Ladeschale) laeuft zum Schluss,
 // danach die Auswertung.
-laufen().then(bildRegiePruefen).then(ladeschalePruefen).then(() => {
+laufen().then(lektorPruefen).then(bildRegiePruefen).then(ladeschalePruefen).then(() => {
   console.log('\n' + (bad ? '✗ ' + bad + ' Fehler, ' : '✓ alles grün — ') + ok + ' Prüfungen bestanden');
   process.exit(bad ? 1 : 0);
 }).catch(e => {
