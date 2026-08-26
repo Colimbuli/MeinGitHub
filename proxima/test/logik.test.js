@@ -1040,6 +1040,55 @@ pruefe('der beschriftete Knopf ist als breit markiert',
   /id="autobtn" class="breit"/.test(html) && !/id="npcbtn" class="breit"/.test(html));
 
 // Alle Symbole kommen aus einem Satz und nehmen die Farbe des Knopfes an.
+console.log('\n— Referenzbild (img2img) —');
+// Kohaerenz entsteht nur an einem FESTEN Anker. Das letzte Szenenbild taugt
+// nicht dafuer, sonst entsteht jedes Bild aus dem vorigen.
+frischeWelt(); ctx.verarbeiteWelt(weltJson);
+ctx.S.imSpiel = true;
+ctx.blattSchreiben('Marcelle', '');
+ctx.blattSchreiben(ctx.heldName(), '');
+ctx.S.aktBild = '';
+pruefe('ohne Blatt und ohne Aktbild gibt es keinen Anker', ctx.referenzQuelle() === null);
+ctx.S.aktBild = 'data:image/jpeg;base64,AKT';
+pruefe('das erste Bild des Akts ist die Rückfallebene',
+  ctx.referenzQuelle().url === 'data:image/jpeg;base64,AKT' && /Akts/.test(ctx.referenzQuelle().woher));
+ctx.blattSchreiben(ctx.heldName(), 'data:image/jpeg;base64,HELD');
+pruefe('das Blatt des Helden schlägt das Aktbild', ctx.referenzQuelle().url === 'data:image/jpeg;base64,HELD');
+ctx.S.verlauf = [{ rolle: 'npc', idx: 0, text: 'Hallo.', name: 'Marcelle' }];
+ctx.blattSchreiben('Marcelle', 'data:image/jpeg;base64,MARCELLE');
+pruefe('das Blatt der zuletzt sprechenden Figur schlägt beides',
+  ctx.referenzQuelle().url === 'data:image/jpeg;base64,MARCELLE' && /Marcelle/.test(ctx.referenzQuelle().woher));
+pruefe('das letzte Szenenbild wird bewusst NICHT genommen',
+  !/letzteBildUrl/.test((ctx.referenzQuelle.toString() + ctx.referenzBild.toString())));
+
+// Die Vorlage darf nicht daran zerbrechen, wie jemand sie getippt hat.
+const mitAnf = ctx.gradioDaten('["{prompt}", "{negativ}", {seed}, "{referenz}", {staerke}]',
+  { prompt: 'p', negativ: 'n', seed: 7, referenz: 'data:bild', staerke: 0.4 });
+pruefe('Referenz in Anführungszeichen wird ersetzt', mitAnf[3] === 'data:bild' && mitAnf[4] === 0.4, JSON.stringify(mitAnf));
+const ohneAnf = ctx.gradioDaten('["{prompt}", {referenz}, {staerke}]',
+  { prompt: 'p', referenz: 'data:bild', staerke: 0.4 });
+pruefe('auch ohne Anführungszeichen', ohneAnf[1] === 'data:bild' && ohneAnf[2] === 0.4, JSON.stringify(ohneAnf));
+const ohneBild = ctx.gradioDaten('["{prompt}", "{referenz}", {staerke}]', { prompt: 'p' });
+pruefe('fehlt das Bild, steht dort null', ohneBild[1] === null, JSON.stringify(ohneBild));
+pruefe('fehlt die Stärke, gilt der Standard und kein "undefined"', ohneBild[2] === 0.65, JSON.stringify(ohneBild));
+const objektForm = (function(){ ctx.CFG.gradioReferenzForm = 'datei'; const w = ctx.referenzWert('data:bild'); ctx.CFG.gradioReferenzForm = 'roh'; return w; })();
+pruefe('als Dateiobjekt bekommt Gradio den erwarteten Aufbau',
+  objektForm.path === 'data:bild' && objektForm.meta._type === 'gradio.FileData', JSON.stringify(objektForm));
+pruefe('roh bleibt die Data-URL', ctx.referenzWert('data:bild') === 'data:bild');
+pruefe('ohne Bild bleibt es null', ctx.referenzWert(null) === null);
+
+// Das Charakterblatt darf nie auf einem anderen Bild aufbauen.
+pruefe('das Blatt geht ohne Referenz in die Quelle', /ohneReferenz:true/.test(html));
+pruefe('die Quelle beachtet das', /CFG\.gradioReferenz&&!a\.ohneReferenz/.test(html));
+pruefe('ein neuer Akt setzt den Rückfall-Anker zurück', (function(){
+  ctx.W.mission = 'Ziel'; ctx.S.aktZiel = 'Etappe eins'; ctx.S.aktBild = 'data:alt';
+  ctx.naechsteEtappe('Etappe zwei');
+  return ctx.S.aktBild === '';
+})());
+pruefe('Schalter und Stärke stehen bei der Bildquelle',
+  html.includes("k:'gradioReferenz'") && html.includes("k:'gradioStaerke'") && html.includes("typ:'schalter'"));
+ctx.blattSchreiben('Marcelle', ''); ctx.blattSchreiben(ctx.heldName(), '');
+
 console.log('\n— Goldener Symbolsatz —');
 pruefe('jeder Knopf holt sein Symbol aus dem Satz',
   ['chronik','figuren','ort','bild','einstellungen','speichern','npcplus'].every(k => html.includes('data-sym="' + k + '"')),
