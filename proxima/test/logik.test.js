@@ -1130,6 +1130,136 @@ pruefe('für leere Felder gilt die KI',
 pruefe('die Stimmung wird auf ein Wort gebracht',
   ctx.mischeFigur({ stimmung: 'ziemlich genervt heute' }, { grundstimmung: 'heiter' }).grundstimmung === 'ziemlich');
 
+console.log('\n— Chat aus einem anderen Generator —');
+// Der Generator "AI Character Chat" gibt Unterhaltungen als Textblock heraus.
+// Der muss hier ankommen, ohne dass mehrzeilige Antworten zerfallen.
+const fremderChat = [
+  '[USER]: Hallo, ist hier noch frei?',
+  '[AI]: Setz dich. Der Wein ist besser als der Ruf des Hauses.',
+  '[SYSTEM; hiddenFrom=ai]: Der Wirt hört heimlich mit.',
+  '[SYSTEM; name=Bo]: Bo hebt den Kopf und mustert dich.',
+  '[USER]: Ich suche jemanden.',
+  '[AI]: Dann such weiter.\nHier findest du nur mich.'
+].join('\n\n');
+const nachr = ctx.nachrichtenLesen(fremderChat);
+pruefe('der Textblock wird gelesen', nachr.length === 6, 'gefunden: ' + nachr.length);
+pruefe('die Rollen stimmen',
+  nachr[0].rolle === 'user' && nachr[1].rolle === 'ai' && nachr[3].rolle === 'system');
+pruefe('mehrzeilige Antworten bleiben heil',
+  nachr[5].text.indexOf('\n') > 0 && /Hier findest du nur mich\.$/.test(nachr[5].text), nachr[5].text);
+pruefe('Parameter werden gelesen', nachr[2].verborgen === 'ai' && nachr[3].name === 'Bo');
+pruefe('kein Chat im Feld gibt keine Nachrichten',
+  ctx.nachrichtenLesen('Das ist einfach nur Text.').length === 0 && ctx.nachrichtenLesen('').length === 0);
+
+// Auch die Schreibweise mit Semikolon zwischen den Parametern muss gehen -
+// der fremde Generator schreibt mit Komma, liest aber mit Semikolon.
+pruefe('Komma und Semikolon trennen beide',
+  ctx.nachrichtenLesen('[SYSTEM; hiddenFrom=ai; name=Bo]: Text')[0].name === 'Bo' &&
+  ctx.nachrichtenLesen('[SYSTEM; hiddenFrom=ai, name=Bo]: Text')[0].name === 'Bo');
+
+// Zweite Form: das JSON des ganzen Stranges.
+const fremdesJson = JSON.stringify({ formatName: 'dexie', data: { data: [
+  { tableName: 'characters', rows: [{ id: 3, name: 'Ida' }, { id: 7, name: 'Bo' }] },
+  { tableName: 'threads', rows: [{ id: 1, name: 'Der Abend im Keller', characterId: 3 }] },
+  { tableName: 'messages', rows: [
+    { order: 2, characterId: 3, message: 'Setz dich.', hiddenFrom: [] },
+    { order: 1, characterId: -1, message: 'Hallo?', hiddenFrom: [] },
+    { order: 3, characterId: 7, message: 'Bo mustert dich.', hiddenFrom: [] },
+    { order: 4, characterId: -2, message: 'Der Wirt hört mit.', hiddenFrom: ['ai'] }
+  ] }
+] } });
+const ausJson = ctx.nachrichtenLesen(fremdesJson);
+pruefe('das JSON wird gelesen', ausJson.length === 4);
+pruefe('die Reihenfolge kommt aus order', ausJson[0].text === 'Hallo?' && ausJson[1].text === 'Setz dich.');
+pruefe('der Mensch, die Hauptfigur und die Nebenfigur werden unterschieden',
+  ausJson[0].rolle === 'user' && ausJson[1].rolle === 'ai' && ausJson[2].rolle === 'system');
+pruefe('Namen kommen aus der Figurentabelle', ausJson[1].name === 'Ida' && ausJson[2].name === 'Bo');
+pruefe('versteckte Systemzeilen bleiben erkennbar', ausJson[3].verborgen === 'ai' && !ausJson[3].name);
+pruefe('der Name des Stranges wird gemerkt', ctx.CHAT_TITEL === 'Der Abend im Keller', ctx.CHAT_TITEL);
+// Der Name gilt nur bis zum nächsten Einlesen — deshalb hier festhalten.
+const strangTitel = ctx.CHAT_TITEL;
+
+// Der Bauplan: wer tritt auf, was ist Dialog, was nur Notiz.
+const plan = ctx.chatPlan(nachr, 'Ida');
+pruefe('[AI] bekommt den Ersatznamen', plan.figuren.indexOf('Ida') >= 0);
+pruefe('benannte Systemzeilen sind eine zweite Figur', plan.figuren.indexOf('Bo') >= 0);
+pruefe('die häufigste Stimme steht vorn', plan.figuren[0] === 'Ida', plan.figuren.join(', '));
+pruefe('der Dialog ist vollständig', plan.zeilen.length === 5, 'Zeilen: ' + plan.zeilen.length);
+pruefe('versteckte Regieanweisungen werden Notiz',
+  plan.notizen.length === 1 && /Wirt/.test(plan.notizen[0]), plan.notizen.join(' | '));
+
+// Mehr Sprecher als Plätze am Ort: die Übrigen landen im Gedächtnis.
+const vieleStimmen = [];
+for (let i = 1; i <= 6; i++) vieleStimmen.push('[SYSTEM; name=Figur' + i + ']: Ich rede auch.');
+const planViele = ctx.chatPlan(ctx.nachrichtenLesen(vieleStimmen.join('\n\n')), 'X');
+pruefe('nicht mehr Figuren als Plätze', planViele.figuren.length === ctx.MAX_NPCS);
+pruefe('die Übrigen werden gemeldet', planViele.uebrig.length === 6 - ctx.MAX_NPCS);
+pruefe('und ihre Zeilen gehen nicht verloren', planViele.notizen.length === 6 - ctx.MAX_NPCS);
+
+// Fall 1: Noch kein Spiel — aus dem Chat entsteht eine Welt.
+const stummSetzen = () => {
+  ctx.sysZeile = () => {};
+  ctx.betreteSpiel = () => {};
+  ctx.starteOrt = () => {};
+  ctx.schliesseModal = () => {};
+  ctx.zeichneVerlaufNeu = () => {};
+  ctx.autosave = () => {};
+};
+stummSetzen();
+ctx.S.imSpiel = false; ctx.S.fakten = []; ctx.S.verlauf = [];
+ctx.chatAlsWelt(plan, 'Jan', strangTitel);
+pruefe('der Held bekommt den eingetragenen Namen', ctx.W.protagonist.name === 'Jan');
+pruefe('die Figuren des Chats stehen am Ort',
+  ctx.W.npcs.map(n => n.name).join(',') === 'Ida,Bo', ctx.W.npcs.map(n => n.name).join(','));
+pruefe('der Ort trägt den Namen des Stranges', ctx.W.ort.name === 'Der Abend im Keller', ctx.W.ort.name);
+pruefe('der Verlauf ist übernommen', ctx.S.verlauf.length === 5);
+pruefe('jede Zeile zeigt auf die richtige Figur',
+  ctx.S.verlauf[1].rolle === 'npc' && ctx.S.verlauf[1].idx === 0 &&
+  ctx.S.verlauf[2].idx === 1 && ctx.S.verlauf[0].rolle === 'ich');
+pruefe('Stimmung und Kleidung sind gesetzt', ctx.S.stimmung.length === 2 && !!ctx.S.kleidung[0]);
+pruefe('die Notiz wurde ins Gedächtnis gelegt',
+  ctx.S.fakten.some(f => /Wirt/.test(f.t)), JSON.stringify(ctx.S.fakten));
+pruefe('der letzte Satz wird zur Eröffnung', /such weiter/.test(ctx.W.npcs[0].eroeffnung), ctx.W.npcs[0].eroeffnung);
+pruefe('die Züge zählen mit', ctx.S.zug === 2);
+
+// Fall 2: Es läuft ein Spiel — bekannte Namen finden ihre Figur wieder.
+ctx.S.imSpiel = true;
+const vorher = ctx.S.verlauf.length;
+const planZwei = ctx.chatPlan(ctx.nachrichtenLesen('[AI]: Und weiter geht es.\n\n[USER]: Ja.'), 'Ida');
+ctx.chatAnhaengen(planZwei);
+pruefe('der Chat hängt sich an den laufenden Verlauf', ctx.S.verlauf.length === vorher + 2);
+pruefe('ein bekannter Name bekommt keine zweite Figur', ctx.W.npcs.length === 2);
+pruefe('die angehängte Zeile zeigt auf die vorhandene Figur',
+  ctx.S.verlauf[vorher].idx === 0 && ctx.S.verlauf[vorher].name === 'Ida');
+const planNeu = ctx.chatPlan(ctx.nachrichtenLesen('[SYSTEM; name=Nore]: Ich komme dazu.'), 'Ida');
+ctx.chatAnhaengen(planNeu);
+pruefe('ein unbekannter Name tritt neu auf',
+  ctx.W.npcs.length === 3 && ctx.W.npcs[2].name === 'Nore');
+
+// Der Weg zurück: PROXIMAs Verlauf im Format des anderen Generators.
+const zurueck = ctx.chatAlsText();
+pruefe('der Export nennt den Menschen [USER]', /^\[USER\]: Hallo, ist hier noch frei\?/.test(zurueck), zurueck.split('\n')[0]);
+pruefe('die erste Figur wird zu [AI]', /\[AI\]: Setz dich\./.test(zurueck));
+pruefe('weitere Figuren bekommen einen Namen', /\[SYSTEM; name=Bo\]: Bo hebt den Kopf/.test(zurueck));
+const hinUndZurueck = ctx.nachrichtenLesen(zurueck);
+pruefe('der eigene Export lässt sich wieder einlesen',
+  hinUndZurueck.length === ctx.S.verlauf.length, hinUndZurueck.length + ' statt ' + ctx.S.verlauf.length);
+pruefe('und der Text bleibt dabei unverändert',
+  hinUndZurueck[1].text === ctx.S.verlauf[1].text);
+
+// Ohne Spielstand muss der Weg ins Fenster trotzdem offen sein - sonst kommt
+// niemand an den Chat-Import heran.
+pruefe('der Knopf auf dem Startbildschirm bleibt sichtbar',
+  /b\.style\.display='inline-block';/.test(src) && !/irgendeinStand\(\)\?'inline-block':'none'/.test(src));
+pruefe('und heißt ohne Spielstand nach dem Chat', /CHAT ÜBERNEHMEN/.test(src));
+
+// Die Bedienung: ein Feld, ein Knopf, beide Formate.
+pruefe('IMPORT versucht erst den Spielstand, dann den Chat',
+  /if\(d&&pruefeStand\(d\)\)\{ uebernehmeStand\(d\); return; \}\s*\n\s*if\(chatImportieren\(t\)\)return;/.test(src));
+pruefe('ein eigener Knopf gibt den Chat heraus', /onclick="chatExportAnzeigen\(\)"/.test(html));
+pruefe('für Textblöcke lassen sich die Namen eintragen',
+  /id="chatHeld"/.test(src) && /id="chatFigur"/.test(src));
+
 console.log('\n— Bildregie-Bot —');
 // Der Bot ist ein zweiter KI-Aufruf, der nur nach dem Bild fragt. Er darf die
 // Figuren nicht neu erfinden und muss ausfallen koennen, ohne das Bild zu
