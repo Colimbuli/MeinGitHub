@@ -338,6 +338,30 @@ Der Held hat dort auch ein Feld **Aussehen**. Bleibt es leer, baut PROXIMA beim 
 eine Beschreibung aus Geschlecht und Beruf — und hält sie fest, damit sie nicht bei jedem Bild anders
 ausfällt.
 
+### Referenzbild (img2img) für Gradio-Spaces
+
+Spricht dein Space auch img2img, kann PROXIMA ein **Referenzbild** mitschicken. Der Anker ist
+bewusst **fest**, nicht das zuletzt gezeichnete Bild: sonst entstünde jedes Bild aus dem vorigen und
+nach zehn Zügen wäre es die Fotokopie einer Fotokopie. Gewählt wird in dieser Reihenfolge:
+
+1. das **Charakterblatt der zuletzt sprechenden Figur**,
+2. sonst das **Charakterblatt des Helden**,
+3. sonst das **erste Bild des laufenden Akts** — das mit jedem neuen Akt zurückgesetzt wird.
+
+Einstellbar bei der Bildquelle *Hugging-Face-Space*: **Referenzbild mitschicken** (aus ab Werk),
+**Stärke 0–1** (0.65 ist ein guter Start — darunter bleibt die alte Szene stehen, darüber verliert
+sich die Ähnlichkeit) und die **Form** des Bildes: `roh` schickt die Data-URL, `datei` das
+Gradio-Dateiobjekt. Welche von beiden geht, hängt am Space.
+
+In der Parameter-Vorlage stehen dafür zwei neue Platzhalter, `"{referenz}"` und `{staerke}` — beide
+werden mit **und** ohne Anführungszeichen erkannt, damit die Vorlage nicht daran zerbricht, wie man
+sie getippt hat. Fehlt ein Bild, steht dort `null`; fehlt die Stärke, der Standardwert.
+
+Zwei Dinge, die eingebaut sind, weil sie sonst weh tun: Das Bild wird vor dem Senden auf 512 Pixel
+verkleinert und als JPEG kodiert (ein 1024er-PNG wären als Base64 schnell zwei Megabyte an jedem
+einzelnen Bild). Und das **Charakterblatt selbst wird nie mit Referenz gezeichnet** — sonst zeichnete
+sich der Anker aus dem, was er festhalten soll.
+
 ### Charakterblatt
 
 Gesichter wandern von Panel zu Panel. Im Figurenmenü erzeugt **✎ CHARAKTERBLATT** (oder `/blatt 2`,

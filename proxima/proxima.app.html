@@ -178,7 +178,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.36</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.37</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -505,7 +505,10 @@ var CFG={
   urlVorlage:'https://example.org/bild?p={prompt}&seed={seed}&w={breite}&h={hoehe}',
   gradioHost:'https://ibarakidouji-wai-nsfw-illustrious-sdxl.hf.space',
   gradioApi:'/generate', gradioFnIndex:'', gradioToken:'', gradioBreite:1024, gradioHoehe:1024,
-  gradioVorlage:'["{prompt}", "{negativ}", {seed}, false, {breite}, {hoehe}, 7, 28]'
+  gradioVorlage:'["{prompt}", "{negativ}", {seed}, false, {breite}, {hoehe}, 7, 28]',
+  gradioReferenz:false,      // Referenzbild mitschicken (img2img)
+  gradioStaerke:0.65,        // wie stark das neue Bild vom Referenzbild abweichen darf
+  gradioReferenzForm:'roh'   // 'roh' = Data-URL, 'datei' = Gradio-Dateiobjekt
 };
 function ladeCfg(){
   try{
@@ -681,7 +684,10 @@ var BILDQUELLEN={
       {k:'gradioToken',l:'Hugging-Face-Token (nur bei ZeroGPU oder privat)',typ:'passwort'},
       {k:'gradioBreite',l:'Breite für diesen Space (viele SDXL-Spaces verlangen mindestens 1024)',typ:'zahl'},
       {k:'gradioHoehe',l:'Höhe für diesen Space',typ:'zahl'},
-      {k:'gradioVorlage',l:'Parameter-Vorlage — Platzhalter: "{prompt}" "{negativ}" {seed} {breite} {hoehe}',typ:'text'}
+      {k:'gradioVorlage',l:'Parameter-Vorlage — Platzhalter: "{prompt}" "{negativ}" {seed} {breite} {hoehe} "{referenz}" {staerke}',typ:'text'},
+      {k:'gradioReferenz',l:'Referenzbild mitschicken (img2img) — nur bei Spaces mit Bild-Eingang',typ:'schalter'},
+      {k:'gradioStaerke',l:'Stärke 0–1: wie weit das Bild vom Referenzbild abweichen darf (0.65 ist ein guter Start)',typ:'komma'},
+      {k:'gradioReferenzForm',l:'Form des Bildes: roh (Data-URL) oder datei (Gradio-Dateiobjekt)',typ:'text'}
     ],
     zeichne:async function(a){
       var host=String(CFG.gradioHost||'').replace(/\/+$/,'');
@@ -690,9 +696,18 @@ var BILDQUELLEN={
       if(api.charAt(0)!=='/')api='/'+api;
       // Eigene Masse: viele SDXL-Spaces lehnen alles unter 1024 ab, waehrend
       // andere Quellen mit 512 gut fahren. Deshalb hier getrennt einstellbar.
+      // Das Charakterblatt selbst darf NIE auf einem anderen Bild aufbauen -
+      // sonst zeichnet der Anker sich aus dem, was er festhalten soll.
+      var ref=null;
+      if(CFG.gradioReferenz&&!a.ohneReferenz){
+        var r=await referenzBild();
+        if(r){ ref=r.daten; S.referenzWoher=r.woher; }
+        else { S.referenzWoher=''; }
+      }
       var daten=gradioDaten(CFG.gradioVorlage,{
         prompt:a.prompt, negativ:a.negativ, seed:a.seed,
-        breite:auf64(CFG.gradioBreite||a.breite), hoehe:auf64(CFG.gradioHoehe||a.hoehe)
+        breite:auf64(CFG.gradioBreite||a.breite), hoehe:auf64(CFG.gradioHoehe||a.hoehe),
+        referenz:referenzWert(ref), staerke:CFG.gradioStaerke
       });
       var kopf={'Content-Type':'application/json'};
       if(CFG.gradioToken)kopf['Authorization']='Bearer '+CFG.gradioToken;
@@ -757,12 +772,19 @@ var BILDQUELLEN={
 // Gradio-Spaces erwarten ihre Eingaben als Liste in fester Reihenfolge, die je
 // Space anders ist. Deshalb eine Vorlage, in die die Werte eingesetzt werden.
 function gradioDaten(vorlage,a){
+  // Platzhalter fuer Werte, die selbst schon JSON sind (Bild, Zahl), werden
+  // MIT und OHNE Anfuehrungszeichen ersetzt - sonst haengt es davon ab, wie
+  // jemand die Vorlage getippt hat, und JSON.parse wirft.
+  var referenz=JSON.stringify(a.referenz==null?null:a.referenz);
+  var staerke=String(isFinite(parseFloat(a.staerke))?parseFloat(a.staerke):0.65);
   var t=String(vorlage||'[]')
     .replace(/"\{prompt\}"/g,JSON.stringify(String(a.prompt||'')))
     .replace(/"\{negativ\}"/g,JSON.stringify(String(a.negativ||'')))
     .replace(/\{seed\}/g,String(seedFuerDienst(a.seed)))
     .replace(/\{breite\}/g,String(auf64(a.breite)))
-    .replace(/\{hoehe\}/g,String(auf64(a.hoehe)));
+    .replace(/\{hoehe\}/g,String(auf64(a.hoehe)))
+    .replace(/"\{referenz\}"/g,referenz).replace(/\{referenz\}/g,referenz)
+    .replace(/"\{staerke\}"/g,staerke).replace(/\{staerke\}/g,staerke);
   var d=JSON.parse(t);
   if(!Array.isArray(d))throw new Error('Die Parameter-Vorlage muss eine Liste sein, z.B. ["{prompt}", 0].');
   return d;
@@ -1151,6 +1173,7 @@ var S = {
   handlung:'', fakten:[],           // Kurzzeit-Zusammenfassung + Langzeitgedaechtnis
   missionStand:'',                  // wie weit die Mission gediehen ist
   zug:0,                            // Zaehler fuer das Alter der Fakten
+  aktBild:'', referenzWoher:'',     // Rueckfall-Anker fuer img2img und woher er kam
   akt:1, aktZiel:'', akteVorbei:[],  // Etappen der Mission
   minuten:0, startUhr:19*60+30,     // vergangene Spielzeit und Beginn der Szene
   wetter:'', frist:0,               // Wetter und Frist in Minuten (0 = keine)
@@ -1597,6 +1620,65 @@ function folgeZug(minutenRoh,wetterRoh,antwort,aufdeckRoh,etappeRoh){
   S.probe=null;
   zeigeRaumtitel();
 }
+// ── REFERENZBILD ──────────────────────────────
+// Bildkohaerenz entsteht nur an einem FESTEN Anker. Das letzte Szenenbild
+// taugt nicht dafuer: jedes neue entstuende aus dem vorigen, und nach zehn
+// Zuegen waere es die Fotokopie einer Fotokopie. Genommen wird deshalb das
+// Charakterblatt der Figur, um die es gerade geht - und nur wenn es keines
+// gibt, das erste Bild des laufenden Akts.
+var REFERENZ_KANTE=512;   // laengere Kante; darueber wird der Upload traege
+function referenzQuelle(){
+  var i=letzterNpcIdx();
+  if(i>=0&&W.npcs[i]){
+    var b=blattLesen(W.npcs[i].name);
+    if(b)return {url:b,woher:'Charakterblatt von '+W.npcs[i].name};
+  }
+  var h=blattLesen(heldName());
+  if(h)return {url:h,woher:'Charakterblatt des Helden'};
+  if(S.aktBild)return {url:S.aktBild,woher:'erstes Bild dieses Akts'};
+  return null;
+}
+// Verkleinern und als JPEG kodieren: ein 1024er-PNG waere als Base64 schnell
+// zwei Megabyte, und die haengen am Upload jedes einzelnen Bildes.
+function bildVerkleinern(url,kante){
+  return new Promise(function(fertig){
+    if(!url){ fertig(null); return; }
+    try{
+      var img=new Image();
+      img.crossOrigin='anonymous';
+      img.onload=function(){
+        try{
+          var max=kante||REFERENZ_KANTE;
+          var f=Math.min(1,max/Math.max(img.width||max,img.height||max));
+          var c=document.createElement('canvas');
+          c.width=Math.max(8,Math.round((img.width||max)*f));
+          c.height=Math.max(8,Math.round((img.height||max)*f));
+          c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+          fertig(c.toDataURL('image/jpeg',0.82));   // wirft bei fremder Herkunft
+        }catch(e){ console.warn('Referenzbild nicht lesbar:',e); fertig(null); }
+      };
+      img.onerror=function(){ fertig(null); };
+      img.src=url;
+    }catch(e){ fertig(null); }
+  });
+}
+async function referenzBild(){
+  var q=referenzQuelle();
+  if(!q)return null;
+  var klein=await bildVerkleinern(q.url,REFERENZ_KANTE);
+  if(!klein)return null;
+  return {daten:klein,woher:q.woher};
+}
+// Gradio 4/5 will Bilder meist als Dateiobjekt, aeltere Spaces nehmen die
+// Data-URL direkt. Beides ist einstellbar, weil es am Space haengt.
+function referenzWert(daten){
+  if(!daten)return null;
+  if(CFG.gradioReferenzForm==='datei'){
+    return {path:daten,url:daten,meta:{_type:'gradio.FileData'}};
+  }
+  return daten;
+}
+
 // ── SYMBOLE ───────────────────────────────────
 // Emoji malt jedes Geraet in eigenen Farben - mitten in einer goldenen Leiste
 // sehen sie aus wie hineingefallen. Deshalb sind alle Symbole gezeichnet und
@@ -1722,6 +1804,7 @@ async function zeichneBlatt(i){
     var src=await quelle().zeichne({
       prompt:kappe(blattPrompt(i),quelle().maxPrompt||1500),
       negativ:baueNegativ(),
+      ohneReferenz:true,
       seed:held?heldSeed():figurSeed(i),
       breite:auf64(CFG.breite),hoehe:auf64(CFG.hoehe)
     });
@@ -1788,6 +1871,7 @@ function naechsteEtappe(text){
   }
   S.akt=(S.akt||1)+1;
   S.aktZiel=kappe(t,240);
+  S.aktBild='';                    // neuer Akt, neuer Anker
   sysZeile('— AKT '+S.akt+' — '+S.aktZiel+' —');
   S.bildZaehler=0;
   return true;
@@ -2455,6 +2539,7 @@ async function zeichneBild(opts){
     }
     el('img0').src=src;
     S.letzteBildUrl=src;
+    if(!S.aktBild)S.aktBild=src;   // erstes Bild des Akts als Rueckfall-Anker
     S.bildGeneriert=true;
     S.letzterPrompt=prompt;
     S.letzterNegativ=negativ;
@@ -3499,7 +3584,7 @@ function oeffneEinstellungen(){
 // Seit der Umstellung auf die Ladeschale ist die Frage berechtigt, welcher Stand
 // gerade laeuft. Die Schale legt den geholten Quelltext samt Zweig und Zeitpunkt
 // im localStorage ab; hier wird er nur abgelesen.
-var VERSION = 'V7.36';
+var VERSION = 'V7.37';
 // Ohne Browserkonsole — etwa am Handy — muss der Generator selbst sagen koennen,
 // woran es liegt, wenn ein Plugin von Perchance fehlt.
 function pluginLage(){
@@ -3555,7 +3640,10 @@ function zeichneQuellenFelder(){
   var html='<div class="hinweis">'+escapeHtml(q.info)+'</div>';
   (q.felder||[]).forEach(function(f){
     html+='<label class="feldlabel" for="q_'+f.k+'">'+escapeHtml(f.l)+'</label>'+
-      '<input id="q_'+f.k+'" class="feld" type="'+(f.typ==='passwort'?'password':(f.typ==='zahl'?'number':'text'))+'">';
+      (f.typ==='schalter'
+        ? '<input id="q_'+f.k+'" type="checkbox"'+(CFG[f.k]?' checked':'')+'>'
+        : '<input id="q_'+f.k+'" class="feld" type="'+(f.typ==='passwort'?'password':((f.typ==='zahl'||f.typ==='komma')?'number':'text'))+'"'+
+          (f.typ==='komma'?' step="0.05" min="0" max="1"':'')+'>');
   });
   if((q.felder||[]).some(function(f){return f.typ==='passwort';})){
     html+='<div class="warnung">Schlüssel werden unverschlüsselt im Browser (localStorage) abgelegt und bei jedem Bild an den Dienst geschickt. Nur eigene Schlüssel mit Ausgabenlimit verwenden.</div>';
@@ -3575,7 +3663,12 @@ function zeichneQuellenFelder(){
     html+='<div class="warnung">Prompt und Bild laufen über einen fremden Server, nicht über Perchance. Wenn der Dienst keine Anfragen aus dem Browser erlaubt (CORS), bleibt das Bild leer — dann „QUELLE TESTEN" nutzen und notfalls zurück auf Perchance wechseln.</div>';
   }
   el('quelleFelder').innerHTML=html;
-  (q.felder||[]).forEach(function(f){ var e=el('q_'+f.k); if(e)e.value=(CFG[f.k]==null?'':CFG[f.k]); });
+  (q.felder||[]).forEach(function(f){
+    var e=el('q_'+f.k);
+    if(!e)return;
+    if(f.typ==='schalter')e.checked=!!CFG[f.k];
+    else e.value=(CFG[f.k]==null?'':CFG[f.k]);
+  });
   el('quellePruef').textContent='';el('quellePruef').className='pruefzeile';
 }
 // Modell-Liste beim Dienst abrufen. Schlaegt das fehl, bleibt das Textfeld
@@ -3711,7 +3804,11 @@ function leseEinstellungen(){
   var q=BILDQUELLEN[CFG.quelle];
   (q.felder||[]).forEach(function(f){
     var e=el('q_'+f.k);
-    if(e)CFG[f.k]=(f.typ==='zahl')?(parseInt(e.value,10)||0):e.value.trim();
+    if(!e)return;
+    if(f.typ==='schalter')CFG[f.k]=!!e.checked;
+    else if(f.typ==='zahl')CFG[f.k]=parseInt(e.value,10)||0;
+    else if(f.typ==='komma')CFG[f.k]=Math.max(0,Math.min(1,parseFloat(e.value)||0));
+    else CFG[f.k]=e.value.trim();
   });
   speichereCfg();
 }
@@ -3807,6 +3904,8 @@ function migriere(d){
   }).filter(function(x){ return x.t; });
   if(typeof s.zug!=='number')s.zug=0;
   if(typeof s.akt!=='number')s.akt=1;
+  if(typeof s.aktBild!=='string')s.aktBild='';
+  s.referenzWoher='';
   if(typeof s.aktZiel!=='string')s.aktZiel='';
   if(!Array.isArray(s.akteVorbei))s.akteVorbei=[];
   w.npcs.forEach(function(x){
