@@ -178,7 +178,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.37</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.38</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -425,6 +425,7 @@ select.feld option{background:var(--panel);}
     <div class="modalNav">
       <button onclick="schliesseModal()">SCHLIESSEN</button>
       <button onclick="exportAnzeigen()">↧ EXPORT</button>
+      <button onclick="chatExportAnzeigen()">↧ CHAT</button>
       <button class="haupt" onclick="importStand()">↥ IMPORT</button>
     </div>
   </div>
@@ -3584,7 +3585,7 @@ function oeffneEinstellungen(){
 // Seit der Umstellung auf die Ladeschale ist die Frage berechtigt, welcher Stand
 // gerade laeuft. Die Schale legt den geholten Quelltext samt Zweig und Zeitpunkt
 // im localStorage ab; hier wird er nur abgelesen.
-var VERSION = 'V7.37';
+var VERSION = 'V7.38';
 // Ohne Browserkonsole — etwa am Handy — muss der Generator selbst sagen koennen,
 // woran es liegt, wenn ein Plugin von Perchance fehlt.
 function pluginLage(){
@@ -3962,7 +3963,10 @@ function oeffneSpeicher(){
       '<button onclick="slotLoeschen('+i+')"'+(d?'':' disabled')+'>✕</button></div>';
   });
   html+='<label class="feldlabel" for="exportFeld">EXPORT / IMPORT (Textblock sichern oder einfügen)</label>'+
-        '<textarea id="exportFeld" class="feld" rows="4" placeholder="Hier erscheint der Export – oder füge einen fremden Spielstand ein und drücke IMPORT."></textarea>';
+        '<textarea id="exportFeld" class="feld" rows="4" placeholder="Hier erscheint der Export – oder füge einen Spielstand oder einen Chat aus einem anderen Generator ein und drücke IMPORT."></textarea>'+
+        '<label class="feldlabel" for="chatHeld">FREMDER CHAT: WER IST WER (nur bei Textblöcken nötig)</label>'+
+        '<input id="chatHeld" class="feld" type="text" placeholder="Dein Name im Chat – z.B. Jan">'+
+        '<input id="chatFigur" class="feld" type="text" placeholder="Name der Figur hinter [AI] – z.B. Ida">';
   el('speicherInhalt').innerHTML=html;
   oeffneModal('mSpeicher');
 }
@@ -4002,17 +4006,317 @@ function exportAnzeigen(){
   el('exportFeld').value=JSON.stringify(standObjekt());
   el('exportFeld').select();
 }
+// Ein Knopf fuer beides: erst als Spielstand versuchen, dann als Chat aus dem
+// anderen Generator - der Nutzer soll nicht raten muessen, was er da einfuegt.
 function importStand(){
   var t=el('exportFeld').value.trim();
   if(!t){ zeigeFehler('Import',new Error('Kein Text zum Einlesen.')); return; }
-  var d;
-  try{ d=JSON.parse(t); }catch(e){ zeigeFehler('Import',new Error('Das ist kein gültiger Spielstand.')); return; }
-  if(!pruefeStand(d)){ zeigeFehler('Import',new Error('Spielstand unvollständig.')); return; }
-  uebernehmeStand(d);
+  var d=null;
+  try{ d=JSON.parse(t); }catch(e){ d=null; }
+  if(d&&pruefeStand(d)){ uebernehmeStand(d); return; }
+  if(chatImportieren(t))return;
+  if(d){ zeigeFehler('Import',new Error('Spielstand unvollständig.')); return; }
+  zeigeFehler('Import',new Error('Das ist weder ein Spielstand noch ein Chat aus dem anderen Generator.'));
 }
+// Derselbe Knopf fuehrt in dasselbe Fenster: Spielstaende UND Chats aus einem
+// anderen Generator. Wer noch nichts gespeichert hat, braucht ihn also auch -
+// er heisst dann nur anders, statt zu verschwinden.
 function pruefeLadeButton(){
   var b=el('ladebtn');
-  if(b)b.style.display=irgendeinStand()?'inline-block':'none';
+  if(!b)return;
+  var da=irgendeinStand();
+  b.style.display='inline-block';
+  b.textContent=da?'⟳ SPIELSTAND LADEN':'↥ CHAT ÜBERNEHMEN';
+}
+
+// ── CHATS AUS EINEM ANDEREN GENERATOR ─────────
+// Der Perchance-Generator "AI Character Chat" gibt Unterhaltungen in zwei
+// Formen heraus: als Textblock, in dem vor jeder Zeile [USER], [AI] oder
+// [SYSTEM] steht, und als JSON des ganzen Stranges. PROXIMA liest beides,
+// damit ein dort begonnenes Gespraech hier weitergehen kann - und schreibt
+// den eigenen Verlauf im selben Textformat zurueck.
+var CHAT_KOPF=/^\[(SYSTEM|USER|AI)\s*[;,]?\s*([^\]]*)\]:\s?([\s\S]*)$/i;
+var CHAT_MAX_ZEILEN=400;   // laengere Chats werden hinten abgeschnitten
+var CHAT_MAX_NOTIZEN=8;    // so viele Regieanweisungen wandern ins Gedaechtnis
+var CHAT_TITEL='';         // Name des zuletzt gelesenen Stranges (nur aus JSON)
+
+// "; name=Ida, hiddenFrom=ai" - der fremde Generator trennt beim Schreiben mit
+// Komma und beim Lesen mit Semikolon. Hier gilt beides.
+function chatParameter(roh){
+  var p={};
+  String(roh==null?'':roh).split(/[;,]/).forEach(function(t){
+    var m=t.match(/^\s*([A-Za-z][\w-]*)\s*=\s*(.*?)\s*$/);
+    if(m)p[m[1].toLowerCase()]=entkleide(m[2]);
+  });
+  return p;
+}
+function chatSauber(liste){
+  return liste.map(function(n){
+    n.text=String(n.text==null?'':n.text).trim();
+    n.name=String(n.name||'').trim();
+    n.verborgen=String(n.verborgen||'').toLowerCase();
+    return n;
+  }).filter(function(n){ return n.text; });
+}
+// Textblock: Eine Zeile mit Kopf beginnt eine Nachricht, alles danach gehoert
+// noch dazu - so bleiben mehrzeilige Antworten heil.
+function nachrichtenAusText(roh){
+  var zeilen=String(roh==null?'':roh).replace(/\r\n?/g,'\n').split('\n');
+  var raus=[],akt=null;
+  zeilen.forEach(function(z){
+    var m=z.match(CHAT_KOPF);
+    if(m){
+      if(akt)raus.push(akt);
+      var p=chatParameter(m[2]);
+      akt={rolle:m[1].toLowerCase(),name:p.name||'',verborgen:p.hiddenfrom||'',text:m[3]};
+    }else if(akt){
+      akt.text+='\n'+z;
+    }
+  });
+  if(akt)raus.push(akt);
+  return chatSauber(raus);
+}
+// Das JSON ist ein Auszug der fremden Datenbank: unter data.data liegen die
+// Tabellen. characterId -1 ist der Mensch, -2 das System, alles andere eine
+// Figur; die Hauptfigur des Stranges spricht als [AI].
+function chatTabelle(j,name){
+  var d=j&&j.data&&j.data.data;
+  if(!Array.isArray(d))return null;
+  for(var i=0;i<d.length;i++){ if(d[i]&&d[i].tableName===name)return Array.isArray(d[i].rows)?d[i].rows:[]; }
+  return null;
+}
+function nachrichtenAusJson(j){
+  var zeilen=chatTabelle(j,'messages');
+  if(!zeilen||!zeilen.length)return [];
+  var figuren=chatTabelle(j,'characters')||[];
+  var straenge=chatTabelle(j,'threads')||[];
+  var namen={};
+  figuren.forEach(function(f){ if(f&&f.id!=null)namen[f.id]=String(f.name||'').trim(); });
+  var haupt=(straenge[0]&&straenge[0].characterId!=null)?straenge[0].characterId:null;
+  CHAT_TITEL=(straenge[0]&&String(straenge[0].name||'').trim())||'';
+  var raus=[];
+  zeilen.slice().sort(function(a,b){ return (a&&a.order||0)-(b&&b.order||0); }).forEach(function(m){
+    if(!m)return;
+    var id=m.characterId;
+    var rolle=(id===-1)?'user':((haupt!=null&&id===haupt)?'ai':'system');
+    var verborgen=Array.isArray(m.hiddenFrom)?m.hiddenFrom.join(' '):(m.hiddenFrom||'');
+    raus.push({
+      rolle:rolle,
+      name:(rolle==='user')?'':(m.name||namen[id]||''),
+      verborgen:verborgen,
+      text:m.message
+    });
+  });
+  return chatSauber(raus);
+}
+// Auch die Kurzform aus den Startnachrichten einer Figur: [{author,content}]
+function nachrichtenAusListe(a){
+  return chatSauber(a.map(function(m){
+    if(!m||typeof m!=='object')return {rolle:'',text:''};
+    return {rolle:String(m.author||m.rolle||'').toLowerCase(),name:m.name||'',
+            verborgen:Array.isArray(m.hiddenFrom)?m.hiddenFrom.join(' '):(m.hiddenFrom||''),
+            text:m.content||m.message||m.text||''};
+  })).filter(function(n){ return n.rolle==='user'||n.rolle==='ai'||n.rolle==='system'; });
+}
+function nachrichtenLesen(roh){
+  var t=String(roh==null?'':roh).trim();
+  CHAT_TITEL='';
+  if(!t)return [];
+  if(t.charAt(0)==='{'||t.charAt(0)==='['){
+    var j=null;
+    try{ j=JSON.parse(t); }catch(e){ j=null; }
+    if(Array.isArray(j))return nachrichtenAusListe(j);
+    if(j&&typeof j==='object'){
+      var n=nachrichtenAusJson(j);
+      if(n.length)return n;
+    }
+  }
+  return nachrichtenAusText(t);
+}
+
+// [AI] ist die Hauptfigur. [SYSTEM] mit Namen ist eine weitere Figur - so
+// exportiert der fremde Generator Gruppengespraeche. [SYSTEM] ohne Namen oder
+// mit Versteck ist eine Regieanweisung: die wird Gedaechtnis, nicht Dialog.
+function chatIstFigur(n){
+  if(!n)return false;
+  if(n.rolle==='ai')return true;
+  return n.rolle==='system'&&!!n.name&&!n.verborgen;
+}
+function chatSprecher(nachrichten,ersatz){
+  var zaehler={},reihe=[];
+  nachrichten.forEach(function(n){
+    if(!chatIstFigur(n))return;
+    var name=n.name||ersatz||'';
+    if(!name)return;
+    if(zaehler[name]==null){ zaehler[name]=0; reihe.push(name); }
+    zaehler[name]++;
+  });
+  // Wer am meisten spricht, bekommt einen der wenigen Plaetze am Ort.
+  return reihe.sort(function(a,b){ return zaehler[b]-zaehler[a]; });
+}
+// Aus den Nachrichten wird ein Bauplan: wer auftritt, was gesagt wurde und was
+// nur noch als Notiz taugt.
+function chatPlan(nachrichten,ersatz){
+  var sprecher=chatSprecher(nachrichten,ersatz);
+  var figuren=sprecher.slice(0,MAX_NPCS);
+  var plan={figuren:figuren,uebrig:sprecher.slice(MAX_NPCS),zeilen:[],notizen:[],gekuerzt:0};
+  nachrichten.forEach(function(n){
+    if(n.rolle==='user'){ plan.zeilen.push({rolle:'ich',text:n.text}); return; }
+    if(chatIstFigur(n)){
+      var name=n.name||ersatz||'';
+      if(figuren.indexOf(name)>=0)plan.zeilen.push({rolle:'npc',name:name,text:n.text});
+      else plan.notizen.push(name+': '+n.text);
+      return;
+    }
+    plan.notizen.push(n.text);
+  });
+  if(plan.zeilen.length>CHAT_MAX_ZEILEN){
+    plan.gekuerzt=plan.zeilen.length-CHAT_MAX_ZEILEN;
+    plan.zeilen=plan.zeilen.slice(-CHAT_MAX_ZEILEN);
+  }
+  return plan;
+}
+function chatLetzterSatz(plan,name){
+  var t='';
+  plan.zeilen.forEach(function(z){ if(z.rolle==='npc'&&z.name===name)t=z.text; });
+  return kappe(t,200);
+}
+function chatFigur(name,eroeffnung){
+  return {
+    name:          name,
+    rolle:         'aus einem früheren Gespräch',
+    aussehen:      'an adult with an ordinary but memorable face',
+    kleidung:      'simple everyday clothing',
+    person:        'so, wie sie sich im übernommenen Gespräch gezeigt hat',
+    grundstimmung: 'neutral',
+    ziel:'', geheimnis:'', aufgedeckt:false,
+    eroeffnung:    eroeffnung||'…'
+  };
+}
+// Die Notizen aus [SYSTEM] sind das, was der fremde Chat im Hintergrund wusste.
+function chatNotizenMerken(plan){
+  plan.notizen.slice(-CHAT_MAX_NOTIZEN).forEach(function(t){ merkeFakt(kappe(t,180),3); });
+}
+// Fall 1: Es laeuft bereits ein Spiel. Bekannte Namen finden ihre Figur,
+// unbekannte treten dazu, solange Platz am Ort ist.
+function chatAnhaengen(plan){
+  var karte={},neu=[];
+  plan.figuren.forEach(function(name){
+    var i=findeNpc(name);
+    if(i<0&&W.npcs.length<MAX_NPCS){
+      i=W.npcs.length;
+      W.npcs.push(chatFigur(name,chatLetzterSatz(plan,name)));
+      S.stimmung.push('neutral');
+      S.kleidung.push(W.npcs[i].kleidung);
+      S.regieAnweisung.push('');
+      neu.push(name);
+    }
+    if(i>=0)karte[name]=i;
+  });
+  var offen=0;
+  plan.zeilen.forEach(function(z){
+    if(z.rolle==='ich'){ S.verlauf.push({rolle:'ich',text:z.text}); return; }
+    var i=karte[z.name];
+    if(i==null){ offen++; return; }
+    S.verlauf.push({rolle:'npc',idx:i,text:z.text,name:W.npcs[i].name});
+  });
+  chatNotizenMerken(plan);
+  S.zug=(S.zug||0)+plan.zeilen.filter(function(z){ return z.rolle==='ich'; }).length;
+  zeichneVerlaufNeu();
+  sysZeile('— Gespräch übernommen: '+plan.zeilen.length+' Zeilen'+
+           (neu.length?', neu am Ort: '+neu.join(', '):'')+' —');
+  chatHinweise(plan,offen);
+  autosave();
+  return true;
+}
+// Fall 2: Noch kein Spiel. Dann entsteht aus dem Chat eine schlichte Welt -
+// ein Ort, die Figuren daraus, und der Verlauf als Vorgeschichte.
+function chatAlsWelt(plan,heldWunsch,titel){
+  var namen=plan.figuren.slice();
+  W.protagonist={
+    name:heldWunsch||'Held', herkunft:'', beruf:'', eigenart:'',
+    geschlecht:geschlechtSchluessel(CFG.geschlecht), aussehen:'', kleidung:''
+  };
+  W.stadt='';
+  W.mission='';
+  W.perspektive=(el('perspektive')&&el('perspektive').value==='ich')?'ich':'er';
+  W.ort={
+    name:       titel||'Fortgeführtes Gespräch',
+    geschichte: 'Ein Gespräch, das anderswo begann, geht hier weiter.',
+    bildPrompt: 'two people talking in a quiet room, warm evening light'
+  };
+  setzeNpcs(namen.length?namen.map(function(n){ return chatFigur(n,chatLetzterSatz(plan,n)); })
+                        :[chatFigur('Gesprächspartner','…')]);
+  var rahmen=W.protagonist.name+' setzt ein Gespräch fort'+
+             (namen.length?' mit '+namen.join(', '):'')+'.';
+  W.rahmenhandlung=rahmen;
+  W.rahmenhandlungOriginal=rahmen;
+  S.beziehungen={};
+  S.seed=neuerSeed();
+  S.szeneText=W.ort.bildPrompt;
+  S.handlung='';S.fakten=[];S.verlauf=[];S.rueckgaengig=[];S.missionStand='';
+  S.akt=1;S.aktZiel='';S.akteVorbei=[];S.aktBild='';S.referenzWoher='';
+  S.minuten=0;S.startUhr=19*60+30;S.wetter='';S.frist=0;S.probe=null;
+  S.zug=0;S.bildGeneriert=false;S.bildZaehler=0;
+  var karte={};
+  W.npcs.forEach(function(n,i){ karte[n.name]=i; });
+  plan.zeilen.forEach(function(z){
+    if(z.rolle==='ich'){ S.verlauf.push({rolle:'ich',text:z.text}); return; }
+    var i=karte[z.name];
+    if(i==null)return;
+    S.verlauf.push({rolle:'npc',idx:i,text:z.text,name:W.npcs[i].name});
+  });
+  S.zug=plan.zeilen.filter(function(z){ return z.rolle==='ich'; }).length;
+  chatNotizenMerken(plan);
+  schliesseModal();
+  if(el('start')&&el('start').style.display!=='none'&&!el('start').classList.contains('aus')){
+    betreteSpiel();
+  }else{
+    S.imSpiel=true;
+    starteOrt();
+  }
+  sysZeile('— Gespräch übernommen: '+plan.zeilen.length+' Zeilen —');
+  chatHinweise(plan,0);
+  autosave();
+  return true;
+}
+function chatHinweise(plan,offen){
+  if(plan.gekuerzt)sysZeile('Die ersten '+plan.gekuerzt+' Zeilen wurden weggelassen, damit der Verlauf handlich bleibt.');
+  if(plan.uebrig.length)sysZeile('Zu viele Sprecher: '+plan.uebrig.join(', ')+' ist nicht am Ort, ihre Zeilen liegen im Gedächtnis.');
+  if(offen)sysZeile(offen+' Zeilen ohne Platz am Ort wurden ausgelassen.');
+  if(plan.notizen.length)sysZeile('Regieanweisungen aus dem alten Chat sind ins Gedächtnis gewandert.');
+}
+// Der eine Knopf fuer beide Faelle. Gibt false zurueck, wenn im Feld gar kein
+// Chat steht - dann meldet der Aufrufer den Fehler.
+function chatImportieren(roh){
+  var nachrichten=nachrichtenLesen(roh);
+  if(!nachrichten.length)return false;
+  var titel=CHAT_TITEL;
+  var figurFeld=el('chatFigur'), heldFeld=el('chatHeld');
+  var ersatz=(figurFeld&&figurFeld.value.trim())||'Gesprächspartner';
+  var held=(heldFeld&&heldFeld.value.trim())||'';
+  var plan=chatPlan(nachrichten,ersatz);
+  if(!plan.zeilen.length&&!plan.notizen.length)return false;
+  if(S.imSpiel)return chatAnhaengen(plan);
+  return chatAlsWelt(plan,held,titel);
+}
+// Der Weg zurueck: PROXIMAs Verlauf im Format des anderen Generators. Die
+// erste Figur gilt dort als [AI], alle weiteren als benanntes [SYSTEM].
+function chatAlsText(){
+  var haupt=(W.npcs[0]&&W.npcs[0].name)||'';
+  return S.verlauf.map(function(v){
+    var t=String(v&&v.text||'').trim();
+    if(!t)return '';
+    if(v.rolle==='ich')return '[USER]: '+t;
+    var name=v.name||(W.npcs[v.idx]&&W.npcs[v.idx].name)||'';
+    if(name&&name!==haupt)return '[SYSTEM; name='+name+']: '+t;
+    return '[AI]: '+t;
+  }).filter(function(z){ return z; }).join('\n\n');
+}
+function chatExportAnzeigen(){
+  if(!S.verlauf||!S.verlauf.length){ zeigeFehler('Chat-Export',new Error('Es ist noch kein Gespräch da.')); return; }
+  el('exportFeld').value=chatAlsText();
+  el('exportFeld').select();
 }
 
 // ── HELFER ────────────────────────────────────

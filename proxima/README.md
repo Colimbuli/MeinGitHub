@@ -362,6 +362,41 @@ verkleinert und als JPEG kodiert (ein 1024er-PNG wären als Base64 schnell zwei 
 einzelnen Bild). Und das **Charakterblatt selbst wird nie mit Referenz gezeichnet** — sonst zeichnete
 sich der Anker aus dem, was er festhalten soll.
 
+### Ein Chat aus einem anderen Generator
+
+Ein Gespräch, das im Perchance-Generator **AI Character Chat** begonnen hat, kann hier weitergehen.
+Dessen Export kennt zwei Formen, PROXIMA liest beide:
+
+* **Textblock** — vor jeder Zeile steht `[USER]`, `[AI]` oder `[SYSTEM]`, dahinter der Text.
+* **JSON des ganzen Stranges** — die vollständige Ausfuhr mit Figuren, Strang und Nachrichten.
+
+Der Weg: das Fenster **SPIELSTÄNDE** öffnen — im Spiel über das Disketten-Symbol, auf dem Startbildschirm
+über den Knopf **↥ CHAT ÜBERNEHMEN** —, den Chat in das große Feld einfügen, **↥ IMPORT** drücken. Derselbe
+Knopf nimmt weiterhin PROXIMA-Spielstände; was im Feld steht, wird erst als Spielstand geprüft und
+dann als Chat.
+
+Wie die Zeilen ankommen:
+
+| im fremden Chat | in PROXIMA |
+| --- | --- |
+| `[USER]` | deine eigenen Zeilen |
+| `[AI]` | die Hauptfigur des Stranges |
+| `[SYSTEM; name=Bo]` | eine weitere Figur namens Bo |
+| `[SYSTEM]` ohne Namen oder mit `hiddenFrom` | Regieanweisung → wandert ins Gedächtnis |
+
+Beim **Textblock** fehlt der Name der Hauptfigur — der steht dort nirgends. Deshalb gibt es unter dem
+Feld zwei kleine Zeilen: **dein Name im Chat** und **der Name der Figur hinter `[AI]`**. Beim JSON
+sind beide schon enthalten und die Zeilen bleiben leer.
+
+Läuft noch kein Spiel, entsteht aus dem Chat eine schlichte Welt: der Ort heißt wie der Strang, die
+Figuren kommen aus dem Gespräch, der Verlauf ist die Vorgeschichte. Läuft schon eins, hängt sich das
+Gespräch an — bekannte Namen finden ihre Figur wieder, unbekannte treten dazu, solange am Ort Platz
+ist. Mehr als vier Sprecher passen nicht: Die Übrigen werden gemeldet, ihre Zeilen liegen im
+Gedächtnis statt im Dialog. Sehr lange Chats werden vorn gekürzt.
+
+Der Weg zurück geht auch: **↧ CHAT** schreibt den laufenden Verlauf im selben Textformat ins Feld —
+die erste Figur als `[AI]`, alle weiteren als benanntes `[SYSTEM]`.
+
 ### Charakterblatt
 
 Gesichter wandern von Panel zu Panel. Im Figurenmenü erzeugt **✎ CHARAKTERBLATT** (oder `/blatt 2`,
