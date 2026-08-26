@@ -1200,7 +1200,10 @@ pruefe('die Übrigen werden gemeldet', planViele.uebrig.length === 6 - ctx.MAX_N
 pruefe('und ihre Zeilen gehen nicht verloren', planViele.notizen.length === 6 - ctx.MAX_NPCS);
 
 // Fall 1: Noch kein Spiel — aus dem Chat entsteht eine Welt.
+const echtesAuswerten = ctx.chatAuswerten;
 const stummSetzen = () => {
+  // Der Import stösst die KI-Auswertung an; die wird weiter unten für sich geprüft.
+  ctx.chatAuswerten = () => Promise.resolve(false);
   ctx.sysZeile = () => {};
   ctx.betreteSpiel = () => {};
   ctx.starteOrt = () => {};
@@ -1262,6 +1265,86 @@ pruefe('IMPORT versucht erst den Spielstand, dann den Chat',
 pruefe('ein eigener Knopf gibt den Chat heraus', /onclick="chatExportAnzeigen\(\)"/.test(html));
 pruefe('für Textblöcke lassen sich die Namen eintragen',
   /id="chatHeld"/.test(src) && /id="chatFigur"/.test(src));
+
+console.log('\n— Das übernommene Gespräch auswerten —');
+// Ein importierter Chat bringt Text mit, aber keine Profile. Die Auswertung
+// muss aus dem Gespräch machen, was PROXIMA zum Weiterspielen braucht.
+const leseAuftrag = ctx.baueChatAuswertung();
+pruefe('der Auftrag nennt Held und Figuren',
+  /HELD \(der Mensch am Bildschirm\): Jan/.test(leseAuftrag) && /FIGUREN: Ida, Bo/.test(leseAuftrag),
+  leseAuftrag.split('\n')[3]);
+pruefe('das Gespräch steht darin', /Setz dich/.test(leseAuftrag));
+pruefe('er verlangt JSON mit allen Feldern',
+  ['"held"', '"ort"', '"npcs"', '"fakten"', '"handlung"', '"mission"', '"etappe"']
+    .every(k => leseAuftrag.includes(k)));
+pruefe('Aussehen wird auf Englisch verlangt', /English visual IDENTITY/.test(leseAuftrag));
+
+// Vor der Auswertung stehen die Figuren als Platzhalter da — genau das war der Fehler.
+pruefe('importierte Figuren sind als Platzhalter markiert',
+  ctx.W.npcs.every(n => n.ausChat === true), JSON.stringify(ctx.W.npcs.map(n => n.ausChat)));
+
+ctx.S.handlung = ''; ctx.W.mission = ''; ctx.S.aktZiel = ''; ctx.S.fakten = [];
+ctx.W.protagonist.aussehen = ''; ctx.W.protagonist.kleidung = '';
+const bericht = ctx.chatProfileEinsetzen({
+  held: { name: 'Jonas', aussehen: 'a lean man in his thirties', kleidung: 'a worn coat', geschlecht: 'männlich' },
+  ort: { name: 'Der Weinkeller', geschichte: 'Gewölbe unter der Stadt.', bild: 'a vaulted wine cellar',
+         zeit: '21:40', wetter: 'Regen' },
+  npcs: [
+    { name: 'Ida', rolle: 'Wirtin', aussehen: 'a woman with grey eyes', kleidung: 'a dark apron',
+      person: 'Trocken und wachsam.', stimmung: 'misstrauisch', ziel: 'Den Keller behalten.',
+      geheimnis: 'Sie kannte den Vater des Helden.', beziehung: 'prüfend', beziehungen: 'Bo: alter Freund' },
+    { name: 'Bo', rolle: 'Gast', aussehen: 'a broad man', kleidung: 'a leather jacket',
+      person: 'Laut, aber gutmütig.', stimmung: 'heiter', ziel: 'Nicht allein trinken.', geheimnis: '' },
+    { name: 'Gibtsnicht', rolle: 'Geist', person: 'Existiert nicht.' }
+  ],
+  fakten: ['Ida hat dem Helden den Schlüssel versprochen.', 'Der Keller schließt um Mitternacht.', '-'],
+  handlung: 'Der Held sucht jemanden und Ida weiß mehr, als sie sagt.',
+  mission: 'Herausfinden, wer den Brief geschrieben hat.',
+  etappe: 'Ida zum Reden bringen.'
+});
+
+pruefe('die Figuren bekommen ihr Profil', bericht.figuren === 2, 'gefüllt: ' + bericht.figuren);
+pruefe('unbekannte Namen werden übergangen', !ctx.W.npcs.some(n => n.name === 'Gibtsnicht'));
+const ida = ctx.W.npcs[ctx.findeNpc('Ida')];
+pruefe('Rolle, Wesen und Aussehen stehen jetzt drin',
+  ida.rolle === 'Wirtin' && /grey eyes/.test(ida.aussehen) && /wachsam/.test(ida.person));
+pruefe('Ziel und Geheimnis sind gefüllt',
+  /Keller behalten/.test(ida.ziel) && /Vater des Helden/.test(ida.geheimnis));
+pruefe('die Stimmung steht auch im Spielstand',
+  ctx.S.stimmung[ctx.findeNpc('Ida')] === 'misstrauisch' && ida.grundstimmung === 'misstrauisch');
+pruefe('die Kleidung wandert in den Spielstand',
+  /dark apron/.test(ctx.S.kleidung[ctx.findeNpc('Ida')]));
+pruefe('der Platzhalter-Vermerk ist weg', !ida.ausChat);
+pruefe('die Haltung zum Helden ist eingetragen',
+  ctx.beziehungZu('Ida', 'Jan') === 'prüfend', JSON.stringify(ctx.S.beziehungen));
+pruefe('Haltungen zu anderen Figuren auch',
+  /alter Freund/.test(ctx.beziehungZu('Ida', 'Bo') || ''), JSON.stringify(ctx.S.beziehungen));
+
+pruefe('ein selbst eingetragener Name des Helden bleibt stehen', ctx.W.protagonist.name === 'Jan');
+pruefe('sein Aussehen kommt aus dem Gespräch', /lean man/.test(ctx.W.protagonist.aussehen) && bericht.held);
+// Wer beim Import nichts eingetragen hat, heisst erst einmal "Held" - dann darf
+// die Auswertung den Namen aus dem Gespräch nehmen.
+ctx.W.protagonist.ausChat = true;
+ctx.chatProfileEinsetzen({ held: { name: 'Jonas' } });
+pruefe('ohne eigene Angabe holt die Auswertung den Namen',
+  ctx.W.protagonist.name === 'Jonas' && !ctx.W.protagonist.ausChat);
+ctx.W.protagonist.name = 'Jan';
+pruefe('der Ort ist kein Platzhalter mehr',
+  ctx.W.ort.name === 'Der Weinkeller' && /vaulted wine cellar/.test(ctx.W.ort.bildPrompt) && !ctx.W.ort.ausChat);
+pruefe('Uhrzeit und Wetter kommen mit',
+  ctx.S.startUhr === 21 * 60 + 40 && ctx.S.wetter === 'regen', ctx.S.startUhr + ' / ' + ctx.S.wetter);
+pruefe('das Gedächtnis füllt sich', bericht.fakten === 2 && ctx.S.fakten.length === 2, JSON.stringify(ctx.S.fakten));
+pruefe('leere Einträge zählen nicht mit', !ctx.S.fakten.some(f => f.t === '-'));
+pruefe('die Merkposten wiegen schwer', ctx.S.fakten.every(f => f.g === 3));
+pruefe('Handlung, Mission und Etappe stehen',
+  /Ida weiß mehr/.test(ctx.S.handlung) && /Brief/.test(ctx.W.mission) && /zum Reden/.test(ctx.S.aktZiel));
+
+// Ein zweiter Lauf darf gewachsene Figuren nicht überschreiben.
+ida.person = 'Inzwischen aufgetaut.';
+ctx.chatProfileEinsetzen({ npcs: [{ name: 'Ida', person: 'Wieder misstrauisch.' }] });
+pruefe('ohne Platzhalter bleibt ein Profil unangetastet', ida.person === 'Inzwischen aufgetaut.');
+ctx.chatProfileEinsetzen({ npcs: [{ name: 'Ida', person: 'Doch anders.' }] }, true);
+pruefe('/auswerten darf es trotzdem überschreiben', ida.person === 'Doch anders.');
 
 console.log('\n— Ex- und Import als Datei —');
 // EXPORT soll eine Datei anlegen, IMPORT den Dateiexplorer öffnen. Beides
@@ -1671,6 +1754,61 @@ async function bildRegiePruefen() {
   ctx.console.warn = echteWarnung;
 }
 
+async function chatAuswertungPruefen() {
+  console.log('\n— Auswertung: der Aufruf —');
+  // Der ganze Vorgang: fragen, eintragen, melden. Fällt die KI aus, muss das
+  // Spiel weiterlaufen und die Platzhalter stehen bleiben.
+  const echteFrage = ctx.frageKI, echteWarnung = ctx.console.warn, echterFehler = ctx.console.error;
+  ctx.console.warn = function () {}; ctx.console.error = function () {};
+  let gemeldet = [];
+  ctx.sysZeile = (t) => { gemeldet.push(t); };
+  ctx.errZeile = (t) => { gemeldet.push(t); };
+  ctx.setWartet = () => {};
+  ctx.zeigeRaumtitel = () => {}; ctx.aktualisiereUI = () => {};
+  ctx.zeigeStimmung = () => {}; ctx.autosave = () => {};
+  ctx.zeichneBild = () => Promise.resolve();
+
+  ctx.chatAuswerten = echtesAuswerten;   // beim Import war sie stummgestellt
+  ctx.S.imSpiel = true;
+  ctx.S.verlauf = [
+    { rolle: 'ich', text: 'Ist hier noch frei?' },
+    { rolle: 'npc', idx: 0, text: 'Setz dich.', name: ctx.W.npcs[0].name }
+  ];
+  ctx.W.npcs[0].ausChat = true;
+  ctx.W.npcs[0].rolle = 'aus einem früheren Gespräch';
+
+  ctx.frageKI = () => Promise.reject(new Error('kein Text-Plugin'));
+  gemeldet = [];
+  pruefe('fällt die KI aus, gibt es kein false Profil', (await ctx.chatAuswerten()) === false);
+  pruefe('der Ausfall wird gemeldet', gemeldet.some(t => /nicht auswerten/.test(t)), gemeldet.join(' | '));
+  pruefe('und der Platzhalter bleibt stehen', ctx.W.npcs[0].ausChat === true);
+
+  ctx.frageKI = () => Promise.resolve('Tut mir leid, ich kann das nicht.');
+  gemeldet = [];
+  pruefe('unlesbare Antwort wird abgefangen', (await ctx.chatAuswerten()) === false);
+  pruefe('auch das wird gemeldet', gemeldet.some(t => /unlesbar/.test(t)), gemeldet.join(' | '));
+
+  ctx.frageKI = () => Promise.resolve('```json\n{"npcs":[{"name":"' + ctx.W.npcs[0].name +
+    '","rolle":"Wirtin","person":"Trocken."}],"fakten":["Sie schuldet ihm etwas."]}\n```');
+  gemeldet = [];
+  const ok2 = await ctx.chatAuswerten();
+  pruefe('eine brauchbare Antwort wird eingetragen', ok2 === true);
+  pruefe('das Profil ist gefüllt', ctx.W.npcs[0].rolle === 'Wirtin' && !ctx.W.npcs[0].ausChat);
+  pruefe('das Ergebnis wird gemeldet', gemeldet.some(t => /Angelegt: 1 Profil/.test(t)), gemeldet.join(' | '));
+
+  ctx.S.verlauf = [];
+  gemeldet = [];
+  pruefe('ein zu kurzes Gespräch wird gar nicht erst geschickt', (await ctx.chatAuswerten()) === false);
+  pruefe('mit klarer Ansage', gemeldet.some(t => /zu kurz/.test(t)), gemeldet.join(' | '));
+
+  pruefe('der Import stößt die Auswertung selbst an',
+    /chatAuswerten\(\)\.catch/.test(src), 'im Quelltext');
+  pruefe('und /auswerten wiederholt sie von Hand',
+    /\/auswerten/.test(src) && /chatAuswerten\(true\)/.test(src));
+
+  ctx.frageKI = echteFrage; ctx.console.warn = echteWarnung; ctx.console.error = echterFehler;
+}
+
 async function ladeschalePruefen() {
   console.log('\n— Ladeschale: Aufteilen —');
   const nur = ladeUmgebung(netzStummel([]), {});
@@ -1765,7 +1903,7 @@ async function ladeschalePruefen() {
 
 // Der asynchrone Teil (Quellenwechsel, dann die Ladeschale) laeuft zum Schluss,
 // danach die Auswertung.
-laufen().then(lektorPruefen).then(bildRegiePruefen).then(ladeschalePruefen).then(() => {
+laufen().then(lektorPruefen).then(bildRegiePruefen).then(chatAuswertungPruefen).then(ladeschalePruefen).then(() => {
   console.log('\n' + (bad ? '✗ ' + bad + ' Fehler, ' : '✓ alles grün — ') + ok + ' Prüfungen bestanden');
   process.exit(bad ? 1 : 0);
 }).catch(e => {

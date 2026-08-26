@@ -397,6 +397,23 @@ Gedächtnis statt im Dialog. Sehr lange Chats werden vorn gekürzt.
 Der Weg zurück geht auch: **↧ CHAT** schreibt den laufenden Verlauf im selben Textformat ins Feld —
 die erste Figur als `[AI]`, alle weiteren als benanntes `[SYSTEM]`.
 
+#### Was die Auswertung nachträgt
+
+Ein fremder Chat bringt Text mit, aber keine Profile. Deshalb liest die KI direkt nach dem Import
+das Gespräch einmal durch — ein einzelner Aufruf — und trägt nach, was zum Weiterspielen fehlt:
+
+* **Figuren**: Rolle, Aussehen, Kleidung, Wesen, Stimmung, Ziel und Geheimnis
+* **Beziehungen**: Haltung jeder Figur zum Helden und zu den anderen
+* **Held**: Aussehen, Kleidung, Geschlecht — und der Name, falls du beim Import keinen eingetragen hast
+* **Ort**: Name, Beschreibung, Bildbeschreibung, Uhrzeit, Wetter
+* **Gedächtnis**: was im Gespräch verabredet, versprochen oder enthüllt wurde
+* **Mission und Etappe**, falls das Gespräch ein Ziel erkennen lässt
+
+Angefasst werden dabei nur die Figuren, die aus dem Import stammen — wer schon in deiner Partie
+gewachsen ist, bleibt unangetastet. Fällt die KI aus oder kommt Unlesbares zurück, bleiben die
+Platzhalter stehen und es erscheint eine Meldung; **`/auswerten`** wiederholt den Versuch. Von Hand
+aufgerufen darf der Befehl auch bestehende Profile überschreiben — dann ist es deine Entscheidung.
+
 ### Dateien statt Textblöcke
 
 Ex- und Import laufen über den Dateidialog des Geräts:
@@ -635,6 +652,7 @@ ein neuer Befehl steht damit automatisch in der Hilfe, ohne Nachpflege. Ein Test
 | `/undo` | letzten Zug zurücknehmen |
 | `/nochmal` | letzten Zug verwerfen und die Antwort neu würfeln |
 | `/speichern` | Spielstände öffnen |
+| `/auswerten` | ein übernommenes Gespräch (noch einmal) auswerten — Profile, Beziehungen, Gedächtnis |
 
 ## Was gegenüber V6 anders ist
 
