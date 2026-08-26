@@ -178,7 +178,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.39</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.40</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -1489,13 +1489,14 @@ async function spielStarten(){
   }
   betreteSpiel();
 }
-function betreteSpiel(){
+function betreteSpiel(danach){
   el('start').classList.add('aus');
   setTimeout(function(){
     el('start').style.display='none';
     el('spiel').classList.add('aktiv');
     S.imSpiel=true;
     starteOrt();
+    if(typeof danach==='function')danach();
   },500);
 }
 function starteOrt(){
@@ -2613,7 +2614,9 @@ var BEFEHLE=[
   {muster:/^\/nochmal\b/i,                      hilfe:['/nochmal','letzten Zug verwerfen und die Antwort neu würfeln'],
    fn:function(){ nochmal(); }},
   {muster:/^\/speichern\b/i,                    hilfe:['/speichern','Spielstände öffnen'],
-   fn:function(){ oeffneSpeicher(); }}
+   fn:function(){ oeffneSpeicher(); }},
+  {muster:/^\/auswerten\b/i,                    hilfe:['/auswerten','ein übernommenes Gespräch (noch einmal) auswerten — Profile, Beziehungen, Gedächtnis'],
+   fn:function(){ if(S.wartet){sysZeile('— Bitte kurz warten —');return;} chatAuswerten(true).catch(function(){}); }}
 ];
 function befehlVerarbeitet(txt){
   for(var i=0;i<BEFEHLE.length;i++){
@@ -3585,7 +3588,7 @@ function oeffneEinstellungen(){
 // Seit der Umstellung auf die Ladeschale ist die Frage berechtigt, welcher Stand
 // gerade laeuft. Die Schale legt den geholten Quelltext samt Zweig und Zeitpunkt
 // im localStorage ab; hier wird er nur abgelesen.
-var VERSION = 'V7.39';
+var VERSION = 'V7.40';
 // Ohne Browserkonsole — etwa am Handy — muss der Generator selbst sagen koennen,
 // woran es liegt, wenn ein Plugin von Perchance fehlt.
 function pluginLage(){
@@ -4258,6 +4261,7 @@ function chatLetzterSatz(plan,name){
 function chatFigur(name,eroeffnung){
   return {
     name:          name,
+    ausChat:       true,   // Platzhalter - die Auswertung traegt das Profil nach
     rolle:         'aus einem früheren Gespräch',
     aussehen:      'an adult with an ordinary but memorable face',
     kleidung:      'simple everyday clothing',
@@ -4301,6 +4305,7 @@ function chatAnhaengen(plan){
            (neu.length?', neu am Ort: '+neu.join(', '):'')+' —');
   chatHinweise(plan,offen);
   autosave();
+  chatAuswerten().catch(function(){});
   return true;
 }
 // Fall 2: Noch kein Spiel. Dann entsteht aus dem Chat eine schlichte Welt -
@@ -4309,7 +4314,8 @@ function chatAlsWelt(plan,heldWunsch,titel){
   var namen=plan.figuren.slice();
   W.protagonist={
     name:heldWunsch||'Held', herkunft:'', beruf:'', eigenart:'',
-    geschlecht:geschlechtSchluessel(CFG.geschlecht), aussehen:'', kleidung:''
+    geschlecht:geschlechtSchluessel(CFG.geschlecht), aussehen:'', kleidung:'',
+    ausChat:!heldWunsch   // ohne eigene Angabe darf die Auswertung den Namen setzen
   };
   W.stadt='';
   W.mission='';
@@ -4317,7 +4323,8 @@ function chatAlsWelt(plan,heldWunsch,titel){
   W.ort={
     name:       titel||'Fortgeführtes Gespräch',
     geschichte: 'Ein Gespräch, das anderswo begann, geht hier weiter.',
-    bildPrompt: 'two people talking in a quiet room, warm evening light'
+    bildPrompt: 'two people talking in a quiet room, warm evening light',
+    ausChat:    true   // Platzhalter, bis die Auswertung den Ort kennt
   };
   setzeNpcs(namen.length?namen.map(function(n){ return chatFigur(n,chatLetzterSatz(plan,n)); })
                         :[chatFigur('Gesprächspartner','…')]);
@@ -4343,15 +4350,21 @@ function chatAlsWelt(plan,heldWunsch,titel){
   S.zug=plan.zeilen.filter(function(z){ return z.rolle==='ich'; }).length;
   chatNotizenMerken(plan);
   schliesseModal();
+  function melden(){
+    sysZeile('— Gespräch übernommen: '+plan.zeilen.length+' Zeilen —');
+    chatHinweise(plan,0);
+    autosave();
+    chatAuswerten().catch(function(){});
+  }
+  // Der Startbildschirm blendet sich langsam aus; erst danach steht das
+  // Gespraechsfenster, in das die Meldungen gehoeren.
   if(el('start')&&el('start').style.display!=='none'&&!el('start').classList.contains('aus')){
-    betreteSpiel();
+    betreteSpiel(melden);
   }else{
     S.imSpiel=true;
     starteOrt();
+    melden();
   }
-  sysZeile('— Gespräch übernommen: '+plan.zeilen.length+' Zeilen —');
-  chatHinweise(plan,0);
-  autosave();
   return true;
 }
 function chatHinweise(plan,offen){
@@ -4393,6 +4406,143 @@ function chatExportAnzeigen(){
   var feld=el('exportFeld');
   if(feld)feld.value=text;
   dateiSpeichern(dateiName('chat','txt'),text,'text/plain');
+}
+
+// ── DAS ÜBERNOMMENE GESPRÄCH AUSWERTEN ────────
+// Ein fremder Chat bringt Text mit, aber keine Profile: Wer sind die Figuren,
+// wie sehen sie aus, was wollen sie, was ist verabredet worden? Genau das liest
+// ein einzelner KI-Aufruf aus dem Gespraech heraus und traegt es nach - sonst
+// stuenden die Figuren mit leeren Steckbriefen am Ort.
+var CHAT_LESE_ZEILEN=60;     // so viele Zeilen bekommt die KI zu lesen
+var CHAT_LESE_BREITE=320;    // Zeichen je Zeile
+
+function baueChatAuswertung(){
+  var namen=W.npcs.map(function(n){ return n.name; }).filter(function(n){ return n; });
+  return 'Du liest ein Gespraech, das in einem anderen Programm begonnen wurde, und traegst nach, '+
+    'was zum Weiterspielen fehlt. Halte dich an das Gespraech: Erfinde nichts, was ihm widerspricht. '+
+    'Was darin offen bleibt, ergaenzt du knapp und stimmig.\n\n'+
+    'HELD (der Mensch am Bildschirm): '+heldName()+'\n'+
+    'FIGUREN: '+(namen.join(', ')||'—')+'\n\n'+
+    'GESPRAECH:\n'+verlaufText(CHAT_LESE_ZEILEN,CHAT_LESE_BREITE)+'\n\n'+
+    'Antworte NUR mit einem JSON-Objekt, ohne Codeblock. Aussehen und Kleidung auf ENGLISCH '+
+    '(sie gehen an einen Bildgenerator), alles andere auf DEUTSCH:\n'+
+    '{"held":{"name":"Name des Helden, falls das Gespraech ihn nennt, sonst leer",'+
+    '"aussehen":"constant English visual IDENTITY only, no clothing","kleidung":"english outfit",'+
+    '"geschlecht":"maennlich, weiblich, divers oder leer"},\n'+
+    '"ort":{"name":"deutscher Name des Ortes","geschichte":"ein bis zwei deutsche Saetze",'+
+    '"bild":"english description of the place","zeit":"HH:MM","wetter":"ein deutsches Wort oder leer"},\n'+
+    '"npcs":[{"name":"GENAU einer der Namen oben","rolle":"was die Figur hier ist",'+
+    '"aussehen":"constant English visual IDENTITY only, no clothing","kleidung":"english outfit",'+
+    '"person":"ein deutscher Satz ueber ihr Wesen","stimmung":"EIN deutsches Wort",'+
+    '"ziel":"was sie in dieser Szene will","geheimnis":"was sie verbirgt, oder leer",'+
+    '"beziehung":"ihre Haltung zum Helden, hoechstens 44 Zeichen",'+
+    '"beziehungen":"Name: Haltung; Name: Haltung"}],\n'+
+    '"fakten":["kurze deutsche Saetze: was verabredet, versprochen oder enthuellt wurde"],\n'+
+    '"handlung":"zwei bis drei deutsche Saetze, worum es zuletzt ging",\n'+
+    '"mission":"das uebergeordnete Ziel, oder leer","etappe":"der naechste Schritt, oder leer"}';
+}
+
+// Traegt die Antwort ein. Ohne "alle" werden nur die Figuren angefasst, die aus
+// dem Import stammen - gewachsene Figuren bleiben, wie sie sind.
+function chatProfileEinsetzen(j,alle){
+  var bericht={figuren:0,fakten:0,ort:false,held:false};
+  if(!j||typeof j!=='object')return bericht;
+  function wert(o,feld){
+    if(!o||typeof o!=='object')return '';
+    var v=entkleide(String(o[feld]==null?'':o[feld])).trim();
+    return leerAngabe(v)?'':v;
+  }
+  // Zuerst der Held: sein Name haengt an allen Beziehungen, die danach kommen.
+  var h=j.held;
+  if(h&&typeof h==='object'&&W.protagonist){
+    var p=W.protagonist;
+    var neuerName=wert(h,'name');
+    if(neuerName&&p.ausChat){ p.name=kappe(neuerName,40); p.ausChat=false; bericht.held=true; }
+    if(!p.aussehen&&wert(h,'aussehen')){ p.aussehen=wert(h,'aussehen'); bericht.held=true; }
+    if(!p.kleidung&&wert(h,'kleidung')){ p.kleidung=wert(h,'kleidung'); bericht.held=true; }
+    if(!p.geschlecht&&wert(h,'geschlecht'))p.geschlecht=geschlechtSchluessel(wert(h,'geschlecht'));
+  }
+  // Dann der Ort, solange er noch der Platzhalter aus dem Import ist.
+  var o=j.ort;
+  if(o&&typeof o==='object'&&W.ort&&(alle||W.ort.ausChat)){
+    if(wert(o,'name'))W.ort.name=kappe(wert(o,'name'),60);
+    if(wert(o,'geschichte'))W.ort.geschichte=kappe(wert(o,'geschichte'),400);
+    if(wert(o,'bild')){ W.ort.bildPrompt=wert(o,'bild'); S.szeneText=W.ort.bildPrompt; }
+    var uhr=String(wert(o,'zeit')).match(/(\d{1,2})\s*[:.]\s*(\d{2})/);
+    if(uhr)S.startUhr=(parseInt(uhr[1],10)%24)*60+(parseInt(uhr[2],10)%60);
+    if(wert(o,'wetter'))S.wetter=einWort(wert(o,'wetter'));
+    W.ort.ausChat=false;
+    bericht.ort=true;
+  }
+  // Die Figuren.
+  (Array.isArray(j.npcs)?j.npcs:[]).forEach(function(e){
+    if(!e||typeof e!=='object')return;
+    var i=findeNpc(wert(e,'name'));
+    if(i<0)return;
+    var n=W.npcs[i];
+    if(!alle&&!n.ausChat)return;
+    if(wert(e,'rolle'))n.rolle=kappe(wert(e,'rolle'),60);
+    if(wert(e,'aussehen'))n.aussehen=wert(e,'aussehen');
+    if(wert(e,'kleidung'))n.kleidung=wert(e,'kleidung');
+    if(wert(e,'person'))n.person=kappe(wert(e,'person'),240);
+    if(wert(e,'stimmung'))n.grundstimmung=einWort(wert(e,'stimmung'))||n.grundstimmung;
+    if(wert(e,'ziel'))n.ziel=kappe(wert(e,'ziel'),160);
+    if(wert(e,'geheimnis'))n.geheimnis=kappe(wert(e,'geheimnis'),160);
+    S.stimmung[i]=n.grundstimmung;
+    S.kleidung[i]=n.kleidung;
+    if(wert(e,'beziehung'))setzeBeziehung(n.name,heldName(),wert(e,'beziehung'));
+    if(e.beziehungen)uebernimmBeziehungen(String(e.beziehungen),n.name);
+    n.ausChat=false;
+    bericht.figuren++;
+  });
+  beziehungenAufraeumen();
+  // Was im Gespraech verabredet wurde, gehoert ins Langzeitgedaechtnis.
+  var fk=j.fakten;
+  if(typeof fk==='string')fk=fk.split(/[;\n]+/);
+  if(Array.isArray(fk))fk.forEach(function(f){
+    var t=entkleide(String(f==null?'':f)).trim();
+    if(!t||leerAngabe(t))return;
+    merkeFakt(kappe(t,180),3);
+    bericht.fakten++;
+  });
+  var hd=wert(j,'handlung');
+  if(hd&&(alle||!S.handlung))S.handlung=kappe(hd,400);
+  var mi=wert(j,'mission');
+  if(mi&&(alle||!W.mission))W.mission=kappe(mi,240);
+  var et=wert(j,'etappe');
+  if(et&&(alle||!S.aktZiel))S.aktZiel=kappe(et,240);
+  return bericht;
+}
+
+// Der ganze Vorgang, inklusive Meldungen im Gespraechsfenster. Faellt die KI
+// aus, bleiben die Platzhalter stehen und /auswerten kann es wiederholen.
+async function chatAuswerten(alle){
+  if(!S.imSpiel||!W.npcs.length)return false;
+  if(S.verlauf.length<2){ sysZeile('Für eine Auswertung ist das Gespräch zu kurz.'); return false; }
+  sysZeile('— Die KI liest das Gespräch und legt die Profile an —');
+  setWartet(true);
+  var text='';
+  try{
+    text=await frageKI(baueChatAuswertung(),120000);
+  }catch(e){
+    setWartet(false);
+    errZeile('Das Gespräch ließ sich nicht auswerten: '+((e&&e.message)||e)+' — /auswerten versucht es noch einmal.');
+    return false;
+  }
+  setWartet(false);
+  S.letzteRohantwort=text;
+  var j=jsonAus(text);
+  if(!j){ errZeile('Die Auswertung kam unlesbar zurück. /auswerten versucht es noch einmal.'); return false; }
+  var b=chatProfileEinsetzen(j,!!alle);
+  zeigeRaumtitel();
+  aktualisiereUI();
+  zeigeStimmung();
+  autosave();
+  sysZeile('— Angelegt: '+b.figuren+' '+(b.figuren===1?'Profil':'Profile')+
+           ', '+b.fakten+' '+(b.fakten===1?'Merkposten':'Merkposten')+
+           (b.ort?', Ort und Zeit':'')+' —');
+  if(b.figuren)zeichneBild({});   // das erste Bild zeigte noch Platzhalter
+  return true;
 }
 
 // ── HELFER ────────────────────────────────────
