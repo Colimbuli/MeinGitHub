@@ -371,9 +371,9 @@ Dessen Export kennt zwei Formen, PROXIMA liest beide:
 * **JSON des ganzen Stranges** — die vollständige Ausfuhr mit Figuren, Strang und Nachrichten.
 
 Der Weg: das Fenster **SPIELSTÄNDE** öffnen — im Spiel über das Disketten-Symbol, auf dem Startbildschirm
-über den Knopf **↥ CHAT ÜBERNEHMEN** —, den Chat in das große Feld einfügen, **↥ IMPORT** drücken. Derselbe
-Knopf nimmt weiterhin PROXIMA-Spielstände; was im Feld steht, wird erst als Spielstand geprüft und
-dann als Chat.
+über den Knopf **↥ CHAT ÜBERNEHMEN** —, dann **↥ IMPORT** drücken und die heruntergeladene Datei
+auswählen. Derselbe Knopf nimmt weiterhin PROXIMA-Spielstände: Der Inhalt wird erst als Spielstand
+geprüft und dann als Chat. Wer den Text lieber einfügt, benutzt das Feld und **↥ AUS DEM FELD ÜBERNEHMEN**.
 
 Wie die Zeilen ankommen:
 
@@ -396,6 +396,25 @@ Gedächtnis statt im Dialog. Sehr lange Chats werden vorn gekürzt.
 
 Der Weg zurück geht auch: **↧ CHAT** schreibt den laufenden Verlauf im selben Textformat ins Feld —
 die erste Figur als `[AI]`, alle weiteren als benanntes `[SYSTEM]`.
+
+### Dateien statt Textblöcke
+
+Ex- und Import laufen über den Dateidialog des Geräts:
+
+| Knopf im Fenster **SPIELSTÄNDE** | was passiert |
+| --- | --- |
+| **↧ EXPORT** | legt `proxima-spielstand-<held>-<datum>.json` auf dem Gerät ab |
+| **↧ CHAT** | legt `proxima-chat-<held>-<datum>.txt` ab — im Format des anderen Generators |
+| **↥ IMPORT** | öffnet den Dateiexplorer und liest die gewählte Datei ein |
+| **↥ AUS DEM FELD ÜBERNEHMEN** | liest, was im Textfeld steht |
+
+Das Textfeld bleibt daneben bestehen, und zwar mit Absicht: Manche Browser lassen im
+Perchance-Fenster keinen Download zu. Der Export schreibt seinen Text deshalb **immer auch ins
+Feld** — kommt keine Datei an, kann man ihn von dort kopieren. Umgekehrt geht es genauso: einfügen
+und **↥ AUS DEM FELD ÜBERNEHMEN** drücken.
+
+Beim Import ist es gleichgültig, was in der Datei steht — Spielstand oder Chat aus einem anderen
+Generator werden am Inhalt erkannt, nicht an der Endung.
 
 ### Charakterblatt
 
@@ -657,8 +676,8 @@ ein neuer Befehl steht damit automatisch in der Hilfe, ohne Nachpflege. Ein Test
   und Titel nach oben aus dem Bild — das Szenenbild bleibt unverdeckt. Der Zustand wird gemerkt.
 * **Bis zu vier Figuren** gleichzeitig statt zwei.
 * **Undo und /nochmal** für misslungene Antworten.
-* **Vier Spielstand-Plätze** (einer automatisch) mit Export/Import als Textblock, Versionsfeld und
-  Migration alter V6-Stände.
+* **Vier Spielstand-Plätze** (einer automatisch) mit Ex- und Import als Datei oder Textblock,
+  Versionsfeld und Migration alter V6-Stände.
 * **Fester Seed** über die ganze Partie, damit Figuren sich ähnlich bleiben; nur per 🎲 im Bildmenü
   neu gewürfelt.
 * **Einstellbar**: Bildquelle, Bildgröße, Negativprompt, Bild-Takt (alle N Züge, 0 = nur auf Zuruf),

@@ -18,7 +18,7 @@ function fakeEl(id) {
     id, value: '', textContent: '', innerHTML: '', className: '', style: {}, disabled: false,
     classList: { add() {}, remove() {}, contains() { return false; }, toggle() {} },
     appendChild() {}, remove() {}, querySelector() { return fakeEl('sub'); },
-    setAttribute() {}, addEventListener() {}, focus() {}, select() {}, onclick: null
+    setAttribute() {}, addEventListener() {}, focus() {}, select() {}, click() {}, onclick: null
   };
 }
 const store = {};
@@ -31,6 +31,7 @@ const ctx = {
     removeItem: k => { delete store[k]; }
   },
   document: {
+    body: fakeEl('body'),
     getElementById: fakeEl,
     createElement: fakeEl,
     createTextNode: (t) => ({ nodeValue: t }),
@@ -39,6 +40,8 @@ const ctx = {
   },
   window: { open() {}, addEventListener() {} },
   Image: function () { this.src = ''; },
+  Blob: function (teile, opt) { this.teile = teile; this.type = opt && opt.type; },
+  FileReader: function () { this.readAsText = function () {}; },
   URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} },
   fetch: () => Promise.reject(new Error('kein Netz im Test')),
   Date, Math, JSON, Object, Array, String, Number, RegExp, Promise, isNaN, parseInt, parseFloat, encodeURIComponent
@@ -1259,6 +1262,71 @@ pruefe('IMPORT versucht erst den Spielstand, dann den Chat',
 pruefe('ein eigener Knopf gibt den Chat heraus', /onclick="chatExportAnzeigen\(\)"/.test(html));
 pruefe('für Textblöcke lassen sich die Namen eintragen',
   /id="chatHeld"/.test(src) && /id="chatFigur"/.test(src));
+
+console.log('\n— Ex- und Import als Datei —');
+// EXPORT soll eine Datei anlegen, IMPORT den Dateiexplorer öffnen. Beides
+// hängt an Elementen, die zur Laufzeit entstehen — die werden hier mitgeschrieben.
+const erzeugt = [];
+const echtesCreate = ctx.document.createElement;
+ctx.document.createElement = (tag) => {
+  const e = fakeEl(tag);
+  e.tag = tag; e.geklickt = 0;
+  e.click = () => { e.geklickt++; };
+  erzeugt.push(e);
+  return e;
+};
+
+pruefe('der Dateiname trägt Art, Held und Datum',
+  /^proxima-spielstand-jan-\d{4}-\d{2}-\d{2}-\d{4}\.json$/.test(ctx.dateiName('spielstand', 'json')),
+  ctx.dateiName('spielstand', 'json'));
+pruefe('im Dateinamen stehen nur harmlose Zeichen',
+  /^[a-z0-9.-]+$/.test(ctx.dateiName('chat', 'txt')), ctx.dateiName('chat', 'txt'));
+
+ctx.S.imSpiel = true;
+erzeugt.length = 0;
+ctx.exportAnzeigen();
+const spielstandDatei = erzeugt.filter(e => e.tag === 'a')[0];
+pruefe('EXPORT legt eine Datei an', !!spielstandDatei && spielstandDatei.geklickt === 1);
+pruefe('sie heißt nach dem Spielstand und endet auf .json',
+  !!spielstandDatei && /^proxima-spielstand-.*\.json$/.test(spielstandDatei.download), spielstandDatei && spielstandDatei.download);
+// Der Stub gibt bei jedem el() ein neues Element zurück, deshalb hier am Quelltext:
+pruefe('der Text steht zusätzlich im Feld',
+  /if\(feld\)feld\.value=text;\n\s*dateiSpeichern\(dateiName\('spielstand'/.test(src));
+
+erzeugt.length = 0;
+ctx.chatExportAnzeigen();
+const chatDatei = erzeugt.filter(e => e.tag === 'a')[0];
+pruefe('CHAT legt eine Textdatei an',
+  !!chatDatei && /^proxima-chat-.*\.txt$/.test(chatDatei.download) && chatDatei.geklickt === 1,
+  chatDatei && chatDatei.download);
+
+erzeugt.length = 0;
+ctx.importStand();
+const wahl = erzeugt.filter(e => e.tag === 'input')[0];
+pruefe('IMPORT öffnet den Dateiexplorer', !!wahl && wahl.type === 'file' && wahl.geklickt === 1);
+pruefe('und bietet die passenden Endungen an',
+  !!wahl && /\.json/.test(wahl.accept) && /\.txt/.test(wahl.accept), wahl && wahl.accept);
+pruefe('eine gewählte Datei wird verarbeitet', typeof wahl.onchange === 'function');
+
+// Der Weg über das Textfeld bleibt bestehen, falls der Browser im
+// Perchance-Fenster keinen Download zulässt.
+let gemeldet = '';
+const echtesZeigeFehler = ctx.zeigeFehler;
+ctx.zeigeFehler = (wo, e) => { gemeldet = wo + ': ' + (e && e.message); };
+ctx.importText('');
+pruefe('leerer Text wird gemeldet, nicht verschluckt', /Kein Text/.test(gemeldet), gemeldet);
+gemeldet = '';
+ctx.importText('Das ist weder das eine noch das andere.');
+pruefe('unbrauchbarer Inhalt wird gemeldet', /weder ein Spielstand noch ein Chat/.test(gemeldet), gemeldet);
+gemeldet = '';
+ctx.importText('{"welt":1}');
+pruefe('ein halber Spielstand wird als solcher gemeldet', /unvollständig/.test(gemeldet), gemeldet);
+ctx.zeigeFehler = echtesZeigeFehler;
+ctx.document.createElement = echtesCreate;
+
+pruefe('das Fenster bietet den Weg über das Feld an', /onclick="importAusFeld\(\)"/.test(src));
+pruefe('die Knöpfe sagen, was sie tun',
+  /title="Spielstand als Datei sichern"/.test(html) && /title="Datei vom Gerät einlesen"/.test(html));
 
 console.log('\n— Bildregie-Bot —');
 // Der Bot ist ein zweiter KI-Aufruf, der nur nach dem Bild fragt. Er darf die

@@ -178,7 +178,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.38</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.39</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -424,9 +424,9 @@ select.feld option{background:var(--panel);}
     <div class="modalInhalt" id="speicherInhalt"></div>
     <div class="modalNav">
       <button onclick="schliesseModal()">SCHLIESSEN</button>
-      <button onclick="exportAnzeigen()">↧ EXPORT</button>
-      <button onclick="chatExportAnzeigen()">↧ CHAT</button>
-      <button class="haupt" onclick="importStand()">↥ IMPORT</button>
+      <button onclick="exportAnzeigen()" title="Spielstand als Datei sichern">↧ EXPORT</button>
+      <button onclick="chatExportAnzeigen()" title="Gespräch als Textdatei sichern">↧ CHAT</button>
+      <button class="haupt" onclick="importStand()" title="Datei vom Gerät einlesen">↥ IMPORT</button>
     </div>
   </div>
 </div>
@@ -3585,7 +3585,7 @@ function oeffneEinstellungen(){
 // Seit der Umstellung auf die Ladeschale ist die Frage berechtigt, welcher Stand
 // gerade laeuft. Die Schale legt den geholten Quelltext samt Zweig und Zeitpunkt
 // im localStorage ab; hier wird er nur abgelesen.
-var VERSION = 'V7.38';
+var VERSION = 'V7.39';
 // Ohne Browserkonsole — etwa am Handy — muss der Generator selbst sagen koennen,
 // woran es liegt, wenn ein Plugin von Perchance fehlt.
 function pluginLage(){
@@ -3855,6 +3855,57 @@ function quelleKurzGewechselt(){
   speichereCfg();
 }
 
+// ── DATEIEN AUF DEM GERÄT ─────────────────────
+// Ex- und Import gehen über den Dateidialog des Geräts: EXPORT legt eine Datei
+// an, IMPORT öffnet den Dateiexplorer. Das Textfeld bleibt daneben bestehen —
+// manche Browser blockieren Downloads im Perchance-Fenster, und dann ist der
+// Text zum Kopieren immer noch da.
+function dateiStempel(){
+  var d=new Date();
+  function z(n){ return (n<10?'0':'')+n; }
+  return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+'-'+z(d.getHours())+z(d.getMinutes());
+}
+function dateiName(art,endung){
+  var wer=(W.protagonist&&W.protagonist.name)||'';
+  return ('proxima-'+art+(wer?'-'+wer:'')+'-'+dateiStempel()+'.'+endung)
+         .toLowerCase().replace(/[^a-z0-9.-]+/g,'-');
+}
+function dateiSpeichern(name,text,typ){
+  try{
+    var b=new Blob([text],{type:(typ||'text/plain')+';charset=utf-8'});
+    var u=URL.createObjectURL(b);
+    var a=document.createElement('a');
+    a.href=u; a.download=name; a.style.display='none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){
+      try{ document.body.removeChild(a); }catch(e){}
+      URL.revokeObjectURL(u);
+    },2000);
+    return true;
+  }catch(e){ zeigeFehler('Datei sichern',e); return false; }
+}
+function dateiOeffnen(rueckruf,akzeptiert){
+  try{
+    var e=document.createElement('input');
+    e.type='file';
+    e.accept=akzeptiert||'.json,.txt,application/json,text/plain';
+    e.style.display='none';
+    e.onchange=function(){
+      var f=e.files&&e.files[0];
+      try{ document.body.removeChild(e); }catch(x){}
+      if(!f)return;
+      var l=new FileReader();
+      l.onload=function(){ rueckruf(String(l.result==null?'':l.result),f.name); };
+      l.onerror=function(){ zeigeFehler('Datei lesen',l.error||new Error('Die Datei ließ sich nicht lesen.')); };
+      l.readAsText(f);
+    };
+    document.body.appendChild(e);
+    e.click();
+    return true;
+  }catch(x){ zeigeFehler('Datei öffnen',x); return false; }
+}
+
 // ── SPEICHERSTÄNDE ────────────────────────────
 var SAVE_VERSION=7;
 var SLOTS=['proxima_v7_auto','proxima_v7_1','proxima_v7_2','proxima_v7_3'];
@@ -3962,8 +4013,10 @@ function oeffneSpeicher(){
       '<button onclick="slotLaden('+i+')"'+(d?'':' disabled')+'>LADEN</button>'+
       '<button onclick="slotLoeschen('+i+')"'+(d?'':' disabled')+'>✕</button></div>';
   });
-  html+='<label class="feldlabel" for="exportFeld">EXPORT / IMPORT (Textblock sichern oder einfügen)</label>'+
-        '<textarea id="exportFeld" class="feld" rows="4" placeholder="Hier erscheint der Export – oder füge einen Spielstand oder einen Chat aus einem anderen Generator ein und drücke IMPORT."></textarea>'+
+  html+='<label class="feldlabel" for="exportFeld">ALS DATEI (unten) – ODER HIER ALS TEXT</label>'+
+        '<textarea id="exportFeld" class="feld" rows="4" placeholder="Hier erscheint der Export – oder füge einen Spielstand oder einen Chat aus einem anderen Generator ein und drücke AUS DEM FELD ÜBERNEHMEN."></textarea>'+
+        '<button class="klein" onclick="importAusFeld()">↥ AUS DEM FELD ÜBERNEHMEN</button>'+
+        '<div class="hilfetext">Die Knöpfe unten öffnen den Dateidialog. Lässt dein Browser im Perchance-Fenster keinen Download zu, steht der Text nach dem Export trotzdem im Feld — von dort kopieren.</div>'+
         '<label class="feldlabel" for="chatHeld">FREMDER CHAT: WER IST WER (nur bei Textblöcken nötig)</label>'+
         '<input id="chatHeld" class="feld" type="text" placeholder="Dein Name im Chat – z.B. Jan">'+
         '<input id="chatFigur" class="feld" type="text" placeholder="Name der Figur hinter [AI] – z.B. Ida">';
@@ -3996,21 +4049,42 @@ function uebernehmeStand(d){
     starteOrt();
   }
 }
+// Der Knopf legt eine Datei an. Der Text landet zusaetzlich im Feld, damit er
+// auch dort steht, wo der Browser keinen Download zulaesst.
 function exportAnzeigen(){
-  if(!S.imSpiel){
+  var text='';
+  if(S.imSpiel){
+    text=JSON.stringify(standObjekt());
+  }else{
     var d=leseSlot(0);
-    if(!d){ sysZeile('Kein Spielstand zum Exportieren.'); return; }
-    el('exportFeld').value=JSON.stringify(d);
-    return;
+    if(!d){ zeigeFehler('Export',new Error('Es gibt noch keinen Spielstand.')); return; }
+    text=JSON.stringify(d);
   }
-  el('exportFeld').value=JSON.stringify(standObjekt());
-  el('exportFeld').select();
+  var feld=el('exportFeld');
+  if(feld)feld.value=text;
+  dateiSpeichern(dateiName('spielstand','json'),text,'application/json');
 }
 // Ein Knopf fuer beides: erst als Spielstand versuchen, dann als Chat aus dem
 // anderen Generator - der Nutzer soll nicht raten muessen, was er da einfuegt.
+// Der Knopf oeffnet den Dateiexplorer. Was dabei herauskommt, geht denselben
+// Weg wie eingefuegter Text.
 function importStand(){
-  var t=el('exportFeld').value.trim();
-  if(!t){ zeigeFehler('Import',new Error('Kein Text zum Einlesen.')); return; }
+  dateiOeffnen(function(inhalt,name){
+    var feld=el('exportFeld');
+    if(feld)feld.value=inhalt;
+    importText(inhalt,name);
+  });
+}
+// Zweiter Weg fuer alle, bei denen der Dateidialog nichts hergibt: einfuegen
+// und diesen Knopf druecken.
+function importAusFeld(){
+  var feld=el('exportFeld');
+  importText(feld?feld.value:'');
+}
+// Ein Eingang fuer beides: erst als Spielstand pruefen, dann als Chat.
+function importText(roh,name){
+  var t=String(roh==null?'':roh).trim();
+  if(!t){ zeigeFehler('Import',new Error(name?('Die Datei '+name+' ist leer.'):'Kein Text zum Einlesen.')); return; }
   var d=null;
   try{ d=JSON.parse(t); }catch(e){ d=null; }
   if(d&&pruefeStand(d)){ uebernehmeStand(d); return; }
@@ -4315,8 +4389,10 @@ function chatAlsText(){
 }
 function chatExportAnzeigen(){
   if(!S.verlauf||!S.verlauf.length){ zeigeFehler('Chat-Export',new Error('Es ist noch kein Gespräch da.')); return; }
-  el('exportFeld').value=chatAlsText();
-  el('exportFeld').select();
+  var text=chatAlsText();
+  var feld=el('exportFeld');
+  if(feld)feld.value=text;
+  dateiSpeichern(dateiName('chat','txt'),text,'text/plain');
 }
 
 // ── HELFER ────────────────────────────────────
