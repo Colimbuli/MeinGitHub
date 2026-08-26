@@ -178,7 +178,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.34</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.36</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -197,6 +197,15 @@ select.feld option{background:var(--panel);}
       <option value="eigen">Eigener Stil…</option>
     </select>
     <input id="stilEigen" type="text" placeholder="z.B. noir ink sketch, high contrast" style="display:none">
+  </div>
+  <div class="startreihe">
+    <label for="geschlechtwahl">DU BIST</label>
+    <select id="geschlechtwahl" class="feld" style="flex:1;min-width:150px">
+      <option value="">egal — die KI entscheidet</option>
+      <option value="maennlich">männlich</option>
+      <option value="weiblich">weiblich</option>
+      <option value="divers">divers</option>
+    </select>
   </div>
   <div class="startreihe">
     <label for="perspektive">ERZÄHLWEISE</label>
@@ -218,7 +227,7 @@ select.feld option{background:var(--panel);}
   </div>
   <div id="fehlerbox"></div>
   <div id="storybox"></div>
-  <button class="gbtn" id="spielbtn" onclick="spielStarten()" style="display:none">▶ ABENTEUER BEGINNEN</button>
+  <button class="gbtn" id="spielbtn" onclick="spielStarten()" style="display:none">▶︎ ABENTEUER BEGINNEN</button>
 </div>
 
 <!-- SPIEL -->
@@ -229,16 +238,16 @@ select.feld option{background:var(--panel);}
     <div id="kopfreihe">
     <div id="npcstatus"></div>
     <div id="werkzeuge">
-      <button id="chronikbtn" onclick="zeigeChronik('ort')" title="Chronik">📖</button>
-      <button id="figurbtn" onclick="oeffneFigurMenu()" title="Figuren bearbeiten">👤</button>
-      <button id="ortbtn" onclick="oeffneOrtMenu()" title="Ort bearbeiten" aria-label="Ort bearbeiten"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" focusable="false"><path d="M12 2.4c-3.7 0-6.7 3-6.7 6.7 0 4.9 6.7 12.5 6.7 12.5s6.7-7.6 6.7-12.5c0-3.7-3-6.7-6.7-6.7z" fill="currentColor"/><circle cx="12" cy="9" r="2.5" fill="#2a1c0e"/></svg></button>
-      <button id="bildbtn" onclick="oeffneBildModal()" title="Bild: Stil, Prompt, Seed">🖼</button>
-      <button id="einstellbtn" onclick="oeffneEinstellungen()" title="Einstellungen">⚙</button>
-      <button id="speicherbtn" onclick="oeffneSpeicher()" title="Speichern / Laden">💾</button>
+      <button id="chronikbtn" onclick="zeigeChronik('ort')" title="Chronik" aria-label="Chronik" data-sym="chronik"></button>
+      <button id="figurbtn" onclick="oeffneFigurMenu()" title="Figuren bearbeiten" aria-label="Figuren" data-sym="figuren"></button>
+      <button id="ortbtn" onclick="oeffneOrtMenu()" title="Ort bearbeiten" aria-label="Ort bearbeiten" data-sym="ort"></button>
+      <button id="bildbtn" onclick="oeffneBildModal()" title="Bild: Stil, Prompt, Seed" aria-label="Bild" data-sym="bild"></button>
+      <button id="einstellbtn" onclick="oeffneEinstellungen()" title="Einstellungen" aria-label="Einstellungen" data-sym="einstellungen"></button>
+      <button id="speicherbtn" onclick="oeffneSpeicher()" title="Speichern / Laden" aria-label="Spielstände" data-sym="speichern"></button>
       <button id="hilfebtn" onclick="oeffneHilfe()" title="Befehle und Hilfe">?</button>
       <button id="undobtn" onclick="undo()" title="Letzten Zug zurücknehmen">⟲</button>
-      <button id="npcbtn" class="breit" onclick="erscheineNPC('')" title="Weitere Person auftreten lassen">+ NPC</button>
-      <button id="autobtn" class="breit" onclick="autoUmschalten()" title="Figuren spielen allein weiter">▶ AUTO</button>
+      <button id="npcbtn" onclick="oeffneNeueFigur()" title="Weitere Person auftreten lassen"><span data-sym="npcplus" data-symgroesse="13"></span></button>
+      <button id="autobtn" class="breit" onclick="autoUmschalten()" title="Figuren spielen allein weiter">▶︎ AUTO</button>
     </div>
     </div>
     <div id="raumtitel"></div>
@@ -265,7 +274,7 @@ select.feld option{background:var(--panel);}
 <!-- MODALE -->
 <div class="modal" id="mChronik">
   <div class="modalBox">
-    <div class="modalKopf"><span id="chronikTitel">📖 CHRONIK</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalKopf"><span id="chronikTitel"><span data-sym="chronik"></span> CHRONIK</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
     <div class="modalInhalt fliess" id="chronikInhalt"></div>
     <div class="modalNav" id="chronikNav"></div>
   </div>
@@ -273,7 +282,7 @@ select.feld option{background:var(--panel);}
 
 <div class="modal" id="mBild">
   <div class="modalBox">
-    <div class="modalKopf"><span>🖼 BILD BEARBEITEN</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalKopf"><span><span data-sym="bild"></span> BILD BEARBEITEN</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
     <div class="modalInhalt">
       <label class="feldlabel" for="szeneStil">BILDSTIL — gilt für alle weiteren Bilder</label>
       <select id="szeneStil" class="feld" onchange="szeneStilGewechselt()"></select>
@@ -287,7 +296,7 @@ select.feld option{background:var(--panel);}
       <label class="feldlabel" for="bildSeedFeld">SEED — bleibt fest, damit die Figuren sich ähnlich bleiben</label>
       <div class="reihe">
         <input id="bildSeedFeld" class="feld" type="text" inputmode="numeric">
-        <button onclick="wuerfelSeed()" title="Zufalls-Seed">🎲</button>
+        <button onclick="wuerfelSeed()" title="Zufalls-Seed" aria-label="Zufalls-Seed" data-sym="wuerfel"></button>
       </div>
       <div class="hinweis" id="bildQuelleInfo"></div>
     </div>
@@ -302,7 +311,7 @@ select.feld option{background:var(--panel);}
 
 <div class="modal" id="mFigur">
   <div class="modalBox">
-    <div class="modalKopf"><span>👤 FIGUREN</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalKopf"><span><span data-sym="figuren"></span> FIGUREN</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
     <div class="modalInhalt" id="figurInhalt"></div>
     <div class="modalNav">
       <button onclick="schliesseModal()">SCHLIESSEN</button>
@@ -311,9 +320,45 @@ select.feld option{background:var(--panel);}
   </div>
 </div>
 
+<div class="modal" id="mNeueFigur">
+  <div class="modalBox">
+    <div class="modalKopf"><span><span data-sym="npcplus"></span> NEUE FIGUR</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalInhalt">
+      <div class="hinweis">Alles ist freiwillig. Was du einträgst, gilt unverändert — die Lücken füllt die KI passend zur Szene.</div>
+      <label class="feldlabel" for="nf_name">NAME</label>
+      <input id="nf_name" class="feld" type="text">
+      <label class="feldlabel" for="nf_rolle">ROLLE — wer sie hier ist, und was sie mit dem Helden verbindet</label>
+      <input id="nf_rolle" class="feld" type="text">
+      <label class="feldlabel" for="nf_aussehen">AUSSEHEN (englisch) — nur Identität: Alter, Gesicht, Haare, Statur</label>
+      <textarea id="nf_aussehen" class="feld" rows="2"></textarea>
+      <label class="feldlabel" for="nf_kleidung">KLEIDUNG (englisch)</label>
+      <input id="nf_kleidung" class="feld" type="text">
+      <label class="feldlabel" for="nf_person">PERSÖNLICHKEIT UND SPRECHWEISE</label>
+      <textarea id="nf_person" class="feld" rows="2"></textarea>
+      <label class="feldlabel" for="nf_stimmung">STIMMUNG (ein Wort)</label>
+      <input id="nf_stimmung" class="feld" type="text">
+      <label class="feldlabel" for="nf_beziehung">HALTUNG ZUM HELDEN — vertraut, skeptisch, alte Freundin …</label>
+      <input id="nf_beziehung" class="feld" type="text">
+      <label class="feldlabel" for="nf_ziel">WAS SIE WILL — verdeckt, der Spieler sieht es nicht</label>
+      <textarea id="nf_ziel" class="feld" rows="2"></textarea>
+      <label class="feldlabel" for="nf_geheimnis">WAS SIE VERBIRGT — verdeckt</label>
+      <textarea id="nf_geheimnis" class="feld" rows="2"></textarea>
+      <label class="feldlabel" for="nf_eroeffnung">ERSTER SATZ BEIM HEREINKOMMEN</label>
+      <textarea id="nf_eroeffnung" class="feld" rows="2"></textarea>
+      <label class="feldlabel" for="nf_hinweis">HINWEIS AN DIE KI — freier Text, wenn etwas sonst nirgends hinpasst</label>
+      <textarea id="nf_hinweis" class="feld" rows="2"></textarea>
+    </div>
+    <div class="modalNav">
+      <button onclick="schliesseModal()">ABBRECHEN</button>
+      <button onclick="neueFigurUebernehmen(false)" title="Genau so übernehmen, ohne KI-Aufruf">NUR MEINE ANGABEN</button>
+      <button class="haupt" onclick="neueFigurUebernehmen(true)">✦ ERSCHEINEN LASSEN</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="mMission">
   <div class="modalBox">
-    <div class="modalKopf"><span>✦ MISSION</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalKopf"><span><span data-sym="mission"></span> MISSION</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
     <div class="modalInhalt">
       <label class="feldlabel" for="missionZiel">ZIEL — worauf die Geschichte zuläuft. Ein Satz, an dem man scheitern kann.</label>
       <textarea id="missionZiel" class="feld" rows="3"></textarea>
@@ -331,7 +376,7 @@ select.feld option{background:var(--panel);}
 
 <div class="modal" id="mOrt">
   <div class="modalBox">
-    <div class="modalKopf"><span><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false" style="vertical-align:-2px"><path d="M12 2.4c-3.7 0-6.7 3-6.7 6.7 0 4.9 6.7 12.5 6.7 12.5s6.7-7.6 6.7-12.5c0-3.7-3-6.7-6.7-6.7z" fill="currentColor"/><circle cx="12" cy="9" r="2.5" fill="#2a1c0e"/></svg> ORT</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalKopf"><span><span data-sym="ort"></span> ORT</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
     <div class="modalInhalt">
       <label class="feldlabel" for="ortName">NAME DES ORTES</label>
       <input id="ortName" class="feld" type="text">
@@ -363,7 +408,7 @@ select.feld option{background:var(--panel);}
 
 <div class="modal" id="mEinstellungen">
   <div class="modalBox">
-    <div class="modalKopf"><span>⚙ EINSTELLUNGEN</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalKopf"><span><span data-sym="einstellungen"></span> EINSTELLUNGEN</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
     <div class="modalInhalt" id="einstellInhalt"></div>
     <div class="modalNav">
       <button onclick="schliesseModal()">SCHLIESSEN</button>
@@ -375,7 +420,7 @@ select.feld option{background:var(--panel);}
 
 <div class="modal" id="mSpeicher">
   <div class="modalBox">
-    <div class="modalKopf"><span>💾 SPIELSTÄNDE</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalKopf"><span><span data-sym="speichern"></span> SPIELSTÄNDE</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
     <div class="modalInhalt" id="speicherInhalt"></div>
     <div class="modalNav">
       <button onclick="schliesseModal()">SCHLIESSEN</button>
@@ -453,6 +498,7 @@ var CFG={
   tempo:16,        // ms pro Zeichen im Schreibmaschinen-Effekt (0 = sofort)
   bildTakt:2,      // alle N Zuege ein neues Bild (0 = nur auf Zuruf)
   wuerfel:true,    // Handlungen des Helden koennen misslingen
+  geschlecht:'',   // zuletzt gewaehltes Geschlecht des Helden (leer = KI entscheidet)
   pollModell:'',
   hordeKey:'0000000000', hordeModell:'', hordeSchritte:25,
   apiUrl:'https://api.openai.com/v1', apiKey:'', apiModell:'gpt-image-1',
@@ -1091,7 +1137,7 @@ function einWort(s){ return String(s||'').toLowerCase().trim().split(/[\s,.;:]/)
 
 // ── ZUSTAND ───────────────────────────────────
 var W = {
-  protagonist:{name:'',herkunft:'',beruf:'',eigenart:'',aussehen:'',kleidung:''},
+  protagonist:{name:'',herkunft:'',beruf:'',eigenart:'',geschlecht:'',aussehen:'',kleidung:''},
   stadt:'', rahmenhandlung:'', rahmenhandlungOriginal:'',
   mission:'',         // das uebergeordnete Ziel, dem die Szene folgt
   perspektive:'er',   // 'er' = Held im Bild, 'ich' = Blick durch seine Augen
@@ -1132,8 +1178,8 @@ function zeigeFehler(wo,e){
   var meldung=wo+': '+(e&&e.message?e.message:String(e));
   var box=el('fehlerbox');
   if(!el('start').classList.contains('aus')){
-    box.textContent='⚠ '+meldung;box.style.display='block';
-  }else{ errZeile('⚠ '+meldung); }
+    box.textContent='⚠︎ '+meldung;box.style.display='block';
+  }else{ errZeile('⚠︎ '+meldung); }
 }
 
 // ── WÜRFELN ───────────────────────────────────
@@ -1141,7 +1187,7 @@ function zufall(liste){ return liste[Math.floor(Math.random()*liste.length)]; }
 async function wuerfeln(){
   var w1=zufall(WOERTER1),w2=zufall(WOERTER2),w3=zufall(WOERTER3);
   var btn=el('wuerfelBtn'),status=el('wuerfelStatus'),feld=el('begriffe');
-  btn.disabled=true;btn.textContent='⏳';
+  btn.disabled=true;btn.textContent='⧗';
   status.textContent='KI erfindet eine Idee…';feld.value='';
   try{
     var txt=await frageKI(
@@ -1159,6 +1205,8 @@ async function wuerfeln(){
 
 // ── WELT ERSCHAFFEN ───────────────────────────
 async function weltErstellen(){
+  var gwahlEl=el('geschlechtwahl');
+  if(gwahlEl){ CFG.geschlecht=geschlechtSchluessel(gwahlEl.value); speichereCfg(); }
   var begriffe=el('begriffe').value.trim();
   if(!begriffe){
     begriffe=zufall(WOERTER1)+', '+zufall(WOERTER2)+', '+zufall(WOERTER3);
@@ -1173,7 +1221,10 @@ async function weltErstellen(){
 
   var p=
     'Du bist Autor eines lebendigen deutschen Dialog-Adventures.'+
-    ' Ausgangsidee des Spielers: '+begriffe+'.\n\n'+
+    ' Ausgangsidee des Spielers: '+begriffe+'.\n'+
+    (geschlechtSchluessel(CFG.geschlecht)
+      ? ' Der Held ist '+GESCHLECHTER[geschlechtSchluessel(CFG.geschlecht)].label+' — das steht fest, richte Name und Beschreibung danach.\n\n'
+      : '\n')+
     'LIES DIE AUSGANGSIDEE GENAU:\n'+
     '- Nennt sie PERSONEN ("meine Frau", "mein Chef", "zwei alte Freunde"), dann sind genau diese Personen von Anfang an anwesend. Jede bekommt einen eigenen Eintrag in "npcs", einen Namen und eine Rolle, die das Verhaeltnis festhaelt ("Ehefrau des Helden"). Sie sind KEINE Fremden: wer den Helden kennt, spricht ihn auch so an.\n'+
     '- Nennt sie einen ORT (Kino, Bahnhof, Werkstatt), dann ist DAS der Ort. Erfinde keinen anderen.\n'+
@@ -1183,7 +1234,7 @@ async function weltErstellen(){
     'DER TON: Die Figuren sind warm, offen und zugewandt; frivol und frech duerfen sie sein, aber nie unfreundlich, herablassend oder abweisend. Zuneigung darf entstehen, sie ist aber nicht der Zweck der Szene.\n\n'+
     'Antworte NUR mit einem JSON-Objekt, ohne Codeblock, ohne Text davor oder danach, in genau dieser Form:\n'+
     '{\n'+
-    '  "held": {"name":"Vor- und Nachname","herkunft":"Geburtsstadt","beruf":"Beruf","eigenart":"schrullige Eigenart"},\n'+
+    '  "held": {"name":"Vor- und Nachname","herkunft":"Geburtsstadt","beruf":"Beruf","eigenart":"schrullige Eigenart","geschlecht":"maennlich, weiblich oder divers","aussehen":"constant English visual IDENTITY of the hero: age, face, hair, build. NO clothing, no art style."},\n'+
     '  "stadt": "europaeische Stadt",\n'+
     '  "mission": "das uebergeordnete Ziel in EINEM deutschen Satz, konkret und ueberpruefbar",\n'+
     '  "etappe": "die ERSTE Etappe auf dem Weg zur Mission in einem deutschen Satz — was JETZT gleich ansteht",\n'+
@@ -1230,7 +1281,7 @@ async function weltErstellen(){
     setStatus('Fehler bei der Welt-Generierung.');
     if(/Timeout|Zeitüberschreitung/i.test(m)){
       var box=el('fehlerbox');
-      box.textContent='⏱ Der Textdienst von Perchance hat nicht rechtzeitig geantwortet ('+
+      box.textContent='⧖ Der Textdienst von Perchance hat nicht rechtzeitig geantwortet ('+
         Math.round((Date.now()-seit)/1000)+'s). Das liegt nicht an deiner Eingabe. '+
         'Einfach noch einmal auf ✦ WELT ERSCHAFFEN ✦ drücken — meist klappt der zweite Versuch.';
       box.style.display='block';
@@ -1255,7 +1306,11 @@ function verarbeiteWelt(text){
   W.protagonist.herkunft = f(['held','herkunft'],'HERKUNFT','Hameln');
   W.protagonist.beruf    = f(['held','beruf'],'BERUF','Reisender');
   W.protagonist.eigenart = f(['held','eigenart'],'EIGENART','spricht in Sprichwoertern');
-  W.protagonist.aussehen = W.protagonist.aussehen||'';
+  // Die Wahl auf dem Startbildschirm schlaegt die Erfindung der KI.
+  var gwunsch=geschlechtSchluessel(CFG.geschlecht);
+  W.protagonist.geschlecht = gwunsch||geschlechtSchluessel(f(['held','geschlecht'],'GESCHLECHT',''));
+  W.protagonist.aussehen = entkleide(f(['held','aussehen'],'HELD_AUSSEHEN',''))||W.protagonist.aussehen||'';
+  if(leerAngabe(W.protagonist.aussehen))W.protagonist.aussehen='';
   W.protagonist.kleidung = W.protagonist.kleidung||'';
   W.stadt                = f(['stadt'],'STADT','Wien');
   W.rahmenhandlung       = f(['rahmenhandlung'],'RAHMENHANDLUNG','');
@@ -1340,7 +1395,7 @@ function verarbeiteWelt(text){
 
   if(luecken.length){
     var fb=el('fehlerbox');
-    fb.textContent='⚠ Die Antwort kam unvollständig zurück — es fehlten: '+luecken.join(', ')+
+    fb.textContent='⚠︎ Die Antwort kam unvollständig zurück — es fehlten: '+luecken.join(', ')+
       '. Dafür stehen jetzt Platzhalter. Du kannst so spielen, aber ✦ WELT ERSCHAFFEN ✦ noch einmal '+
       'zu drücken bringt meist eine vollständige Welt.';
     fb.style.display='block';
@@ -1350,7 +1405,7 @@ function verarbeiteWelt(text){
   el('ladefill').style.width='100%';
   el('spielbtn').style.display='inline-block';
   el('spielbtn').disabled=false;
-  el('spielbtn').textContent='▶ ABENTEUER BEGINNEN';
+  el('spielbtn').textContent='▶︎ ABENTEUER BEGINNEN';
   freigebenErstellen();
 }
 function freigebenErstellen(){
@@ -1406,7 +1461,7 @@ async function spielStarten(){
     try{
       setzeNpcs([await leiteNpcAusStoryAb(W.rahmenhandlung)]);
     }catch(e){ zeigeFehler('Person ableiten',e); }
-    if(btn){btn.disabled=false;btn.textContent='▶ ABENTEUER BEGINNEN';}
+    if(btn){btn.disabled=false;btn.textContent='▶︎ ABENTEUER BEGINNEN';}
   }
   betreteSpiel();
 }
@@ -1542,6 +1597,79 @@ function folgeZug(minutenRoh,wetterRoh,antwort,aufdeckRoh,etappeRoh){
   S.probe=null;
   zeigeRaumtitel();
 }
+// ── SYMBOLE ───────────────────────────────────
+// Emoji malt jedes Geraet in eigenen Farben - mitten in einer goldenen Leiste
+// sehen sie aus wie hineingefallen. Deshalb sind alle Symbole gezeichnet und
+// nehmen ueber currentColor die Farbe des Knopfes an.
+var SYM={
+  chronik:'<path d="M4 3.5h5.2A2.8 2.8 0 0 1 12 6.3V20a2.6 2.6 0 0 0-2.4-1.6H4z"/>'+
+          '<path d="M20 3.5h-5.2A2.8 2.8 0 0 0 12 6.3V20a2.6 2.6 0 0 1 2.4-1.6H20z"/>',
+  figuren:'<circle cx="12" cy="7.6" r="3.6"/><path d="M4.6 20.6c0-3.7 3.3-6.2 7.4-6.2s7.4 2.5 7.4 6.2z"/>',
+  npcplus:'<circle cx="9.5" cy="7.6" r="3.4"/><path d="M2.8 20.4c0-3.5 3-5.9 6.7-5.9 1 0 2 .2 2.9.5v5.4z"/>'+
+          '<path d="M17.6 12.4h1.8v3h3v1.8h-3v3h-1.8v-3h-3v-1.8h3z"/>',
+  bild:'<path d="M3 5.2h18v13.6H3zm2 11.4h14l-4.4-5.6-3.1 3.8-2.2-2.5z"/><circle cx="8.2" cy="9.4" r="1.5"/>',
+  einstellungen:'<path d="M12 8.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2zm9 3.6c0 .6-.05 1.2-.14 1.75l2.02 1.5-2 3.46-2.36-.95c-.85.72-1.84 1.28-2.92 1.62L15.3 22h-4l-.3-2.57a8.9 8.9 0 0 1-2.92-1.62l-2.36.95-2-3.46 2.02-1.5A9.6 9.6 0 0 1 5.6 12c0-.6.05-1.2.14-1.75L3.72 8.75l2-3.46 2.36.95A8.9 8.9 0 0 1 11 4.62L11.3 2h4l.3 2.62c1.08.34 2.07.9 2.92 1.62l2.36-.95 2 3.46-2.02 1.5c.09.55.14 1.15.14 1.75z"/>',
+  speichern:'<path d="M4 3.5h12.5L20.5 7.5V20.5H4zM8 4.5v5h7v-5zm-1.5 10h11v6h-11z"/>',
+  ort:'<path d="M12 2.4c-3.7 0-6.7 3-6.7 6.7 0 4.9 6.7 12.5 6.7 12.5s6.7-7.6 6.7-12.5c0-3.7-3-6.7-6.7-6.7z"/><circle cx="12" cy="9" r="2.5" fill="#2a1c0e"/>',
+  mission:'<path d="M12 2.2 14.6 8l6.4.6-4.8 4.2 1.4 6.2L12 15.7l-5.6 3.3 1.4-6.2L3 8.6 9.4 8z"/>',
+  wuerfel:'<path d="M4.5 4.5h15v15h-15z"/><circle cx="8.6" cy="8.6" r="1.5" fill="#2a1c0e"/>'+
+          '<circle cx="15.4" cy="15.4" r="1.5" fill="#2a1c0e"/><circle cx="12" cy="12" r="1.5" fill="#2a1c0e"/>',
+  regie:'<path d="M3 8.5h18v11.5H3z"/><path d="M3.4 4.2 8 3l1.6 3.4L5 7.6zM10.6 2.7l4.6-1.2 1.6 3.4-4.6 1.2zM17.8 1.2l3.6-.9L23 3.7l-3.6.9z"/>'
+};
+function sym(name,groesse){
+  var g=groesse||15;
+  return '<svg viewBox="0 0 24 24" width="'+g+'" height="'+g+'" fill="currentColor" aria-hidden="true" '+
+    'focusable="false" style="vertical-align:-2px">'+(SYM[name]||'')+'</svg>';
+}
+// Jedes Element mit data-sym bekommt sein Symbol - so steht die Zeichnung
+// genau einmal im Quelltext.
+function symboleEinsetzen(){
+  try{
+    var liste=document.querySelectorAll('[data-sym]');
+    for(var i=0;i<liste.length;i++){
+      var e=liste[i];
+      e.innerHTML=sym(e.getAttribute('data-sym'),parseInt(e.getAttribute('data-symgroesse'),10)||15);
+    }
+  }catch(err){}
+}
+
+// ── GESCHLECHT DES HELDEN ─────────────────────
+// Es steht in der Anweisung (damit die Figuren richtig ansprechen) und im
+// Bildprompt (damit der Held nicht bei jedem Panel das Geschlecht wechselt).
+var GESCHLECHTER={
+  maennlich:{label:'männlich',  bild:'a man',                 wort:'er'},
+  weiblich: {label:'weiblich',  bild:'a woman',               wort:'sie'},
+  divers:   {label:'divers',    bild:'an androgynous person', wort:'they'}
+};
+function geschlechtSchluessel(wert){
+  var t=String(wert||'').trim().toLowerCase();
+  if(/^(m|mann|maennlich|männlich|male|herr)$/.test(t))return 'maennlich';
+  if(/^(w|f|frau|weiblich|female|dame)$/.test(t))return 'weiblich';
+  if(/^(d|divers|nichtbinaer|nichtbinär|nonbinary|enby|neutral)$/.test(t))return 'divers';
+  return '';
+}
+function geschlechtLabel(){
+  var g=GESCHLECHTER[geschlechtSchluessel(W.protagonist.geschlecht)];
+  return g?g.label:'nicht festgelegt';
+}
+function geschlechtFuerBild(){
+  var g=GESCHLECHTER[geschlechtSchluessel(W.protagonist.geschlecht)];
+  return g?g.bild:'';
+}
+// Fehlt eine Beschreibung, entsteht eine aus dem, was ueber den Helden
+// feststeht - und sie wird festgehalten, damit sie nicht jedes Mal anders ist.
+function heldAussehen(schreiben){
+  var P=W.protagonist;
+  var a=(P.aussehen||'').trim();
+  if(a)return a;
+  var teile=[geschlechtFuerBild()||'a person'];
+  if(P.beruf)teile.push('a '+String(P.beruf).toLowerCase());
+  teile.push('an ordinary but memorable face');
+  var neu=teile.join(', ');
+  if(schreiben)P.aussehen=neu;
+  return neu;
+}
+
 // ── CHARAKTERBLATT ────────────────────────────
 // Gesichter wandern von Panel zu Panel. Ein einmal erzeugtes Portraet gibt der
 // Figur ein festes Bild: als Anhalt fuer den Spieler und als eigener Seed, der
@@ -1560,28 +1688,41 @@ function blattSchreiben(name,url){
     return true;
   }catch(e){ return false; }
 }
+function heldSeed(){ return ((S.seed||1)+104729)%2147483647; }
 function figurSeed(i){
   // Ein eigener, aber aus dem Szenen-Seed abgeleiteter Wert: dieselbe Partie
   // ergibt dieselben Gesichter, verschiedene Figuren aber verschiedene.
   return ((S.seed||1)+ (i+1)*7919)%2147483647;
 }
+var BLATT_RAHMEN=', character reference sheet, head and shoulders portrait, '+
+  'neutral grey background, even soft light, facing the viewer, neutral expression, ';
 function blattPrompt(i){
-  var n=W.npcs[i];
-  if(!n)return '';
-  var a=(n.aussehen||'a person').trim().replace(/[.\s]+$/,'');
-  var k=(S.kleidung[i]||n.kleidung||'').trim().replace(/[.\s]+$/,'');
-  return a+(k?', wearing '+k:'')+', character reference sheet, head and shoulders portrait, '+
-    'neutral grey background, even soft light, facing the viewer, neutral expression, '+aktuellerStil();
+  var a,k;
+  if(i==='held'){
+    a=heldAussehen(false).trim().replace(/[.\s]+$/,'');
+    var g=geschlechtFuerBild();
+    if(g&&a.toLowerCase().indexOf(g)<0)a=g+', '+a;
+    k=(W.protagonist.kleidung||'').trim().replace(/[.\s]+$/,'');
+  }else{
+    var n=W.npcs[i];
+    if(!n)return '';
+    a=(n.aussehen||'a person').trim().replace(/[.\s]+$/,'');
+    k=(S.kleidung[i]||n.kleidung||'').trim().replace(/[.\s]+$/,'');
+  }
+  return a+(k?', wearing '+k:'')+BLATT_RAHMEN+aktuellerStil();
 }
 async function zeichneBlatt(i){
-  if(!S.imSpiel||!W.npcs[i])return;
-  var n=W.npcs[i];
+  if(!S.imSpiel)return;
+  var held=(i==='held');
+  if(!held&&!W.npcs[i])return;
+  if(held)heldAussehen(true);              // fehlende Beschreibung einmal festhalten
+  var n=held?W.protagonist:W.npcs[i];
   sysZeile('✎ Charakterblatt für '+n.name+' entsteht…');
   try{
     var src=await quelle().zeichne({
       prompt:kappe(blattPrompt(i),quelle().maxPrompt||1500),
       negativ:baueNegativ(),
-      seed:figurSeed(i),
+      seed:held?heldSeed():figurSeed(i),
       breite:auf64(CFG.breite),hoehe:auf64(CFG.hoehe)
     });
     if(!blattSchreiben(n.name,src)){
@@ -1701,7 +1842,7 @@ function probeText(p){
     'Das Ergebnis steht fest. Erfinde keinen anderen Ausgang.\n';
 }
 function sysProbe(p){
-  sysZeile('🎲 '+p.wurf+(p.bonus?(p.bonus>0?' + '+p.bonus:' − '+Math.abs(p.bonus)):'')+
+  sysZeile('⚄ '+p.wurf+(p.bonus?(p.bonus>0?' + '+p.bonus:' − '+Math.abs(p.bonus)):'')+
     ' gegen '+p.schwelle+' — '+
     (p.patzer?'Patzer':p.glanz?'Glanzwurf':p.gelungen?(p.knapp?'knapp gelungen':'gelungen'):(p.knapp?'knapp misslungen':'misslungen')));
 }
@@ -1755,7 +1896,9 @@ function missionText(){
 }
 function weltKontext(){
   var k='WELT: Das Geschehen spielt in '+W.stadt+'.\n'+
-    'HELD: '+W.protagonist.name+', '+W.protagonist.beruf+' aus '+W.protagonist.herkunft+'. Eigenart: '+W.protagonist.eigenart+'.\n';
+    'HELD: '+W.protagonist.name+', '+W.protagonist.beruf+' aus '+W.protagonist.herkunft+
+      (geschlechtSchluessel(W.protagonist.geschlecht)?', '+geschlechtLabel():'')+
+      '. Eigenart: '+W.protagonist.eigenart+'.\n';
   if(W.rahmenhandlung)k+='VORGESCHICHTE: '+kappe(W.rahmenhandlung,S.kurzKontext?260:400)+'\n';
   k+=(W.perspektive==='ich')
     ? 'ERZAEHLWEISE: Ich-Perspektive. Handlungen des Helden werden in der ICH-Form geschrieben ("\x5Bich greife nach dem Glas\x5D"). Die Figuren sprechen ihn direkt an. Das Geschehen wird durch SEINE Augen erlebt.\n'
@@ -1994,11 +2137,11 @@ function pruefeZeitueberschreitung(e){
   if(!/Timeout|Zeitüberschreitung|Zeitueberschreitung/i.test(m))return false;
   if(!S.kurzKontext){
     S.kurzKontext=true;
-    sysZeile('⏱ Die KI hat nicht rechtzeitig geantwortet. Ab jetzt wird der Kontext kürzer gehalten — '+
+    sysZeile('⧖ Die KI hat nicht rechtzeitig geantwortet. Ab jetzt wird der Kontext kürzer gehalten — '+
              'mit /nochmal kannst du den Zug wiederholen.');
     autosave();
   }else{
-    sysZeile('⏱ Wieder keine Antwort. Der Textdienst ist vermutlich überlastet — /nochmal versucht es erneut.');
+    sysZeile('⧖ Wieder keine Antwort. Der Textdienst ist vermutlich überlastet — /nochmal versucht es erneut.');
   }
   return true;
 }
@@ -2121,11 +2264,11 @@ function autoUmschalten(){
   S.autoAktiv=!S.autoAktiv;
   aktualisiereUI();
   if(S.autoAktiv){
-    sysZeile('▶ Auto-Modus an — '+(CFG.autoHeld?(W.protagonist.name+' und die Figuren übernehmen'):'die Figuren übernehmen')+
+    sysZeile('▶︎ Auto-Modus an — '+(CFG.autoHeld?(W.protagonist.name+' und die Figuren übernehmen'):'die Figuren übernehmen')+
              '. Deine Eingaben sind jetzt Regie (mit /sag: sprichst du selbst).');
     autoSchleife();
   }else{
-    sysZeile('⏹ Auto-Modus aus.');
+    sysZeile('■ Auto-Modus aus.');
   }
 }
 async function autoSchleife(){
@@ -2146,7 +2289,7 @@ async function autoSchleife(){
       if(!pruefeZeitueberschreitung(e))zeigeFehler('Auto-Zug',e);
       if(fehler>=3){
         S.autoAktiv=false;
-        sysZeile('⏹ Auto-Modus nach mehreren Fehlern beendet.');
+        sysZeile('■ Auto-Modus nach mehreren Fehlern beendet.');
         break;
       }
       await warte(2000*fehler);
@@ -2175,7 +2318,7 @@ async function autoSchleife(){
 }
 function setzeAutoRegie(txt){
   S.autoRegie=txt;
-  sysZeile('🎬 Stehende Regie: '+txt);
+  sysZeile('❖ Stehende Regie: '+txt);
   autosave();
 }
 
@@ -2191,6 +2334,8 @@ function bauePrompt(opts,max){
   // die Kamera ist sein Blick.
   if(!ichSicht&&P&&(P.aussehen||'').trim()){
     var pa=P.aussehen.trim().replace(/[.\s]+$/,'');
+    var pg=geschlechtFuerBild();
+    if(pg&&pa.toLowerCase().indexOf(pg)<0)pa=pg+', '+pa;
     var pk=(P.kleidung||'').trim().replace(/[.\s]+$/,'');
     figurenArr.push(pa+(pk?', wearing '+pk:''));
   }
@@ -2321,17 +2466,17 @@ async function zeichneBild(opts){
     var kontingent=/zerogpu|quota|rate.?limit|exceeded|kontingent/i.test(m);
     if(!gedrosselt&&!kontingent&&istServerPanne(m)){
       S.bildPauseBis=Date.now()+90000;
-      errZeile('⚠ '+quelle().label+' ist auf einen GPU-Fehler gelaufen — das passiert auf dem Server, '+
+      errZeile('⚠︎ '+quelle().label+' ist auf einen GPU-Fehler gelaufen — das passiert auf dem Server, '+
                'nicht in deiner Anfrage. Zweiter Anlauf ist schon gescheitert, daher 90s Pause. '+
                'Bleibt es dabei, ist der Space gerade defekt; Perchance zeichnet weiter.');
     }else if(gedrosselt||kontingent){
       var sek=gedrosselt?60:300, ra=m.match(/in (\d+)s/);
       if(ra)sek=Math.max(15,Math.min(600,parseInt(ra[1],10)||60));
       S.bildPauseBis=Date.now()+sek*1000;
-      errZeile('⚠ '+quelle().label+(kontingent?' — Kontingent erschöpft':' drosselt (HTTP 429)')+
+      errZeile('⚠︎ '+quelle().label+(kontingent?' — Kontingent erschöpft':' drosselt (HTTP 429)')+
                '. Keine Bildanfragen für '+sek+'s. '+
-               (/token/i.test(m)?'Ein Hugging-Face-Token im Feld „Token" (⚙) hebt das Kontingent deutlich an. ':'')+
-               'Sonst: Bild-Takt in ⚙ erhöhen oder zurück auf Perchance.');
+               (/token/i.test(m)?'Ein Hugging-Face-Token im Feld „Token" (⚙︎) hebt das Kontingent deutlich an. ':'')+
+               'Sonst: Bild-Takt in ⚙︎ erhöhen oder zurück auf Perchance.');
     }else{
       zeigeFehler('Bild ('+quelle().label+')',e);
     }
@@ -2352,7 +2497,7 @@ var BEFEHLE=[
   {muster:/^\/kleidung\s*(\d+)\s*:?\s*([\s\S]*)$/i, hilfe:['/kleidungN: …','dauerhaftes Outfit für Figur N (englisch)'],
    fn:function(m){ kleidungBefehl(parseInt(m[1],10)-1,m[2]); }},
   {muster:/^\/regie\s*:?\s*([\s\S]*)$/i,        hilfe:['/regie: …','stehende Regie für die ganze Szene (leer = löschen)'],
-   fn:function(m){ var t=entkleide(m[1]); if(!t){S.autoRegie='';sysZeile('🎬 Stehende Regie gelöscht.');autosave();return;} setzeAutoRegie(t); }},
+   fn:function(m){ var t=entkleide(m[1]); if(!t){S.autoRegie='';sysZeile('❖ Stehende Regie gelöscht.');autosave();return;} setzeAutoRegie(t); }},
   {muster:/^\/bild\s*:?\s*([\s\S]*)$/i,         hilfe:['/bild: …','neues Bild aus deiner Beschreibung (englisch wirkt am besten)'],
    fn:function(m){ bildBefehl(m[1]); }},
   {muster:/^\/stil\s*:?\s*([\s\S]*)$/i,         hilfe:['/stil: …','Bildstil ändern (manga, comic, aquarell, oel, realistisch, pixel oder eigener Text)'],
@@ -2361,8 +2506,14 @@ var BEFEHLE=[
    fn:function(m){ quelleBefehl(m[1]); }},
   {muster:/^\/roh\b/i,                          hilfe:['/roh','zeigt die letzte Antwort der Regie im Original — zur Fehlersuche'],
    fn:function(){ zeigeRohantwort(); }},
-  {muster:/^\/blatt\s*:?\s*(\d*)\s*$/i,          hilfe:['/blatt N','Charakterblatt für Figur N zeichnen (ohne Zahl: Figurenmenü)'],
-   fn:function(m){ var i=parseInt(m[1],10); if(!isFinite(i)){oeffneFigurMenu();return;} zeichneBlatt(i-1); }},
+  {muster:/^\/blatt\s*:?\s*([a-zA-Zäöü0-9]*)\s*$/i,  hilfe:['/blatt N','Charakterblatt zeichnen — N ist die Figurennummer, „held" der Held (ohne Angabe: Figurenmenü)'],
+   fn:function(m){
+     var t=String(m[1]||'').toLowerCase();
+     if(/^(held|ich|0)$/.test(t)){ zeichneBlatt('held'); return; }
+     var i=parseInt(t,10);
+     if(!isFinite(i)){ oeffneFigurMenu(); return; }
+     zeichneBlatt(i-1);
+   }},
   {muster:/^\/gedanken\b/i,                     hilfe:['/gedanken','verdeckte Absichten aller Figuren zeigen — verrät die Geheimnisse'],
    fn:function(){ zeigeGedanken(); }},
   {muster:/^\/mission\s*:?\s*([\s\S]*)$/i,      hilfe:['/mission: …','das Ziel der Geschichte setzen (ohne Angabe: Missions-Menü, „weg" streicht es)'],
@@ -2426,18 +2577,18 @@ function oeffneHilfe(){
   h+='<div class="hilfeabschnitt">WAS DIE HANDLUNG VON SELBST TUT</div>'+
     '<div class="hilfeabsatz">Erzählt die Regie, dass jemand <b>hereinkommt oder geht</b>, dass der '+
     '<b>Ort wechselt</b> oder sich jemand <b>umzieht</b>, geschieht das wirklich — die Besetzung, der '+
-    'Raumtitel, das Figurenmenü und das Bild ziehen nach. Abschaltbar in ⚙.<br><br>'+
+    'Raumtitel, das Figurenmenü und das Bild ziehen nach. Abschaltbar in ⚙︎.<br><br>'+
     'Bleibt eine solche Änderung aus, zeigt <b>/roh</b>, was die Regie tatsächlich geantwortet hat.</div>'+
     '<div class="hilfeabschnitt">DIE KNÖPFE OBEN</div>';
-  [['📖','Chronik: Ort, Handlung und die Figuren'],
-   ['👤','Figuren bearbeiten — Name, Aussehen, Kleidung, Stimmung'],
+  [['❖','Chronik: Ort, Handlung und die Figuren'],
+   ['❖','Figuren bearbeiten — Name, Aussehen, Kleidung, Stimmung'],
    ['◉','Ort: Name, Beschreibung, Bildkulisse, Ortswechsel'],
-   ['🖼','Bild: Bildstil, Prompt, Negativprompt, Seed, neu zeichnen'],
-   ['⚙','Einstellungen: Bildquelle, Bildgröße, Takt, Schreibtempo'],
-   ['💾','Spielstände: vier Plätze, Export und Import'],
+   ['❖','Bild: Bildstil, Prompt, Negativprompt, Seed, neu zeichnen'],
+   ['⚙︎','Einstellungen: Bildquelle, Bildgröße, Takt, Schreibtempo'],
+   ['❖','Spielstände: vier Plätze, Export und Import'],
    ['⟲','letzten Zug zurücknehmen'],
    ['+ NPC','eine weitere Person auftreten lassen'],
-   ['▶ AUTO','die Figuren spielen selbstständig weiter'],
+   ['▶︎ AUTO','die Figuren spielen selbstständig weiter'],
    ['⌃','Kopfleiste ein- und ausklappen']
   ].forEach(function(k){
     h+='<div class="hilfezeile"><div class="hilfebefehl">'+escapeHtml(k[0])+'</div>'+
@@ -2476,14 +2627,14 @@ function regieBefehl(idx,hintRaw){
   if(S.autoAktiv){
     S.regieAnweisung[idx]=hint;
     S.autoForceIdx=idx;
-    sysZeile('🎬 Regie an '+W.npcs[idx].name+': '+hint);
+    sysZeile('❖ Regie an '+W.npcs[idx].name+': '+hint);
     autosave();
     return;
   }
   if(S.wartet){ sysZeile('— Bitte kurz warten —'); return; }
   merkeSchnappschuss();
   S.regieAnweisung[idx]=hint;
-  sysZeile('🎬 Regie an '+W.npcs[idx].name+': '+hint);
+  sysZeile('❖ Regie an '+W.npcs[idx].name+': '+hint);
   fuehreSchlagabtausch(idx);
 }
 function kleidungBefehl(idx,outfitRaw){
@@ -2603,7 +2754,90 @@ function zeichneVerlaufNeu(){
 }
 
 // ── FIGUREN AUFTRETEN / ABTRETEN ──────────────
-async function erscheineNPC(hint,still){
+// ── NEUE FIGUR ────────────────────────────────
+// Der Knopf fuehrt zuerst in ein leeres Formular: Was der Spieler eintraegt,
+// gilt unveraendert; die Luecken fuellt die KI. Wer nichts eintraegt, bekommt
+// wie bisher eine frei erfundene Figur.
+var NF_FELDER=['name','rolle','aussehen','kleidung','person','stimmung','beziehung','ziel','geheimnis','eroeffnung','hinweis'];
+function oeffneNeueFigur(){
+  if(!S.imSpiel)return;
+  if(W.npcs.length>=MAX_NPCS){ sysZeile('Mehr als '+MAX_NPCS+' Personen werden hier nicht gleichzeitig gespielt.'); return; }
+  NF_FELDER.forEach(function(k){ var e=el('nf_'+k); if(e)e.value=''; });
+  oeffneModal('mNeueFigur');
+}
+function neueFigurVorgabe(){
+  var v={};
+  NF_FELDER.forEach(function(k){ var e=el('nf_'+k); v[k]=e?e.value.trim():''; });
+  return v;
+}
+// Was der Spieler vorgegeben hat, in Worte fuer die Anweisung.
+function vorgabeText(v){
+  if(!v)return '';
+  var zeilen=[];
+  var namen={name:'Name',rolle:'Rolle',aussehen:'Aussehen (englisch)',kleidung:'Kleidung (englisch)',
+             person:'Persoenlichkeit',stimmung:'Stimmung',beziehung:'Haltung zum Helden',
+             ziel:'Was sie will',geheimnis:'Was sie verbirgt',eroeffnung:'Erster Satz'};
+  Object.keys(namen).forEach(function(k){ if(v[k])zeilen.push('- '+namen[k]+': '+v[k]); });
+  if(v.hinweis)zeilen.push('- Hinweis: '+v.hinweis);
+  if(!zeilen.length)return '';
+  return 'VORGABEN DES SPIELERS — diese Angaben sind verbindlich und werden WOERTLICH uebernommen. '+
+    'Fuelle nur, was fehlt, und richte es nach den Vorgaben:\n'+zeilen.join('\n')+'\n';
+}
+// Vorgabe schlaegt KI: nur leere Felder werden von der Antwort gefuellt.
+function mischeFigur(v,ki){
+  var raus={};
+  Object.keys(ki).forEach(function(k){ raus[k]=ki[k]; });
+  if(!v)return raus;
+  if(v.name)raus.name=v.name;
+  if(v.rolle)raus.rolle=v.rolle;
+  if(v.aussehen)raus.aussehen=v.aussehen;
+  if(v.kleidung)raus.kleidung=v.kleidung;
+  if(v.person)raus.person=v.person;
+  if(v.stimmung)raus.grundstimmung=einWort(v.stimmung);
+  if(v.ziel)raus.ziel=v.ziel;
+  if(v.geheimnis)raus.geheimnis=v.geheimnis;
+  if(v.eroeffnung)raus.eroeffnung=v.eroeffnung;
+  return raus;
+}
+// Der gemeinsame Weg ins Spiel - mit KI erfunden oder von Hand eingetragen.
+function figurEinfuegen(npc,bez,bezAndere){
+  var idx=W.npcs.length;
+  npc.aufgedeckt=false;
+  W.npcs.push(npc);
+  S.stimmung.push(npc.grundstimmung);
+  S.kleidung.push(npc.kleidung);
+  S.regieAnweisung.push('');
+  if(bez)setzeBeziehung(npc.name,heldName(),bez);
+  if(bezAndere)uebernimmBeziehungen(bezAndere,npc.name);
+  sysZeile('— '+npc.name+' erscheint —');
+  npcSagt(idx,npc.eroeffnung);
+  S.verlauf.push({rolle:'npc',idx:idx,text:npc.eroeffnung,name:npc.name});
+  merkeFakt(npc.name+' ist am Ort dazugekommen ('+npc.rolle+').');
+  aktualisiereUI();
+  S.bildZaehler=0;
+  return idx;
+}
+function neueFigurUebernehmen(mitKi){
+  var v=neueFigurVorgabe();
+  schliesseModal();
+  if(mitKi){ erscheineNPC(v.hinweis,false,v); return; }
+  if(W.npcs.length>=MAX_NPCS){ sysZeile('Mehr als '+MAX_NPCS+' Personen werden hier nicht gleichzeitig gespielt.'); return; }
+  var npc={
+    name:         v.name||'Ein Fremder',
+    rolle:        v.rolle||'Gast',
+    aussehen:     v.aussehen||'an adult with a memorable face',
+    kleidung:     v.kleidung||'simple clothing',
+    person:       v.person||'zurueckhaltend',
+    grundstimmung:einWort(v.stimmung||'neugierig'),
+    ziel:         v.ziel||'',
+    geheimnis:    v.geheimnis||'',
+    eroeffnung:   v.eroeffnung||'\x5Btritt ein\x5D Störe ich?'
+  };
+  figurEinfuegen(npc,v.beziehung,'');
+  autosave();
+  zeichneBild({});
+}
+async function erscheineNPC(hint,still,vorgabe){
   if(!S.imSpiel)return;
   if(W.npcs.length>=MAX_NPCS){ sysZeile('Mehr als '+MAX_NPCS+' Personen werden hier nicht gleichzeitig gespielt.'); return; }
   if(S.npcErscheint||(S.wartet&&!still)){ if(!still)sysZeile('— Bitte kurz warten —'); return; }
@@ -2618,13 +2852,14 @@ async function erscheineNPC(hint,still){
     'BEREITS ANWESEND: '+anwesend+'.\n'+
     'BISHERIGES GESCHEHEN:\n'+verlaufText(10)+'\n'+
     (hint?'VORGABE fuer die neue Person: '+hint+'\n':'')+
+    vorgabeText(vorgabe)+
     '\nAntworte NUR mit einem JSON-Objekt, ohne Codeblock:\n'+
     '{"name":"","rolle":"","aussehen":"constant English visual IDENTITY only, no clothing, no art style","kleidung":"english default outfit","person":"deutscher Satz, warm, frech, frivol, aber respektvoll","stimmung":"EIN deutsches Wort","ziel":"was sie hier fuer sich erreichen will, ein deutscher Satz","geheimnis":"was sie verbirgt, ein deutscher Satz","beziehung":"Haltung dieser Person zum Helden in ein bis drei deutschen Woertern","beziehungen":"Haltung zu den bereits Anwesenden, Format Name: Haltung; Name: Haltung, sonst leer","eroeffnung":"erster deutscher Satz beim Hereinkommen, Handlungen in eckigen Klammern erlaubt"}';
   try{
     var text=await frageKI(instruction);
     var j=jsonAus(text), z=j?null:felderAus(text);
     var f=function(k,flach,ersatz){ return j?hole(j,[k],ersatz):(z[flach]||ersatz); };
-    var npc={
+    var npc=mischeFigur(vorgabe,{
       name:         f('name','NAME','Ein Fremder'),
       rolle:        f('rolle','ROLLE','Bewohner'),
       aussehen:     f('aussehen','AUSSEHEN','an adult with a memorable face'),
@@ -2633,23 +2868,12 @@ async function erscheineNPC(hint,still){
       grundstimmung:einWort(f('stimmung','STIMMUNG','neugierig')),
       ziel:         f('ziel','ZIEL',''),
       geheimnis:    f('geheimnis','GEHEIMNIS',''),
-      aufgedeckt:   false,
       eroeffnung:   f('eroeffnung','EROEFFNUNG','\x5Btritt ein\x5D Störe ich?')
-    };
-    var idx=W.npcs.length;
-    W.npcs.push(npc);
-    S.stimmung.push(npc.grundstimmung);
-    S.kleidung.push(npc.kleidung);
-    S.regieAnweisung.push('');
-    setzeBeziehung(npc.name,heldName(),f('beziehung','BEZIEHUNG',''));
-    uebernimmBeziehungen(f('beziehungen','BEZIEHUNGEN',''),npc.name);
-    sysZeile('— '+npc.name+' erscheint —');
-    npcSagt(idx,npc.eroeffnung);
-    S.verlauf.push({rolle:'npc',idx:idx,text:npc.eroeffnung,name:npc.name});
-    merkeFakt(npc.name+' ist am Ort dazugekommen ('+npc.rolle+').');
-    aktualisiereUI();
+    });
+    var idx=figurEinfuegen(npc,
+      (vorgabe&&vorgabe.beziehung)||f('beziehung','BEZIEHUNG',''),
+      f('beziehungen','BEZIEHUNGEN',''));
     S.npcErscheint=false;
-    S.bildZaehler=0;
     if(!still)setWartet(false);
     // Aus der Handlung heraus: keine zusaetzliche Runde ausloesen, die laeuft schon.
     if(hint&&!still){ S.regieAnweisung[idx]=hint; await fuehreSchlagabtausch(idx); }
@@ -2765,7 +2989,7 @@ function aktualisiereUI(){
   var a=el('autobtn');
   if(a){
     a.classList.toggle('an',!!S.autoAktiv);
-    a.textContent=S.autoAktiv?'■ AUTO':'▶ AUTO';
+    a.textContent=S.autoAktiv?'■ AUTO':'▶︎ AUTO';
   }
   var f=el('freitext');
   if(f)f.placeholder=S.autoAktiv
@@ -2823,9 +3047,9 @@ if(typeof window!=='undefined'&&window.addEventListener){
     var g=(ev&&ev.reason)||{};
     var text=String(g.message||g);
     if(kiNochNichtBereit(g)){
-      errZeile('⚠ Das Text-Plugin war kurz nicht bereit. Wenn nichts weitergeht: Seite neu laden.');
+      errZeile('⚠︎ Das Text-Plugin war kurz nicht bereit. Wenn nichts weitergeht: Seite neu laden.');
     }else{
-      errZeile('⚠ '+text);
+      errZeile('⚠︎ '+text);
     }
     if(ev.preventDefault)ev.preventDefault();
   });
@@ -2857,17 +3081,17 @@ function zeigeChronik(ziel){
   var kopf=el('chronikTitel'), inhalt=el('chronikInhalt');
   inhalt.style.whiteSpace=(ziel==='handlung')?'pre-wrap':'normal';
   if(ziel==='ort'){
-    kopf.textContent='📖 '+((W.ort&&W.ort.name)||'Ort').toUpperCase();
+    kopf.innerHTML=sym('chronik')+' '+((W.ort&&W.ort.name)||'Ort').toUpperCase();
     inhalt.textContent=((W.ort&&W.ort.geschichte)||'Keine Aufzeichnungen.')+
       (S.szeneGlobal?'\n\nKulisse: '+S.szeneGlobal:'');
     inhalt.style.whiteSpace='pre-wrap';
   }else if(ziel==='handlung'){
-    kopf.textContent='📖 HANDLUNG';
+    kopf.innerHTML=sym('chronik')+' HANDLUNG';
     var t=(S.handlung||'Noch nichts geschehen.');
     if(S.fakten.length)t+='\n\n• '+faktenTexte().join('\n• ');
     inhalt.textContent=t;
   }else if(ziel==='mission'){
-    kopf.textContent='📖 MISSION';
+    kopf.innerHTML=sym('mission')+' MISSION';
     inhalt.style.whiteSpace='pre-wrap';
     inhalt.textContent=(W.mission||'Für diese Geschichte wurde kein Ziel gesetzt.')+
       (S.aktZiel?'\n\nAkt '+(S.akt||1)+': '+S.aktZiel:'')+
@@ -2879,7 +3103,7 @@ function zeigeChronik(ziel){
     bearbeiten.onclick=function(){ schliesseModal(); oeffneMissionMenu(); };
     el('chronikNav').appendChild(bearbeiten);
   }else if(ziel==='beziehungen'){
-    kopf.textContent='📖 BEZIEHUNGEN';
+    kopf.innerHTML=sym('chronik')+' BEZIEHUNGEN';
     inhalt.style.whiteSpace='pre-wrap';
     beziehungenAufraeumen();
     var zeilen=W.npcs.map(function(x){
@@ -2892,7 +3116,7 @@ function zeigeChronik(ziel){
   }else{
     var n=W.npcs[ziel];
     if(!n)return;
-    kopf.textContent='📖 '+(n.name||'NPC').toUpperCase();
+    kopf.innerHTML=sym('chronik')+' '+(n.name||'NPC').toUpperCase();
     beziehungenAufraeumen();
     var zieleN=[heldName()].concat(W.npcs.map(function(a){return a.name;}).filter(function(nm){return nm!==n.name;}));
     inhalt.style.whiteSpace='pre-wrap';
@@ -2963,8 +3187,17 @@ function oeffneFigurMenu(){
       (multi?'<textarea id="'+id+'" class="feld" rows="2"></textarea>':'<input id="'+id+'" class="feld" type="text">');
   }
   var P=W.protagonist;
+  var heldBlatt=blattLesen(P.name);
+  var gwahl=['','maennlich','weiblich','divers'].map(function(k){
+    var sel=(geschlechtSchluessel(P.geschlecht)===k)?' selected':'';
+    return '<option value="'+k+'"'+sel+'>'+(k?GESCHLECHTER[k].label:'nicht festgelegt')+'</option>';
+  }).join('');
   var html='<div class="figblock"><div class="figtitel">HELD</div>'+
+    (heldBlatt?'<img src="'+heldBlatt+'" alt="Charakterblatt" style="width:120px;max-width:40%;border:1px solid var(--border);display:block;margin:0 0 8px;">':'')+
+    '<div class="reihe"><button onclick="zeichneBlatt(\'held\')" title="Porträt des Helden erzeugen">✎ '+(heldBlatt?'BLATT NEU':'CHARAKTERBLATT')+'</button></div>'+
     feld('fig_held_name','Name',P.name,false)+
+    '<label class="feldlabel" for="fig_held_geschlecht">Geschlecht</label>'+
+    '<select id="fig_held_geschlecht" class="feld">'+gwahl+'</select>'+
     feld('fig_held_herkunft','Herkunft',P.herkunft,false)+
     feld('fig_held_beruf','Beruf',P.beruf,false)+
     feld('fig_held_eigenart','Eigenart',P.eigenart,true)+
@@ -2995,6 +3228,8 @@ function speichereFiguren(){
   P.herkunft=g('fig_held_herkunft')||P.herkunft;
   P.beruf=g('fig_held_beruf')||P.beruf;
   P.eigenart=g('fig_held_eigenart')||P.eigenart;
+  var gs=el('fig_held_geschlecht');
+  if(gs){ P.geschlecht=geschlechtSchluessel(gs.value); CFG.geschlecht=P.geschlecht; speichereCfg(); }
   P.aussehen=g('fig_held_aussehen');   // leer erlaubt: dann erscheint der Held nicht im Bild
   P.kleidung=g('fig_held_kleidung');
   W.npcs.forEach(function(n,i){
@@ -3117,7 +3352,7 @@ function missionLoeschen(){
 function zeigeGedanken(){
   if(!S.imSpiel)return;
   if(!W.npcs.length){ sysZeile('Niemand da.'); return; }
-  sysZeile('🎬 REGIE-BLICK — das verraten die Figuren nicht von selbst:');
+  sysZeile('❖ REGIE-BLICK — das verraten die Figuren nicht von selbst:');
   W.npcs.forEach(function(x){
     sysZeile('· '+x.name+': '+(x.ziel||'kein eigenes Ziel')+
       (x.geheimnis?(x.aufgedeckt?' — Geheimnis (bereits offen): ':' — verbirgt: ')+x.geheimnis:''));
@@ -3264,7 +3499,7 @@ function oeffneEinstellungen(){
 // Seit der Umstellung auf die Ladeschale ist die Frage berechtigt, welcher Stand
 // gerade laeuft. Die Schale legt den geholten Quelltext samt Zweig und Zeitpunkt
 // im localStorage ab; hier wird er nur abgelesen.
-var VERSION = 'V7.34';
+var VERSION = 'V7.36';
 // Ohne Browserkonsole — etwa am Handy — muss der Generator selbst sagen koennen,
 // woran es liegt, wenn ein Plugin von Perchance fehlt.
 function pluginLage(){
@@ -3485,7 +3720,7 @@ function speichereEinstellungen(){
   fuelleQuelleKurz();
   schliesseModal();
   if(S.imSpiel){
-    sysZeile('⚙ Einstellungen übernommen — Bildquelle: '+quelle().label);
+    sysZeile('⚙︎ Einstellungen übernommen — Bildquelle: '+quelle().label);
     zeichneBild({});
   }
 }
@@ -3602,6 +3837,8 @@ function migriere(d){
   if(!s.seed)s.seed=(w.ort&&parseInt(w.ort.seed,10))||neuerSeed();   // V6 hielt den Seed am Ort
   if(w.perspektive!=='ich'&&w.perspektive!=='er')w.perspektive='er';
   if(w.protagonist){
+    if(typeof w.protagonist.geschlecht!=='string')w.protagonist.geschlecht='';
+    w.protagonist.geschlecht=(typeof geschlechtSchluessel==='function')?geschlechtSchluessel(w.protagonist.geschlecht):w.protagonist.geschlecht;
     if(typeof w.protagonist.aussehen!=='string')w.protagonist.aussehen='';
     if(typeof w.protagonist.kleidung!=='string')w.protagonist.kleidung='';
   }
@@ -3696,6 +3933,7 @@ function uebernehmeAltstand(){
 
 // ── START ─────────────────────────────────────
 (function(){
+  symboleEinsetzen();
   ladeCfg();
   zeichneKopfSchalter();
   fuelleQuelleKurz();

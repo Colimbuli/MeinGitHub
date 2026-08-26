@@ -307,10 +307,41 @@ Erwähnung. Verdrängt wird der mit dem kleinsten Wert aus `Gewicht × 40 − Al
 Gespräch berührt, altert er nicht weiter. In die Anweisung gehen die wichtigsten, aber in
 Erzählreihenfolge.
 
+### Eine neue Figur von Hand
+
+Der Knopf **+ NPC** führt jetzt zuerst in ein leeres Formular: Name, Rolle, Aussehen, Kleidung,
+Persönlichkeit, Stimmung, Haltung zum Helden, was sie will, was sie verbirgt, ihr erster Satz — und
+ein freies Feld für alles, was sonst nirgends hinpasst. Alles ist freiwillig.
+
+Zwei Wege hinaus: **✦ ERSCHEINEN LASSEN** gibt deine Angaben als verbindliche Vorgabe an die KI, die
+nur die Lücken füllt — was du eingetragen hast, wird wörtlich übernommen. **NUR MEINE ANGABEN**
+kommt ganz ohne KI-Aufruf aus und nimmt genau das, was dasteht.
+
+Der alte Weg bleibt: `/npc3: kommt mit einer Taschenlampe` erfindet die Figur wie bisher direkt.
+
+### Alle Symbole in einem Stil
+
+Emoji malt jedes Gerät in eigenen Farben — mitten in einer goldenen Leiste sehen sie aus wie
+hineingefallen. Alle Symbole sind deshalb gezeichnet (Inline-SVG mit `fill="currentColor"`) und
+nehmen die Farbe des Knopfes an, auch beim Überfahren. Sie stehen genau einmal im Quelltext, im
+Objekt `SYM`; jedes Element mit `data-sym="chronik"` bekommt seines beim Start eingesetzt. Ein Test
+schlägt an, sobald wieder ein farbiges Emoji in die Datei gerät.
+
+### Wer der Held ist
+
+Auf dem Startbildschirm steht neben Bildstil und Erzählweise **DU BIST**: männlich, weiblich, divers
+oder *egal — die KI entscheidet*. Die Wahl bleibt gemerkt, geht in die Welterschaffung ein und steht
+danach in jeder Anweisung (damit die Figuren richtig ansprechen) und im Bildprompt (damit der Held
+nicht von Panel zu Panel wechselt). Ändern lässt sie sich jederzeit im Figurenmenü 👤.
+
+Der Held hat dort auch ein Feld **Aussehen**. Bleibt es leer, baut PROXIMA beim ersten Charakterblatt
+eine Beschreibung aus Geschlecht und Beruf — und hält sie fest, damit sie nicht bei jedem Bild anders
+ausfällt.
+
 ### Charakterblatt
 
-Gesichter wandern von Panel zu Panel. Im Figurenmenü erzeugt **✎ CHARAKTERBLATT** (oder `/blatt 2`)
-ein Porträt der Figur: Identität und Kleidung vor neutralem Grund, mit einem eigenen Seed, der aus
+Gesichter wandern von Panel zu Panel. Im Figurenmenü erzeugt **✎ CHARAKTERBLATT** (oder `/blatt 2`,
+für den Helden `/blatt held`) ein Porträt der Figur: Identität und Kleidung vor neutralem Grund, mit einem eigenen Seed, der aus
 dem Seed der Partie abgeleitet ist — dieselbe Partie ergibt dieselben Gesichter, verschiedene Figuren
 verschiedene. Die Bilder liegen **neben** dem Spielstand im `localStorage`, nicht darin; ein
 Spielstand bleibt damit klein genug zum Exportieren.
@@ -516,7 +547,7 @@ ein neuer Befehl steht damit automatisch in der Hilfe, ohne Nachpflege. Ein Test
 | `/regie: …` | stehende Regie für die ganze Szene, leer = löschen |
 | `/bild: …` | neues Bild aus eigener Beschreibung |
 | `/gedanken` | verdeckte Absichten aller Figuren zeigen — verrät die Geheimnisse |
-| `/blatt N` | Charakterblatt für Figur N zeichnen (ohne Zahl: Figurenmenü) |
+| `/blatt N` | Charakterblatt zeichnen — N ist die Figurennummer, `held` der Held (ohne Angabe: Figurenmenü) |
 | `/mission: …` | das Ziel der Geschichte setzen; `weg` streicht es, ohne Angabe öffnet sich das Missions-Menü |
 | `/stil: …` | Bildstil wechseln (`manga`, `comic`, `aquarell`, `oel`, `realistisch`, `pixel` oder freier Text) — dasselbe geht oben im Bildmenü 🖼 |
 | `/ort: …` | an einen anderen Ort wechseln (ohne Angabe: Ort-Menü) |

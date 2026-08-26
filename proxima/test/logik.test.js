@@ -818,6 +818,48 @@ pruefe('dieselbe Zeile gilt als keine Korrektur', ctx.lektorAntwort('Gleiche Zei
 pruefe('Leeres ändert nichts', ctx.lektorAntwort('', 'Original') === '' && ctx.lektorAntwort(null, 'Original') === '');
 pruefe('der Schalter steht in den Einstellungen', html.includes('id="cfgLektor"') && html.includes('CFG.lektor=!!lk.checked'));
 
+console.log('\n— Geschlecht des Helden —');
+// Es steht in der Anweisung, damit die Figuren richtig ansprechen, und im
+// Bildprompt, damit der Held nicht in jedem Panel wechselt.
+pruefe('gängige Schreibweisen werden verstanden',
+  ctx.geschlechtSchluessel('männlich') === 'maennlich' && ctx.geschlechtSchluessel('W') === 'weiblich' &&
+  ctx.geschlechtSchluessel('nichtbinär') === 'divers' && ctx.geschlechtSchluessel('Kürbis') === '',
+  ctx.geschlechtSchluessel('Kürbis'));
+frischeWelt(); ctx.verarbeiteWelt(weltJson);
+ctx.W.protagonist.geschlecht = 'weiblich';
+pruefe('es steht in der Anweisung', /weiblich/.test(ctx.weltKontext()), ctx.weltKontext().split('\n')[1]);
+pruefe('es wird zum Bildwort', ctx.geschlechtFuerBild() === 'a woman');
+ctx.W.protagonist.geschlecht = '';
+pruefe('ohne Festlegung steht nichts da', !/nicht festgelegt/.test(ctx.weltKontext()) && ctx.geschlechtFuerBild() === '');
+ctx.W.protagonist.geschlecht = 'maennlich';
+ctx.W.protagonist.aussehen = 'in his forties, grey at the temples';
+ctx.W.perspektive = 'er';
+const heldBild = ctx.bauePrompt({});
+pruefe('der Held erscheint mit Geschlecht im Bild', /a man, in his forties/.test(heldBild), heldBild.slice(0, 80));
+ctx.W.protagonist.aussehen = 'a man with a beard';
+pruefe('doppelt wird es nicht gesetzt', !/a man, a man/.test(ctx.bauePrompt({})));
+ctx.W.protagonist.aussehen = '';
+pruefe('fehlt die Beschreibung, entsteht eine aus Beruf und Geschlecht',
+  /a man/.test(ctx.heldAussehen(false)) && /apotheker/i.test(ctx.heldAussehen(false)), ctx.heldAussehen(false));
+pruefe('lesen allein schreibt sie nicht fest', ctx.W.protagonist.aussehen === '');
+ctx.heldAussehen(true);
+pruefe('beim Zeichnen wird sie festgehalten', ctx.W.protagonist.aussehen.length > 0);
+pruefe('die Wahl steht auf dem Startbildschirm', html.includes('id="geschlechtwahl"') && html.includes('CFG.geschlecht'));
+pruefe('und im Figurenmenü', html.includes('id="fig_held_geschlecht"'));
+
+console.log('\n— Charakterblatt des Helden —');
+ctx.S.seed = 12345;
+pruefe('der Held hat einen eigenen Seed',
+  ctx.heldSeed() !== ctx.figurSeed(0) && ctx.heldSeed() !== ctx.figurSeed(1));
+ctx.W.protagonist.aussehen = 'in his forties, grey at the temples';
+ctx.W.protagonist.kleidung = 'a worn linen jacket';
+const hb = ctx.blattPrompt('held');
+pruefe('sein Blatt nennt Geschlecht, Identität und Kleidung',
+  /a man/.test(hb) && /grey at the temples/.test(hb) && /wearing a worn linen jacket/.test(hb), hb);
+pruefe('es ist derselbe Rahmen wie bei den Figuren',
+  /character reference sheet/.test(hb) && /neutral grey background/.test(hb));
+pruefe('/blatt held ist ein Weg dorthin', /held\|ich\|0/.test(html));
+
 console.log('\n— Verdeckte Absichten —');
 // Jede Figur will etwas fuer sich und verbirgt etwas. Der Spieler sieht das
 // nicht, die KI schon.
@@ -994,11 +1036,50 @@ const breit = (breitCss.match(/width:(\d+)px/) || [])[1];
 pruefe('Icon-Knopf steht 1:1', hoehe && breite && +hoehe === +breite, breite + 'x' + hoehe);
 pruefe('beschrifteter Knopf steht 1:2', breit && +breit === 2 * +hoehe, breit + 'x' + hoehe);
 pruefe('kein Padding zieht die Breite auseinander', /padding:0/.test(werkzeugCss), werkzeugCss);
-pruefe('beide beschrifteten Knoepfe sind als breit markiert',
-  (html.match(/id="(npcbtn|autobtn)" class="breit"/g) || []).length === 2);
-// Der Ort traegt jetzt eine umgekehrte Tropfenform statt der runden Nadel.
-pruefe('das Ort-Symbol ist gezeichnet, nicht mehr die runde Nadel',
-  !html.includes('\u{1F4CD}') && /id="ortbtn"[^>]*>\s*<svg/.test(html));
+pruefe('der beschriftete Knopf ist als breit markiert',
+  /id="autobtn" class="breit"/.test(html) && !/id="npcbtn" class="breit"/.test(html));
+
+// Alle Symbole kommen aus einem Satz und nehmen die Farbe des Knopfes an.
+console.log('\n— Goldener Symbolsatz —');
+pruefe('jeder Knopf holt sein Symbol aus dem Satz',
+  ['chronik','figuren','ort','bild','einstellungen','speichern','npcplus'].every(k => html.includes('data-sym="' + k + '"')),
+  ['chronik','figuren','ort','bild','einstellungen','speichern','npcplus'].filter(k => !html.includes('data-sym="' + k + '"')).join(','));
+pruefe('der Satz kennt jedes davon',
+  ['chronik','figuren','ort','bild','einstellungen','speichern','npcplus','mission','wuerfel','regie'].every(k => ctx.SYM[k]),
+  Object.keys(ctx.SYM).join(','));
+pruefe('gezeichnet wird in der Farbe des Knopfes', /fill="currentColor"/.test(ctx.sym('chronik')));
+pruefe('unbekannte Namen ergeben ein leeres, aber gültiges Symbol',
+  /<svg[\s\S]*<\/svg>/.test(ctx.sym('gibtsnicht')));
+pruefe('die Größe lässt sich vorgeben', /width="22"/.test(ctx.sym('bild', 22)));
+pruefe('die Symbole werden beim Start eingesetzt', /symboleEinsetzen\(\);/.test(html));
+// Farbige Emoji haben in einer goldenen Leiste nichts verloren.
+const emoji = (html.match(/[\u{1F300}-\u{1FAFF}]/gu) || []);
+pruefe('kein farbiges Emoji mehr im Generator', emoji.length === 0, emoji.join(' '));
+
+console.log('\n— Formular für neue Figuren —');
+// Der Knopf fuehrt zuerst in ein leeres Formular.
+pruefe('der Knopf öffnet das Formular', /id="npcbtn"[^>]*onclick="oeffneNeueFigur\(\)"/.test(html));
+pruefe('das Formular steht im Markup',
+  html.includes('id="mNeueFigur"') && ['name','rolle','aussehen','kleidung','person','stimmung','beziehung','ziel','geheimnis','eroeffnung','hinweis']
+    .every(k => html.includes('id="nf_' + k + '"')));
+pruefe('es führt beide Wege', /neueFigurUebernehmen\(false\)/.test(html) && /neueFigurUebernehmen\(true\)/.test(html));
+const vorgabe = { name: 'Elsa Brandt', rolle: 'Platzanweiserin', aussehen: '', kleidung: '', person: '',
+  stimmung: 'genervt', beziehung: 'misstrauisch', ziel: 'Feierabend machen.', geheimnis: '', eroeffnung: '', hinweis: 'kommt mit Taschenlampe' };
+const vt = ctx.vorgabeText(vorgabe);
+pruefe('die Vorgaben stehen als verbindlich in der Anweisung',
+  /VORGABEN DES SPIELERS/.test(vt) && /WOERTLICH/.test(vt) && /Elsa Brandt/.test(vt) && /Taschenlampe/.test(vt), vt);
+pruefe('leere Felder tauchen dort nicht auf', !/Aussehen/.test(vt) && !/Was sie verbirgt/.test(vt));
+pruefe('ohne jede Eingabe bleibt die Anweisung frei', ctx.vorgabeText({}) === '' && ctx.vorgabeText(null) === '');
+const gemischt = ctx.mischeFigur(vorgabe, {
+  name: 'Frei Erfunden', rolle: 'Gast', aussehen: 'a tall woman', kleidung: 'a uniform',
+  person: 'knapp', grundstimmung: 'heiter', ziel: 'etwas anderes', geheimnis: 'ein Geheimnis', eroeffnung: 'Hallo.'
+});
+pruefe('eingetragene Angaben schlagen die KI',
+  gemischt.name === 'Elsa Brandt' && gemischt.grundstimmung === 'genervt' && gemischt.ziel === 'Feierabend machen.');
+pruefe('für leere Felder gilt die KI',
+  gemischt.aussehen === 'a tall woman' && gemischt.person === 'knapp' && gemischt.geheimnis === 'ein Geheimnis');
+pruefe('die Stimmung wird auf ein Wort gebracht',
+  ctx.mischeFigur({ stimmung: 'ziemlich genervt heute' }, { grundstimmung: 'heiter' }).grundstimmung === 'ziemlich');
 
 console.log('\n— Bildregie-Bot —');
 // Der Bot ist ein zweiter KI-Aufruf, der nur nach dem Bild fragt. Er darf die
