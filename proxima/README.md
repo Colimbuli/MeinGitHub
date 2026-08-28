@@ -441,11 +441,38 @@ dem Seed der Partie abgeleitet ist — dieselbe Partie ergibt dieselben Gesichte
 verschiedene. Die Bilder liegen **neben** dem Spielstand im `localStorage`, nicht darin; ein
 Spielstand bleibt damit klein genug zum Exportieren.
 
+### Wie die Figuren reden
+
+Der häufigste Fehler einer KI im Dialog ist nicht der falsche Inhalt, sondern der falsche Klang:
+gestelzte Bilder, erfundene Fachwörter, Sätze, die kein Mensch ausspricht („dann korrigiere ich die
+Symmetrie mit meinem Wanderstock"). Dagegen stehen zwei Blöcke in **jeder** Anweisung an die KI.
+
+**Die Sprachregeln gelten immer:**
+
+* gesprochene Sprache — einfache Wörter, kurze Sätze, auch mal ein halber
+* jeder Satz wird gegengeprüft: Würde ein Mensch in *dieser* Lage das wirklich so sagen? Ein banaler
+  echter Satz ist besser als ein origineller, den niemand sagt
+* höchstens **ein** Bild oder Vergleich pro Zeile, meistens gar keines
+* keine erfundenen Fachbegriffe, kein Vokabular, das die Figur nicht kennen kann
+* konkret statt geheimnisvoll: was die Figur sieht, tut und will
+* auch Ungeduld, Drohung und Scherz bleiben alltäglich
+
+**Der Tonfall ist wählbar** (⚙ EINSTELLUNGEN → *Tonfall der Figuren*):
+
+| Wahl | Klang |
+| --- | --- |
+| natürlich (Standard) | warm und respektvoll, alltagsnah; Necken und Ironie erlaubt |
+| frivol | frech und anzüglich, spielerisch und gutmütig |
+| sachlich | knapp und nüchtern, ohne Flirt und Ausschmückung |
+
+Klingen die Antworten trotzdem ausgedacht, hilft der **Lektor** — er prüft die Sprache inzwischen
+als Erstes.
+
 ### Lektor
 
-Ein zweiter, stiller KI-Aufruf liest jede Antwort, bevor du sie siehst, und prüft vier Dinge:
-wiederholte Formulierungen, zu schnelle Beziehungssprünge, ignorierte Mission, Widerspruch zur
-Würfelprobe. Findet er nichts, antwortet er `OK` und die Zeile bleibt, wie sie war. Findet er etwas,
+Ein zweiter, stiller KI-Aufruf liest jede Antwort, bevor du sie siehst, und prüft fünf Dinge:
+**gestelzte Sprache** (Sätze, die niemand so sagt), wiederholte Formulierungen, zu schnelle
+Beziehungssprünge, ignorierte Mission, Widerspruch zur Würfelprobe. Findet er nichts, antwortet er `OK` und die Zeile bleibt, wie sie war. Findet er etwas,
 schreibt er sie neu — aber nur, wenn die Korrektur nicht länger als das Doppelte des Originals ist,
 sonst gilt sie als Aufsatz und wird verworfen. Kostet einen KI-Aufruf je Zug, ab Werk aus.
 

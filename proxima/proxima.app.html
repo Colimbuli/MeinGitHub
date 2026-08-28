@@ -192,7 +192,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.41</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.42</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -532,6 +532,7 @@ var CFG={
   lektor:false,    // zweiter KI-Aufruf prueft die Antwort, bevor sie erscheint
   tempo:16,        // ms pro Zeichen im Schreibmaschinen-Effekt (0 = sofort)
   bildTakt:2,      // alle N Zuege ein neues Bild (0 = nur auf Zuruf)
+  ton:'natuerlich',// Tonfall der Figuren: natuerlich, frivol oder sachlich
   wuerfel:true,    // Handlungen des Helden koennen misslingen
   geschlecht:'',   // zuletzt gewaehltes Geschlecht des Helden (leer = KI entscheidet)
   pollModell:'',
@@ -1119,14 +1120,15 @@ function baueLektorAnweisung(antwort,name){
     (S.probe?'PROBE: Der Versuch des Helden ist '+(S.probe.gelungen?'GELUNGEN':'MISSLUNGEN')+'.\n':'')+
     'BISHER GESAGT:\n'+verlaufText(4,160)+'\n\n'+
     'ZU PRUEFENDE ZEILE:\n'+antwort+'\n\n'+
-    'Pruefe genau vier Dinge:\n'+
-    '1. Wiederholung: Kommt eine Formulierung oder ein Bild aus den letzten Zeilen noch einmal?\n'+
-    '2. Beziehungssprung: Wird aus Hoeflichkeit ploetzlich Vertrautheit oder Verliebtheit?\n'+
-    '3. Mission: Wird das Ziel voellig ignoriert, obwohl es sich anboete?\n'+
-    '4. Probe: Widerspricht die Zeile dem feststehenden Ausgang?\n\n'+
+    'Pruefe genau fuenf Dinge:\n'+
+    '1. Sprache: Klingt die Zeile wie GESPROCHENE Rede? Wuerde ein Mensch in dieser Lage das wirklich so sagen? Gestelzte Bilder, erfundene Fachwoerter, mehr als ein Vergleich, Saetze wie aus einem Roman — all das muss weg.\n'+
+    '2. Wiederholung: Kommt eine Formulierung oder ein Bild aus den letzten Zeilen noch einmal?\n'+
+    '3. Beziehungssprung: Wird aus Hoeflichkeit ploetzlich Vertrautheit oder Verliebtheit?\n'+
+    '4. Mission: Wird das Ziel voellig ignoriert, obwohl es sich anboete?\n'+
+    '5. Probe: Widerspricht die Zeile dem feststehenden Ausgang?\n\n'+
     'Ist alles in Ordnung, antworte NUR mit: OK\n'+
-    'Sonst antworte NUR mit der verbesserten Zeile auf Deutsch, gleiche Laenge, gleiche Figur, '+
-    'Handlungen in eckigen Klammern. Keine Erklaerung, keine Anfuehrungszeichen.';
+    'Sonst antworte NUR mit der verbesserten Zeile auf Deutsch, hoechstens so lang wie das Original, '+
+    'gleiche Figur, Handlungen in eckigen Klammern. Keine Erklaerung, keine Anfuehrungszeichen.';
 }
 function lektorAntwort(roh,original){
   var t=String(roh==null?'':roh).trim();
@@ -1494,7 +1496,7 @@ async function leiteNpcAusStoryAb(story){
     'HELD: '+W.protagonist.name+' aus '+W.protagonist.herkunft+'.\n'+
     'STADT: '+W.stadt+'. ORT: '+W.ort.name+' — '+W.ort.geschichte+'\n'+
     'VORGESCHICHTE:\n'+story+'\n\n'+
-    'Ton der Figur: warm, freundlich, offen; frivol/frech erlaubt, aber respektvoll.\n'+
+    registerText()+sprachRegeln()+
     'Antworte NUR mit einem JSON-Objekt, ohne Codeblock:\n'+
     '{"name":"","rolle":"","aussehen":"constant English visual IDENTITY only, no clothing","kleidung":"english default outfit","person":"deutscher Satz","stimmung":"EIN deutsches Wort","eroeffnung":"erster deutscher Satz an den Helden"}';
   var text=await frageKI(instruction,120000);
@@ -2141,6 +2143,34 @@ function kappe(t,max){
   return t.length>max?(t.substring(0,max)+'…'):t;
 }
 
+// ── WIE DIE FIGUREN REDEN ─────────────────────
+// Der haeufigste Fehler einer KI im Dialog ist nicht der falsche Inhalt,
+// sondern der falsche Klang: gestelzte Bilder, erfundene Fachwoerter, Saetze,
+// die niemand ausspricht. Dagegen stehen zwei Bloecke in jeder Anweisung -
+// der Tonfall, den der Spieler waehlt, und die Sprachregeln, die immer gelten.
+var TONFAELLE={
+  natuerlich:{label:'Natürlich — wie Menschen wirklich reden',
+    text:'REGISTER: Warm, freundlich und respektvoll — vor allem aber alltagsnah. Necken, Ironie und ein trockener Spruch sind willkommen, solange sie klingen wie gesprochene Sprache. KEINE Beleidigungen, keine Herablassung, keine Feindseligkeit.\n'},
+  frivol:{label:'Frivol — frech und anzüglich',
+    text:'REGISTER: Der Ton ist warm, freundlich und offen. Frivole, freche und anzuegliche Sprueche sind erlaubt und erwuenscht, solange sie SPIELERISCH und gutmuetig bleiben und wie gesprochene Sprache klingen. KEINE Beleidigungen, keine Herablassung, keine Feindseligkeit — necken ja, verletzen nein.\n'},
+  sachlich:{label:'Sachlich — knapp und nüchtern',
+    text:'REGISTER: Nuechtern und knapp. Die Figuren reden zur Sache, ohne Flirt und ohne Ausschmueckung. Hoeflich, aber sparsam mit Gefuehlen.\n'}
+};
+function tonSchluessel(t){
+  var k=String(t||'').toLowerCase().trim();
+  return TONFAELLE[k]?k:'natuerlich';
+}
+function registerText(){ return TONFAELLE[tonSchluessel(CFG.ton)].text; }
+function sprachRegeln(){
+  return 'SPRACHE — hier geht am meisten schief, also lies es zweimal:\n'+
+    '- Schreib GESPROCHENE Sprache: einfache Woerter, kurze Saetze, auch mal ein halber. So, wie Menschen wirklich reden.\n'+
+    '- Pruefe jeden Satz, bevor du ihn abschickst: Wuerde ein Mensch in DIESER Lage das wirklich so sagen? Wenn nein, schreib ihn schlichter. Ein banaler echter Satz ist besser als ein origineller, den niemand sagt.\n'+
+    '- Hoechstens EIN Bild oder Vergleich pro Zeile, meistens gar keines. Keine Metapher auf der Metapher, nichts, was etwas "fast schon" tut.\n'+
+    '- Keine erfundenen Fachbegriffe und kein Vokabular, das diese Figur nicht kennen kann.\n'+
+    '- Konkret statt geheimnisvoll: was die Figur SIEHT, TUT und WILL.\n'+
+    '- Auch Ungeduld, Drohung und Scherz bleiben alltaeglich — "Jetzt mach schon" statt einer ausgedachten Bildrede.\n';
+}
+
 // ── EIN ZUG: Regie + Schauspiel + Bildidee in EINEM Aufruf ──
 async function naechsterZug(erzwinge,autoModus){
   // Spielbar ist, wer im Raum der Kamera steht - und nicht die Figur, die der
@@ -2204,7 +2234,7 @@ async function naechsterZug(erzwinge,autoModus){
       : '- Es gibt kein festes Ziel. Dann verfolgt jede Figur eigene Absichten am Ort und treibt die Szene damit voran.\n')+
     '- Die BEZIEHUNGEN oben sind verbindlich: Jede Figur spricht mit jeder anderen genau so, wie es dort steht — vertraut, skeptisch, verliebt, dankbar. Wer den Helden kennt, behandelt ihn nicht wie einen Fremden.\n'+
     '- ANNAEHERUNG: Zuneigung, Flirt und Begehren duerfen entstehen, sind aber weder das Thema noch eine Abkuerzung. Sie wachsen langsam aus gemeinsamem Tun und Vertrauen, in kleinen Schritten und nur, wenn BEIDE Seiten sie tragen. Ueberspringe keine Stufe: aus "hoeflich" wird nicht im naechsten Zug "verliebt". Nimmt die Szene eine amouroese Wendung, laeuft alles andere trotzdem weiter — die Mission, die uebrigen Anwesenden, der Ort.\n'+
-    'REGISTER: Der Ton ist warm, freundlich und offen. Alle Figuren begegnen einander UND dem Helden mit Respekt und Sympathie. Frivole, freche, anzuegliche und teils obszoene Sprueche sind erlaubt und erwuenscht, solange sie SPIELERISCH und gutmuetig bleiben. KEINE Beleidigungen, keine Herablassung, keine Feindseligkeit untereinander — necken ja, verletzen oder respektlos sein nein.\n'+
+    registerText()+sprachRegeln()+
     '- Text des Helden in eckigen Klammern sind seine HANDLUNGEN. Figuren antworten mit EIGENEN Handlungen (in eckigen Klammern) und Rede.\n'+
     '- Reagiere KONKRET auf das zuletzt Gesagte. Wiederhole keine Formulierungen aus frueheren Zeilen.\n'+
     '- Widersprich nichts, was unter WAS BISHER FESTSTEHT aufgefuehrt ist.\n'+
@@ -3982,15 +4012,22 @@ function oeffneEinstellungen(){
     '> Im Auto-Modus handelt der Held selbst mit</label>'+
     '<label class="feldlabel"><input type="checkbox" id="cfgAutoBesetzung"'+(CFG.autoBesetzung?' checked':'')+
     '> Handlung verändert Ort, Besetzung und Kleidung</label>'+
+    '<label class="feldlabel" for="cfgTon">TONFALL DER FIGUREN</label>'+
+    '<select id="cfgTon" class="feld">'+
+    Object.keys(TONFAELLE).map(function(k){
+      return '<option value="'+k+'"'+(tonSchluessel(CFG.ton)===k?' selected':'')+'>'+escapeHtml(TONFAELLE[k].label)+'</option>';
+    }).join('')+'</select>'+
+    '<div class="hinweis">Unabhängig davon gilt immer: gesprochene Sprache, kurze Sätze, höchstens ein Bild pro Zeile. '+
+    'Klingen die Antworten trotzdem ausgedacht, hilft der Lektor darunter — er prüft jede Zeile auch darauf.</div>'+
     '<label class="feldlabel"><input type="checkbox" id="cfgWuerfel"'+(CFG.wuerfel?' checked':'')+
     '> Handlungen des Helden können misslingen (Würfelprobe)</label>'+
     '<div class="hinweis">Steht in deiner Eingabe eine Handlung in eckigen Klammern, entscheidet ein Wurf, ob sie gelingt. '+
     'Wie die angesprochene Figur zu dir steht, hilft oder steht im Weg. Aus ist alles wie früher: Es gelingt, was du schreibst.</div>'+
     '<label class="feldlabel"><input type="checkbox" id="cfgLektor"'+(CFG.lektor?' checked':'')+
     '> Lektor: prüft jede Antwort, bevor sie erscheint</label>'+
-    '<div class="hinweis">Ein zweiter Aufruf liest die Zeile gegen vier Dinge: Wiederholung, zu schneller Beziehungssprung, '+
-    'ignorierte Mission, Widerspruch zur Würfelprobe. Nur wenn er etwas findet, schreibt er sie neu — kostet dafür je Zug '+
-    'einen KI-Aufruf mehr.</div>'+
+    '<div class="hinweis">Ein zweiter Aufruf liest die Zeile gegen fünf Dinge: gestelzte Sprache, Wiederholung, '+
+    'zu schneller Beziehungssprung, ignorierte Mission, Widerspruch zur Würfelprobe. Nur wenn er etwas findet, schreibt '+
+    'er sie neu — kostet dafür je Zug einen KI-Aufruf mehr.</div>'+
     '<label class="feldlabel"><input type="checkbox" id="cfgBildBot"'+(CFG.bildBot?' checked':'')+
     '> Bildregie: eigener KI-Aufruf sucht das Bild zum Moment</label>'+
     '<div class="hinweis">Aus: Die Bildbeschreibung fällt nebenbei im Dialog-Aufruf ab — schnell und ohne Zusatzkosten. '+
@@ -4008,7 +4045,7 @@ function oeffneEinstellungen(){
 // Seit der Umstellung auf die Ladeschale ist die Frage berechtigt, welcher Stand
 // gerade laeuft. Die Schale legt den geholten Quelltext samt Zweig und Zeitpunkt
 // im localStorage ab; hier wird er nur abgelesen.
-var VERSION = 'V7.41';
+var VERSION = 'V7.42';
 // Ohne Browserkonsole — etwa am Handy — muss der Generator selbst sagen koennen,
 // woran es liegt, wenn ein Plugin von Perchance fehlt.
 function pluginLage(){
@@ -4225,6 +4262,7 @@ function leseEinstellungen(){
   var bb=el('cfgBildBot'); if(bb)CFG.bildBot=!!bb.checked;
   var wf=el('cfgWuerfel'); if(wf)CFG.wuerfel=!!wf.checked;
   var lk=el('cfgLektor'); if(lk)CFG.lektor=!!lk.checked;
+  var tn=el('cfgTon'); if(tn)CFG.ton=tonSchluessel(tn.value);
   var q=BILDQUELLEN[CFG.quelle];
   (q.felder||[]).forEach(function(f){
     var e=el('q_'+f.k);
