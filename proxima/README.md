@@ -673,6 +673,32 @@ Unveraenderte Angaben werden verworfen, damit nicht bei jedem Zug dasselbe Bild 
 Der Held kann sich ebenso umziehen. Von Hand geht es weiter mit `/kleidungN: …` oder im
 Figurenmenue.
 
+### Wenn es lange dauert
+
+**`/tempo`** zeigt, wo die Zeit hingeht — gemessen, nicht geschätzt:
+
+```
+WO DIE ZEIT HINGEHT
+Text der Regie: 4.2 s  (6368 Zeichen Anweisung)
+Lektor: aus
+Bildregie-Bot: aus
+Bild (Perchance): 38.1 s
+Bild-Takt: alle 2 Züge — noch 1 Zug bis zum nächsten
+Zwangspause: keine
+
+Der Bilddienst ist der langsame Teil. …
+```
+
+Ein Zug kostet **einen** Textaufruf. Zwei Schalter machen daraus mehr, und beide sind ab Werk aus:
+der **Lektor** (ein zweiter Textaufruf je Zug) und die **Bildregie** (ein eigener Textaufruf vor
+jedem Bild). Steht in `/tempo` bei einem von beiden eine hohe Sekundenzahl, ist die Ursache
+gefunden.
+
+Das Bild selbst hängt am gewählten Dienst und nicht am Generator. Dagegen helfen: kleinere
+Bildgröße, höherer Bild-Takt (⚙ EINSTELLUNGEN, `0` = nur auf Zuruf) oder eine andere Quelle.
+Hat ein Dienst gedrosselt, steht die verbleibende **Zwangspause** ebenfalls in `/tempo` — in dieser
+Zeit fragt PROXIMA bewusst nicht nach, statt weiter anzuklopfen.
+
 ### Wenn eine Aenderung nicht ankommt
 
 Die Regie antwortet mit einem JSON-Objekt, in dem `auftritt`, `abgang`, `ortwechsel` und
@@ -765,6 +791,7 @@ ein neuer Befehl steht damit automatisch in der Hilfe, ohne Nachpflege. Ein Test
 | `/speichern` | Spielstände öffnen |
 | `/räume` | Kachelübersicht aller Räume — wer wo ist, und wer wohin geht |
 | `/ton: …` | Tonfall der Figuren — natürlich, frivol, sachlich oder eigener Wortlaut |
+| `/tempo` | zeigt, wo die Zeit hingeht — Text, Lektor, Bildregie, Bilddienst, Takt, Pausen |
 | `/auswerten` | ein übernommenes Gespräch (noch einmal) auswerten — Profile, Beziehungen, Gedächtnis |
 
 ## Was gegenüber V6 anders ist

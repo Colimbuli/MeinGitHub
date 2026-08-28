@@ -192,7 +192,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.43</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.44</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -1142,12 +1142,15 @@ function lektorAntwort(roh,original){
   return t;
 }
 async function lektor(antwort,name){
-  if(!CFG.lektor||!antwort)return antwort;
+  if(!CFG.lektor||!antwort){ S.msLektor=0; return antwort; }
+  var tLekt=Date.now();
   try{
     var roh=await frageKI(baueLektorAnweisung(antwort,name),45000);
+    S.msLektor=Date.now()-tLekt;
     var besser=lektorAntwort(roh,antwort);
     if(besser){ S.lektorGriff=(S.lektorGriff||0)+1; return besser; }
   }catch(e){
+    S.msLektor=Date.now()-tLekt;
     console.warn('Lektor ohne Antwort:',e);
   }
   return antwort;
@@ -1224,6 +1227,8 @@ var S = {
   seed:0,                           // fest, damit Figuren wiedererkennbar bleiben
   bildGeneriert:false, bildZaehler:0, bildLaeuft:false, bildAusstehend:null, bildPauseBis:0,
   letzteRohantwort:'', letzteJsonOk:false, kurzKontext:false,
+  msText:0, msBild:0, msRegie:0, msLektor:0, msAnweisung:0,   // Dauer der letzten Aufrufe
+
   szeneText:'', szeneGlobal:'', letzterPrompt:'', letzterNegativ:'', letzteBildUrl:'',
   // Von Hand geschriebener Prompt. Solange gesetzt, gilt er statt des aus der
   // Szene gebauten — auch ueber einen Wechsel der Bildquelle hinweg.
@@ -2302,7 +2307,10 @@ async function naechsterZug(erzwinge,autoModus){
     (autoModus?'"wer": Es MUSS eine Figur sprechen, niemals STOP.':'"wer": STOP heisst, der Held ist wieder dran.')+
     ' "weiter": true, wenn sofort noch eine ANDERE Figur reagieren sollte.';
 
+  var tText=Date.now();
   var text=await frageKI(instruction,150000);
+  S.msText=Date.now()-tText;
+  S.msAnweisung=instruction.length;
   var j2=jsonAus(text), z=j2?null:felderAus(text);
   // Fuer /roh aufheben: ohne Blick auf die Rohantwort ist nicht zu erkennen,
   // ob ein Feld fehlte, leer war oder die Antwort abgeschnitten wurde.
@@ -2673,13 +2681,16 @@ function saeubereBildIdee(roh){
   return t;
 }
 async function bildRegie(){
+  var tRegie=Date.now();
   try{
     var roh=await frageKI(baueBildRegieAnweisung(),45000);
+    S.msRegie=Date.now()-tRegie;
     var idee=saeubereBildIdee(roh);
     return idee.length>=8?idee:null;
   }catch(e){
     // Faellt der Bot aus, uebernimmt die alte Methode - lieber ein Bild aus
     // der Dialogregie als gar keines.
+    S.msRegie=Date.now()-tRegie;
     console.warn('Bildregie-Bot ohne Antwort:',e);
     return null;
   }
@@ -2713,7 +2724,9 @@ async function zeichneBild(opts){
                  ?(parseInt(opts.seedOverride,10)||S.seed)
                  :(S.seed||(S.seed=neuerSeed()));
     S.seed=seed;
+    var tBild=Date.now();
     var src=await quelle().zeichne({prompt:prompt,negativ:negativ,seed:seed,breite:auf64(CFG.breite),hoehe:auf64(CFG.hoehe)});
+    S.msBild=Date.now()-tBild;
     if(S.letzteBildUrl&&S.letzteBildUrl.indexOf('blob:')===0&&S.letzteBildUrl!==src){
       try{ URL.revokeObjectURL(S.letzteBildUrl); }catch(e1){}
     }
@@ -2724,6 +2737,7 @@ async function zeichneBild(opts){
     S.letzterPrompt=prompt;
     S.letzterNegativ=negativ;
   }catch(e){
+    if(typeof tBild==='number')S.msBild=Date.now()-tBild;
     var m=String((e&&e.message)||e);
     var gedrosselt=/HTTP 429/.test(m);
     // Ein erschöpftes Kontingent meldet nicht jeder Dienst als 429 — ZeroGPU
@@ -2769,6 +2783,8 @@ var BEFEHLE=[
    fn:function(m){ stilBefehl(m[1]); }},
   {muster:/^\/quelle\b\s*:?\s*([\s\S]*)$/i,     hilfe:['/quelle','Bildquelle wechseln (öffnet die Einstellungen)'],
    fn:function(m){ quelleBefehl(m[1]); }},
+  {muster:/^\/tempo\b/i,                        hilfe:['/tempo','zeigt, wo die Zeit hingeht — Text, Lektor, Bildregie, Bilddienst, Takt und Pausen'],
+   fn:function(){ zeigeTempo(); }},
   {muster:/^\/roh\b/i,                          hilfe:['/roh','zeigt die letzte Antwort der Regie im Original — zur Fehlersuche'],
    fn:function(){ zeigeRohantwort(); }},
   {muster:/^\/blatt\s*:?\s*([a-zA-Zäöü0-9]*)\s*$/i,  hilfe:['/blatt N','Charakterblatt zeichnen — N ist die Figurennummer, „held" der Held (ohne Angabe: Figurenmenü)'],
@@ -3445,7 +3461,8 @@ function oeffneBildModal(){
          ? '✎ Prompt festgehalten — das Bild bleibt so, bis du den Haken entfernst oder „AUS SZENE" drückst. '
          : '✎ Eigener Prompt — er überlebt den Wechsel der Bildquelle, beim nächsten Bildtakt übernimmt aber wieder die Handlung. ')
       : 'Automatisch aus der Szene gebaut. ')
-    +'Quelle: '+quelle().label+' — '+quelle().info;
+    +'Quelle: '+quelle().label+' — '+quelle().info+
+    (S.msBild?('  Letztes Bild: '+sekunden(S.msBild)+' (/tempo zeigt mehr).'):'');
   oeffneModal('mBild');
 }
 function wuerfelSeed(){ el('bildSeedFeld').value=String(neuerSeed()); }
@@ -4087,7 +4104,7 @@ function oeffneEinstellungen(){
 // Seit der Umstellung auf die Ladeschale ist die Frage berechtigt, welcher Stand
 // gerade laeuft. Die Schale legt den geholten Quelltext samt Zweig und Zeitpunkt
 // im localStorage ab; hier wird er nur abgelesen.
-var VERSION = 'V7.43';
+var VERSION = 'V7.44';
 // Ohne Browserkonsole — etwa am Handy — muss der Generator selbst sagen koennen,
 // woran es liegt, wenn ein Plugin von Perchance fehlt.
 function pluginLage(){
@@ -5081,6 +5098,55 @@ async function chatAuswerten(alle){
            (b.ort?', Ort und Zeit':'')+' —');
   if(b.figuren)zeichneBild({});   // das erste Bild zeigte noch Platzhalter
   return true;
+}
+
+// ── WO DIE ZEIT HINGEHT ───────────────────────
+// "Warum dauert das Bild so lange?" laesst sich nicht raten. Hier steht, was
+// der letzte Zug wirklich gekostet hat - und was gerade bremst.
+function sekunden(ms){
+  if(!ms||ms<0)return '—';
+  return (ms/1000).toFixed(1)+' s';
+}
+function tempoZeilen(){
+  var takt=Number(CFG.bildTakt)||0;
+  var rest=S.bildPauseBis?Math.ceil((S.bildPauseBis-Date.now())/1000):0;
+  var z=[];
+  z.push(['Text der Regie',sekunden(S.msText)+(S.msAnweisung?'  ('+S.msAnweisung+' Zeichen Anweisung)':'')]);
+  z.push(['Lektor',CFG.lektor?(sekunden(S.msLektor)+'  — zweiter Textaufruf je Zug'):'aus']);
+  z.push(['Bildregie-Bot',CFG.bildBot?(sekunden(S.msRegie)+'  — eigener Textaufruf vor jedem Bild'):'aus']);
+  z.push(['Bild ('+quelle().label+')',sekunden(S.msBild)+(S.bildLaeuft?'  — läuft gerade':'')]);
+  z.push(['Bild-Takt',takt?('alle '+takt+' Züge — noch '+Math.max(0,takt-(S.bildZaehler||0))+' Zug bis zum nächsten'):'nur auf Zuruf']);
+  z.push(['Zwangspause',rest>0?(rest+' s — der Bilddienst hat gedrosselt'):'keine']);
+  if(S.promptFesthalten)z.push(['Prompt festgehalten','ja — es entsteht absichtlich kein neues Bild']);
+  return z;
+}
+// Ein Satz dazu, was der groesste Posten ist. Meist ist es der Bilddienst.
+function tempoUrteil(){
+  var text=(S.msText||0)+(S.msLektor||0);
+  var bild=(S.msBild||0)+(S.msRegie||0);
+  if(!text&&!bild)return 'Noch nichts gemessen — spiel einen Zug, dann steht hier, wo die Zeit hingeht.';
+  if(bild>text*2&&bild>15000)
+    return 'Der Bilddienst ist der langsame Teil. Daran ändert der Generator nichts: kleinere Bildgröße, '+
+           'ein höherer Bild-Takt oder eine andere Quelle in ⚙ EINSTELLUNGEN helfen.';
+  if(CFG.bildBot&&S.msRegie>4000)
+    return 'Der Bildregie-Bot kostet vor jedem Bild einen eigenen Textaufruf. Ausschalten macht die Bilder '+
+           'schneller, aber ungenauer zum Moment.';
+  if(CFG.lektor&&S.msLektor>4000)
+    return 'Der Lektor verdoppelt die Wartezeit je Zug. Er ist es meist wert — abschalten geht in ⚙ EINSTELLUNGEN.';
+  if(text>25000)
+    return 'Der Textdienst von Perchance antwortet gerade langsam. Das liegt an seiner Auslastung, nicht an dieser Partie.';
+  return 'Nichts Auffälliges — die Zeit verteilt sich wie erwartet.';
+}
+function zeigeTempo(){
+  var g=el('gespraech');
+  if(!g)return;
+  var z=document.createElement('div');
+  z.className='zeile hilfe';
+  z.innerHTML='<div class="txt"><b>WO DIE ZEIT HINGEHT</b><br>'+
+    tempoZeilen().map(function(r){ return escapeHtml(r[0])+': '+escapeHtml(r[1]); }).join('<br>')+
+    '<br><br>'+escapeHtml(tempoUrteil())+'</div>';
+  g.appendChild(z);
+  scrolle();
 }
 
 // ── HELFER ────────────────────────────────────

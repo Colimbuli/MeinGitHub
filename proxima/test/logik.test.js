@@ -1408,6 +1408,47 @@ ctx.CFG.ton = 'natuerlich'; ctx.CFG.tonText = '';
 pruefe('der alte Zwang zum Obszönen ist raus', !/obszoene/.test(src));
 pruefe('der Tonfall lässt sich einstellen', /id="cfgTon"/.test(src) && /CFG\.ton=tonSchluessel/.test(src));
 
+console.log('\n— Wo die Zeit hingeht —');
+// "Dauert das zu lange?" soll man ablesen können, statt zu raten.
+pruefe('Sekunden werden lesbar', ctx.sekunden(4200) === '4.2 s' && ctx.sekunden(0) === '—');
+ctx.S.msText = 4200; ctx.S.msAnweisung = 6368; ctx.S.msBild = 38100;
+ctx.S.msLektor = 0; ctx.S.msRegie = 0;
+ctx.CFG.lektor = false; ctx.CFG.bildBot = false;
+ctx.CFG.bildTakt = 2; ctx.S.bildZaehler = 1; ctx.S.bildPauseBis = 0;
+const zeilen = ctx.tempoZeilen();
+const alsText = zeilen.map(r => r[0] + ': ' + r[1]).join(' | ');
+pruefe('der Textaufruf steht drin, mit der Größe der Anweisung',
+  /Text der Regie: 4\.2 s\s+\(6368 Zeichen/.test(alsText), alsText);
+pruefe('abgeschaltete Helfer stehen als aus da',
+  /Lektor: aus/.test(alsText) && /Bildregie-Bot: aus/.test(alsText));
+pruefe('der Bilddienst steht mit Namen da', /Bild \(.+\): 38\.1 s/.test(alsText), alsText);
+pruefe('der Takt sagt, wie lange es noch dauert',
+  /Bild-Takt: alle 2 Züge — noch 1 Zug/.test(alsText), alsText);
+pruefe('ohne Drosselung steht dort keine', /Zwangspause: keine/.test(alsText));
+ctx.S.bildPauseBis = Date.now() + 60000;
+pruefe('eine laufende Zwangspause wird in Sekunden genannt',
+  /Zwangspause: \d+ s — der Bilddienst hat gedrosselt/.test(ctx.tempoZeilen().map(r => r[0] + ': ' + r[1]).join(' | ')),
+  ctx.tempoZeilen().map(r => r[0] + ': ' + r[1]).join(' | '));
+ctx.S.bildPauseBis = 0;
+
+pruefe('das Urteil zeigt auf den Bilddienst', /Bilddienst ist der langsame Teil/.test(ctx.tempoUrteil()),
+  ctx.tempoUrteil());
+ctx.S.msBild = 2000; ctx.CFG.bildBot = true; ctx.S.msRegie = 9000;
+pruefe('bei eingeschaltetem Bot zeigt es auf den Bot', /Bildregie-Bot kostet/.test(ctx.tempoUrteil()));
+ctx.CFG.bildBot = false; ctx.CFG.lektor = true; ctx.S.msLektor = 9000;
+pruefe('beim Lektor auf den Lektor', /Lektor verdoppelt/.test(ctx.tempoUrteil()));
+ctx.CFG.lektor = false; ctx.S.msLektor = 0; ctx.S.msText = 40000;
+pruefe('ist der Textdienst langsam, sagt es das', /Textdienst von Perchance/.test(ctx.tempoUrteil()));
+ctx.S.msText = 3000; ctx.S.msBild = 4000;
+pruefe('sonst ist nichts auffällig', /Nichts Auffälliges/.test(ctx.tempoUrteil()));
+ctx.S.msText = 0; ctx.S.msBild = 0; ctx.S.msRegie = 0;
+pruefe('vor dem ersten Zug wird nichts behauptet', /Noch nichts gemessen/.test(ctx.tempoUrteil()));
+
+pruefe('die Dauern werden auch wirklich gemessen',
+  /S\.msText=Date\.now\(\)-tText;/.test(src) && /S\.msBild=Date\.now\(\)-tBild;/.test(src) &&
+  /S\.msLektor=Date\.now\(\)-tLekt;/.test(src) && /S\.msRegie=Date\.now\(\)-tRegie;/.test(src));
+pruefe('und es gibt einen Befehl dafür', /\/tempo/.test(src) && /zeigeTempo\(\)/.test(src));
+
 console.log('\n— Räume, Kamera und Anwesenheit —');
 // Ab jetzt hat jede Figur einen Raum. Die Kamera hängt an der Figur, die der
 // Mensch spielt; wer woanders steht, bleibt im Spiel, ist aber nicht zu sehen.
