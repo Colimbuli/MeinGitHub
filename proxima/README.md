@@ -548,6 +548,56 @@ angehaengt, statt den Ort zu wechseln. Dieselbe Veraenderung wird nicht doppelt 
 Von Hand: im Ort-Menue einen neuen Ort beschreiben und **✦ DORTHIN** druecken, oder `/ort: …`
 schreiben. `/ort` ohne Angabe oeffnet das Menue.
 
+### Mehrere Räume, und wer in welchem steht
+
+Ein Ortswechsel wirft den alten Ort nicht mehr weg: Jeder Raum, der einmal betreten wurde, bleibt
+bestehen, und **jede Figur steht in genau einem davon**. Die Kachelübersicht — `/räume` oder der
+Knopf **⌗ ALLE RÄUME** im Ort-Menü — zeigt alle Räume nebeneinander und darin, wer sich gerade wo
+aufhält. Der Raum mit der Kamera ist hervorgehoben. Aus jeder Kachel heraus lässt sich hingehen
+(**◎ DORTHIN**) oder eine Figur herholen; ein neuer Raum entsteht mit **＋**.
+
+Drei Regeln halten das zusammen:
+
+* **Die Kamera hängt an der Figur, die du spielst.** Verlässt sie den Raum, geht das Bild mit — der
+  Raumtitel wechselt, ein neues Panel entsteht.
+* **Wer nicht im Raum ist, ist nicht da.** Er bleibt im Spiel, mit Profil, Beziehungen und
+  Gedächtnis, taucht aber weder im Bild auf noch im Dialog: Die Regie bekommt ihn ausdrücklich als
+  abwesend genannt und darf ihn nicht sprechen lassen. In der Figurenleiste oben steht er blass und
+  mit seinem Raum dahinter.
+* **Einzelne dürfen durch Türen gehen.** Die Regie hat dafür ein eigenes Feld (`Name > Raum`);
+  ein `ortwechsel` bewegt weiterhin alle, die gerade zusammenstehen.
+
+### Wen du spielst
+
+Standardmäßig spielst du den Helden. Im **Figurenmenü** trägt jeder Block — der Held und jede Figur
+— ein Kästchen **„Diese Rolle spiele ich"**. Setzt du den Haken auf eine Figur, dreht sich alles um:
+
+* Was du eingibst, sagt und tut **diese Figur**; deine Zeilen tragen ihren Namen.
+* **Der Held antwortet dann selbst.** Er ist ab da eine Rolle der KI wie jede andere — mit seinem
+  Beruf, seiner Herkunft und seiner Eigenart — und erscheint als normale Figurenzeile im Gespräch.
+* Die gespielte Figur wird für die KI gesperrt: Sie spricht sie nie, damit sie dir nicht ins Wort
+  fällt.
+* Die Kamera zieht mit — du siehst, was deine Figur sieht.
+
+Die Kästchen verhalten sich wie Radioknöpfe: Es ist immer genau eine Rolle besetzt. Wird die
+gespielte Figur entfernt, spielst du wieder den Helden.
+
+### Wer im Bild ist
+
+Ein Panel muss nicht immer alle zeigen. Im Bildmenü steht dafür **WER IST IM BILD**:
+
+| Wahl | Bild |
+| --- | --- |
+| automatisch | die Regie entscheidet je Zug mit |
+| alle Anwesenden | Held und Figuren des Raums (wie bisher) |
+| nur die Figuren | der Held bleibt draußen |
+| nur der Held | die Figuren bleiben draußen |
+| niemand — Detailaufnahme | keine Person, ein Ding aus nächster Nähe, aus der Ich-Perspektive |
+
+Die Wahl gilt dauerhaft, bis sie wieder auf *automatisch* steht; dann schlägt die Regie zu jedem
+Zug ein Motiv vor. Gezeichnet wird immer nur, wer auch im Raum steht — und in der Ich-Perspektive
+nie die Figur, durch deren Augen du schaust.
+
 ### Kleidung folgt der Handlung
 
 Zieht sich jemand im Verlauf um, legt etwas ab oder wirft sich etwas ueber, traegt die Regie das
@@ -652,6 +702,7 @@ ein neuer Befehl steht damit automatisch in der Hilfe, ohne Nachpflege. Ein Test
 | `/undo` | letzten Zug zurücknehmen |
 | `/nochmal` | letzten Zug verwerfen und die Antwort neu würfeln |
 | `/speichern` | Spielstände öffnen |
+| `/räume` | Kachelübersicht aller Räume — wer wo ist, und wer wohin geht |
 | `/auswerten` | ein übernommenes Gespräch (noch einmal) auswerten — Profile, Beziehungen, Gedächtnis |
 
 ## Was gegenüber V6 anders ist

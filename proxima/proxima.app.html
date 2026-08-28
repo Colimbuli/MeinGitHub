@@ -91,6 +91,8 @@ html,body{width:100%;height:var(--hoehe);background:var(--bg);font-family:var(--
 #autobtn.an{background:var(--gold);color:#2a1c0e;border-color:var(--gold2);}
 #npcstatus{flex:1 1 auto;min-width:0;pointer-events:auto;background:rgba(6,4,2,0.7);border:1px solid var(--border);border-radius:3px;padding:4px 8px;font-family:var(--schrift-titel);font-size:0.6rem;letter-spacing:0.06em;color:var(--dim);display:flex;flex-wrap:wrap;gap:4px 8px;align-self:flex-start;}
 #npcstatus .npcchip{display:inline-flex;align-items:center;gap:5px;}
+#npcstatus .npcchip.fern{opacity:0.45;}
+#npcstatus .npcchip.duselbst{color:var(--gold2);}
 #npcstatus .npcweg{cursor:pointer;color:var(--dim);border:1px solid var(--border);border-radius:50%;width:14px;height:14px;line-height:12px;text-align:center;font-size:0.62rem;transition:all 0.15s;}
 #npcstatus .npcweg:hover{color:#e08080;border-color:var(--rot);}
 
@@ -159,6 +161,18 @@ select.feld option{background:var(--panel);}
 .pruefzeile{font-family:var(--schrift-titel);font-size:0.62rem;letter-spacing:0.08em;color:var(--dim);min-height:1.1em;}
 .pruefzeile.ok{color:#8fbf6a;}
 .pruefzeile.fehler{color:#e08080;}
+.raumgitter{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;}
+.raumkachel{border:1px solid rgba(107,76,42,0.4);padding:8px 9px;display:flex;flex-direction:column;gap:6px;}
+.raumkachel.hier{border-color:var(--gold2);background:rgba(212,160,51,0.07);}
+.raumkopf{font-family:var(--schrift-titel);font-size:0.6rem;letter-spacing:0.12em;color:var(--gold2);}
+.raumleute{display:flex;flex-wrap:wrap;gap:4px;min-height:20px;}
+.raumleer{color:var(--dim);font-size:0.72rem;font-style:italic;}
+.raumperson{border:1px solid rgba(107,76,42,0.5);padding:2px 6px;font-size:0.72rem;color:var(--cream);}
+.raumperson.duselbst{border-color:var(--gold2);color:var(--gold2);}
+.raumkachel button{background:none;border:1px solid var(--border);color:var(--gold2);font-family:var(--schrift-titel);font-size:0.56rem;letter-spacing:0.08em;padding:5px 6px;cursor:pointer;}
+.raumkachel button:hover{background:rgba(212,160,51,0.1);}
+.raumkachel button:disabled{opacity:0.3;cursor:default;}
+.raumkachel select{background:var(--tinte);border:1px solid var(--border);color:var(--cream);font-size:0.72rem;padding:3px;width:100%;}
 .slot{display:flex;gap:6px;align-items:center;border:1px solid rgba(107,76,42,0.4);padding:7px 9px;}
 .slot .slotinfo{flex:1;min-width:0;font-size:0.78rem;line-height:1.35;}
 .slot .slotinfo small{display:block;color:var(--dim);font-size:0.66rem;}
@@ -178,7 +192,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.40</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.41</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -288,6 +302,14 @@ select.feld option{background:var(--panel);}
       <select id="szeneStil" class="feld" onchange="szeneStilGewechselt()"></select>
       <input id="szeneStilEigen" class="feld" type="text" placeholder="z.B. noir ink sketch, high contrast" style="display:none">
       <div class="hinweis" id="szeneStilHinweis"></div>
+      <label class="feldlabel" for="bildMotiv">WER IST IM BILD</label>
+      <select id="bildMotiv" class="feld" onchange="motivGewechselt()">
+        <option value="">automatisch — die Regie entscheidet</option>
+        <option value="alle">alle Anwesenden</option>
+        <option value="figuren">nur die Figuren</option>
+        <option value="held">nur der Held</option>
+        <option value="ort">niemand — Detailaufnahme eines Dings</option>
+      </select>
       <label class="feldlabel" for="bildPromptFeld">PROMPT</label>
       <textarea id="bildPromptFeld" class="feld" rows="6"></textarea>
       <label class="feldlabel" for="bildNegativFeld">NEGATIVPROMPT</label>
@@ -374,6 +396,17 @@ select.feld option{background:var(--panel);}
   </div>
 </div>
 
+<div class="modal" id="mRaeume">
+  <div class="modalBox">
+    <div class="modalKopf"><span><span data-sym="ort"></span> RÄUME</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
+    <div class="modalInhalt" id="raeumeInhalt"></div>
+    <div class="modalNav">
+      <button onclick="schliesseModal()">SCHLIESSEN</button>
+      <button class="haupt" onclick="oeffneOrtMenu()">ORT BEARBEITEN</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="mOrt">
   <div class="modalBox">
     <div class="modalKopf"><span><span data-sym="ort"></span> ORT</span><button onclick="schliesseModal()" aria-label="Schließen">✕</button></div>
@@ -387,6 +420,7 @@ select.feld option{background:var(--panel);}
       <label class="feldlabel" for="ortWechselFeld">ORTSWECHSEL — neuen Ort beschreiben, dann „✦ DORTHIN"</label>
       <input id="ortWechselFeld" class="feld" type="text" placeholder="z.B. der verwilderte Innenhof hinter der Küche">
       <div class="hinweis" id="ortHinweis"></div>
+      <div class="reihe" style="margin-top:8px"><button onclick="oeffneRaeume()">⌗ ALLE RÄUME</button></div>
     </div>
     <div class="modalNav">
       <button onclick="schliesseModal()">SCHLIESSEN</button>
@@ -1164,7 +1198,8 @@ var W = {
   stadt:'', rahmenhandlung:'', rahmenhandlungOriginal:'',
   mission:'',         // das uebergeordnete Ziel, dem die Szene folgt
   perspektive:'er',   // 'er' = Held im Bild, 'ich' = Blick durch seine Augen
-  ort:null,          // mit name, geschichte, bildPrompt
+  ort:null,          // der Raum, den die Kamera zeigt - immer einer aus raeume
+  raeume:[],         // alle bekannten Raeume, je mit name, geschichte, bildPrompt, kulisse
   npcs:[]            // Figuren mit name, rolle, aussehen, kleidung, person, grundstimmung, eroeffnung
 };
 var S = {
@@ -1180,6 +1215,9 @@ var S = {
   wetter:'', frist:0,               // Wetter und Frist in Minuten (0 = keine)
   probe:null,                       // Ergebnis des letzten Wurfs, bis der Zug es liest
   beziehungen:{},                   // wer wie zu wem steht: {Figur:{Ziel:'Haltung'}}
+  raumHeld:0, raumNpc:[],           // in welchem Raum jede Figur steckt
+  spieltIdx:null,                   // wen der Mensch spielt: null = Held, sonst Figurenindex
+  motiv:'', motivZug:'',            // wer ins Bild gehoert: Wahl des Spielers, Vorschlag der Regie
   seed:0,                           // fest, damit Figuren wiedererkennbar bleiben
   bildGeneriert:false, bildZaehler:0, bildLaeuft:false, bildAusstehend:null, bildPauseBis:0,
   letzteRohantwort:'', letzteJsonOk:false, kurzKontext:false,
@@ -1354,8 +1392,11 @@ function verarbeiteWelt(text){
   W.ort={
     name:       f(['ort','name'],'ORT_NAME','Ein Ort','Name des Ortes'),
     geschichte: f(['ort','geschichte'],'ORT_GESCHICHTE','Dieser Ort birgt Geschichten.'),
-    bildPrompt: f(['ort','bild'],'ORT_BILD','the person stands quietly in the foreground, european setting behind them')
+    bildPrompt: f(['ort','bild'],'ORT_BILD','the person stands quietly in the foreground, european setting behind them'),
+    kulisse:    ''
   };
+  W.raeume=[W.ort];
+  S.raumHeld=0;S.raumNpc=[];S.spieltIdx=null;S.motiv='';S.motivZug='';
 
   // Neu ist die Liste: Nennt die Ausgangsidee mehrere Personen, treten sie alle
   // sofort auf. Aeltere Antworten mit einem einzelnen "npc" gehen weiter durch.
@@ -1441,6 +1482,8 @@ function setzeNpcs(liste){
   S.stimmung=liste.map(function(n){return n.grundstimmung;});
   S.kleidung=liste.map(function(n){return n.kleidung;});
   S.regieAnweisung=liste.map(function(){return '';});
+  S.raumNpc=liste.map(function(){return 0;});
+  S.spieltIdx=null;
 }
 function neuerSeed(){ return Math.floor(1+Math.random()*999999998); }   // 32-Bit-sicher
 
@@ -1505,7 +1548,7 @@ function starteOrt(){
   var g=el('gespraech');g.innerHTML='';
   if(S.verlauf.length){
     S.verlauf.forEach(function(v){
-      if(v.rolle==='npc')npcZeileSofort(v.idx,v.text,v.name); else ichSage(v.text);
+      if(v.rolle==='npc')npcZeileSofort(v.idx,v.text,v.name); else ichSage(v.text,v.name);
     });
     sysZeile('— '+W.protagonist.name+' ist zurück —');
   }else{
@@ -1901,9 +1944,11 @@ function wagnisAus(text){
 }
 function letzterNpcIdx(){
   for(var i=S.verlauf.length-1;i>=0;i--){
-    if(S.verlauf[i].rolle==='npc'&&S.verlauf[i].idx>=0&&S.verlauf[i].idx<W.npcs.length)return S.verlauf[i].idx;
+    var v=S.verlauf[i];
+    if(v.rolle==='npc'&&v.idx>=0&&v.idx<W.npcs.length&&anwesendNpc(v.idx))return v.idx;
   }
-  return W.npcs.length?0:-1;
+  var da=anwesendeNpcs();
+  return da.length?da[0]:-1;
 }
 function wuerfle(versuch,idx){
   var name=(idx>=0&&W.npcs[idx])?W.npcs[idx].name:'';
@@ -1998,7 +2043,20 @@ function weltKontext(){
   k+=aktText();
   var bez=beziehungText();
   if(bez)k+='BEZIEHUNGEN (Haltung jeder Figur zu jeder anderen — so spricht sie mit ihr):\n'+bez+'\n';
+  k+=raeumeText();
   return k;
+}
+// Wer wo steht - damit die Regie weiss, wohin jemand gehen kann und wer
+// gerade gar nichts mitbekommt.
+function raeumeText(){
+  var liste=raumListe();
+  if(liste.length<2)return '';
+  var belegung=raumBelegung();
+  return 'RAEUME (wer wo ist; nur wer im selben Raum steht, hoert einander):\n'+
+    belegung.map(function(r,k){
+      return '- '+r.name+(k===kameraRaum()?' [hier]':'')+': '+
+             (r.leute.length?r.leute.map(function(p){return p.name;}).join(', '):'leer');
+    }).join('\n')+'\n';
 }
 // ── GEDAECHTNIS ───────────────────────────────
 // Frueher fiel der aelteste Fakt heraus, egal wie wichtig er war - ein
@@ -2072,7 +2130,7 @@ function frischeFakten(text){
 function verlaufText(n,maxZeile){
   var m=maxZeile||(S.kurzKontext?140:240);
   return S.verlauf.slice(-n).map(function(v){
-    var wer=(v.rolle==='npc'?(v.name||(W.npcs[v.idx]&&W.npcs[v.idx].name)||'NPC'):W.protagonist.name);
+    var wer=(v.rolle==='npc'?(v.name||(W.npcs[v.idx]&&W.npcs[v.idx].name)||'NPC'):(v.name||W.protagonist.name));
     var t=String(v.text||'');
     if(t.length>m)t=t.substring(0,m)+'…';
     return wer+': '+t;
@@ -2085,40 +2143,59 @@ function kappe(t,max){
 
 // ── EIN ZUG: Regie + Schauspiel + Bildidee in EINEM Aufruf ──
 async function naechsterZug(erzwinge,autoModus){
-  var mehrere=W.npcs.length>1;
-  var liste=W.npcs.map(function(n,i){
-    return '- NPC'+(i+1)+' = '+n.name+' ('+n.rolle+'). Persoenlichkeit: '+n.person+
+  // Spielbar ist, wer im Raum der Kamera steht - und nicht die Figur, die der
+  // Mensch am Bildschirm selbst spricht.
+  var spielbar=anwesendeNpcs().filter(function(i){ return i!==S.spieltIdx; });
+  // Der Held antwortet automatisch, sobald der Mensch eine Figur spielt; im
+  // Auto-Modus zusaetzlich, wenn er dort mitspielen soll.
+  var heldSpielt=heldAnwesend()&&((S.spieltIdx!=null)||!!(autoModus&&CFG.autoHeld));
+  if(!spielbar.length&&!heldSpielt)return {stop:true,leer:true};
+  var mehrere=(spielbar.length+(heldSpielt?1:0))>1;
+  var liste=spielbar.map(function(i,pos){
+    var n=W.npcs[i];
+    return '- NPC'+(pos+1)+' = '+n.name+' ('+n.rolle+'). Persoenlichkeit: '+n.person+
            '. Aktuelle Stimmung: '+S.stimmung[i]+
            '. Traegt gerade: '+(S.kleidung[i]||n.kleidung||'unbestimmt')+'.';
   }).join('\n');
   var regieZeilen='';
-  for(var i=0;i<W.npcs.length;i++){
+  spielbar.forEach(function(i,pos){
     if(S.regieAnweisung[i]){
-      regieZeilen+='VERDECKTE REGIE fuer '+W.npcs[i].name+' (NPC'+(i+1)+'): '+S.regieAnweisung[i]+'. Setze das in Rede/Handlung um, ohne es zu erwaehnen oder zu zitieren.\n';
+      regieZeilen+='VERDECKTE REGIE fuer '+W.npcs[i].name+' (NPC'+(pos+1)+'): '+S.regieAnweisung[i]+'. Setze das in Rede/Handlung um, ohne es zu erwaehnen oder zu zitieren.\n';
       S.regieAnweisung[i]='';
     }
-  }
+  });
   var szeneRegie=S.autoRegie?('STEHENDE REGIE (szenenweit, ALLE Figuren beachten sie dauerhaft): '+S.autoRegie+'. Baue das laufend in Rede/Handlung ein, ohne es zu zitieren.\n'):'';
-  var zwang=(erzwinge>=0)?('WICHTIG: In DIESEM Zug MUSS NPC'+(erzwinge+1)+' ('+W.npcs[erzwinge].name+') sprechen.\n'):'';
-  var letzterNpc=-1, letzterWar='';
+  var zwangPos=spielbar.indexOf(erzwinge);
+  var zwang=(zwangPos>=0)?('WICHTIG: In DIESEM Zug MUSS NPC'+(zwangPos+1)+' ('+W.npcs[erzwinge].name+') sprechen.\n'):'';
+  var letzterWar='';
   for(var j=S.verlauf.length-1;j>=0;j--){
-    if(S.verlauf[j].rolle==='npc'){letzterNpc=S.verlauf[j].idx;letzterWar=(W.npcs[letzterNpc]&&W.npcs[letzterNpc].name)||'';break;}
-    if(S.verlauf[j].rolle==='ich'){letzterWar=W.protagonist.name;break;}
+    if(S.verlauf[j].rolle==='npc'){letzterWar=S.verlauf[j].name||(W.npcs[S.verlauf[j].idx]&&W.npcs[S.verlauf[j].idx].name)||'';break;}
+    if(S.verlauf[j].rolle==='ich'){letzterWar=S.verlauf[j].name||W.protagonist.name;break;}
   }
-  var altern=(autoModus&&erzwinge<0&&letzterWar&&(mehrere||heldSpielt))
+  var altern=(autoModus&&erzwinge<0&&letzterWar&&mehrere)
     ?('Zuletzt sprach '+letzterWar+'. Lass nun bevorzugt jemand ANDEREN zu Wort kommen, damit sich alle abwechseln.\n'):'';
-  var heldSpielt=!!(autoModus&&CFG.autoHeld);
-  var werOpt=W.npcs.map(function(n,i){return 'NPC'+(i+1);}).join(' oder ');
-  if(heldSpielt)werOpt+=' oder HELD';
+  var werOpt=spielbar.map(function(i,pos){return 'NPC'+(pos+1);}).join(' oder ');
+  if(heldSpielt)werOpt=(werOpt?werOpt+' oder ':'')+'HELD';
+  // Spielt der Mensch eine Figur, ist der Held eine Rolle der KI - und die
+  // gespielte Figur gehoert ihr nicht.
+  var rollenZeile=(S.spieltIdx!=null)
+    ? ('ROLLENTAUSCH: Der Mensch am Bildschirm spielt '+gespielterName()+'. Diese Figur sprichst du NIE. '+
+       (heldAnwesend()?('Dafuer spielst du '+heldName()+' (HELD) eigenstaendig: '+
+        (W.protagonist.beruf||'ohne Beruf')+' aus '+(W.protagonist.herkunft||'unbekannter Herkunft')+
+        ', Eigenart: '+(W.protagonist.eigenart||'—')+'. Er antwortet, fragt nach und verfolgt eigene Absichten.\n')
+                      :(heldName()+' ist gerade nicht im Raum.\n')))
+    : '';
 
   var instruction=
-    'Du fuehrst Regie UND spielst die Figuren in einem deutschen Dialog-Adventure. Am Ort sind '+W.npcs.length+' Person(en) anwesend. Du entscheidest, wer als Naechstes spricht, und schreibst diese EINE Zeile voll in der Rolle dieser Figur.\n\n'+
+    'Du fuehrst Regie UND spielst die Figuren in einem deutschen Dialog-Adventure. Im Raum sind '+(spielbar.length+(heldSpielt?1:0))+' Person(en), die du spielst. Du entscheidest, wer als Naechstes spricht, und schreibst diese EINE Zeile voll in der Rolle dieser Figur.\n\n'+
     weltKontext()+
-    'ORT: '+W.ort.name+' — '+kappe(W.ort.geschichte,S.kurzKontext?260:420)+'\n'+
-    'ANWESENDE FIGUREN:\n'+liste+'\n\n'+
+    'RAUM: '+W.ort.name+' — '+kappe(W.ort.geschichte,S.kurzKontext?260:420)+'\n'+
+    rollenZeile+
+    'ANWESENDE FIGUREN:\n'+(liste||'- keine')+'\n'+
+    abwesendeText()+'\n'+
     (mehrere?'Die Figuren duerfen sich auch GEGENSEITIG ansprechen und die Handlung gemeinsam vorantreiben. Jede Figur handelt eigenstaendig, mit eigener Stimme.\n':'')+
     (autoModus&&!heldSpielt?'AUTO-MODUS: Der Held schweigt gerade. Die Figuren treiben die Szene EIGENSTAENDIG voran, reden miteinander und handeln.\n':'')+
-    (heldSpielt?('AUTO-MODUS MIT MITSPIELENDEM HELDEN: Auch '+W.protagonist.name+' handelt jetzt eigenstaendig. Du darfst ihn sprechen und handeln lassen, dann ist WER = HELD. Er bleibt dabei ganz er selbst: '+
+    (heldSpielt&&S.spieltIdx==null?('AUTO-MODUS MIT MITSPIELENDEM HELDEN: Auch '+W.protagonist.name+' handelt jetzt eigenstaendig. Du darfst ihn sprechen und handeln lassen, dann ist WER = HELD. Er bleibt dabei ganz er selbst: '+
                  W.protagonist.beruf+' aus '+W.protagonist.herkunft+', Eigenart: '+W.protagonist.eigenart+'. Er ist kein blosser Stichwortgeber, sondern verfolgt eigene Absichten, fragt nach, widerspricht auch mal und ergreift die Initiative.\n'):'')+
     (autoModus&&!mehrere?'Es ist nur EINE Figur anwesend: sie handelt allein weiter – denkt laut, beschaeftigt sich, kommentiert die Umgebung, geht ihrer Taetigkeit nach und treibt die Szene voran, auch ohne Gegenueber.\n':'')+
     'WORAUF DIE SZENE ZULAEUFT:\n'+
@@ -2148,7 +2225,9 @@ async function naechsterZug(erzwinge,autoModus){
     '  "weiter": false,\n'+
     '  "auftritt": "Person, die JETZT dazustoesst: Name und Rolle. Sonst leer.",\n'+
     '  "abgang": "Anwesende Person, die JETZT weggeht: ihr Name. Sonst leer.",\n'+
-    '  "ortwechsel": "Neuer Ort mit kurzer Beschreibung, wenn der Schauplatz JETZT wechselt. Sonst leer.",\n'+
+    '  "ortwechsel": "Neuer Ort mit kurzer Beschreibung, wenn ALLE Anwesenden JETZT gemeinsam den Schauplatz wechseln. Sonst leer.",\n'+
+    '  "raumwechsel": "Wenn EINZELNE den Raum wechseln: Name > Raum, mehrere durch Semikolon. Auch der Held. Sonst leer.",\n'+
+    '  "motiv": "was das Bild zeigen soll: alle, figuren, held oder ort (ein Ding aus naechster Naehe, ohne Person)",\n'+
     '  "kleidung": "Name: neues Outfit auf ENGLISCH, wenn sich jemand JETZT umzieht. Sonst leer.",\n'+
     '  "ortaenderung": "kurzer Satz, wenn sich am Ort etwas dauerhaft aendert. Sonst leer.",\n'+
     '  "bild": "one English sentence, PURELY VISUAL: what the characters do, posture, expression, gaze, setting, light, camera framing. No names, no art style.",\n'+
@@ -2157,7 +2236,8 @@ async function naechsterZug(erzwinge,autoModus){
     '}\n\n'+
     '"minuten": wie viel Zeit dieser Moment gekostet hat, meist 1 bis 5 — ein langes Gespraech oder ein Weg auch mehr.\n'+
     'Die vier Felder auftritt, abgang, ortwechsel und kleidung veraendern das Spiel wirklich: Was dort nicht steht, geschieht nicht. Kommt in deiner Antwort jemand herein, MUSST du "auftritt" ausfuellen. Eine blosse Ankuendigung gehoert nicht hinein.\n'+
-    'Anwesend: '+W.npcs.map(function(n){return n.name;}).join(', ')+'. '+
+    'Anwesend: '+(spielbar.map(function(i){return W.npcs[i].name;}).concat(heldAnwesend()?[heldName()]:[]).join(', ')||'niemand')+'. '+
+    'Wer laut ANWESENDE FIGUREN nicht im Raum steht, kann weder sprechen noch gesehen werden. '+
     (autoModus?'"wer": Es MUSS eine Figur sprechen, niemals STOP.':'"wer": STOP heisst, der Held ist wieder dran.')+
     ' "weiter": true, wenn sofort noch eine ANDERE Figur reagieren sollte.';
 
@@ -2184,6 +2264,8 @@ async function naechsterZug(erzwinge,autoModus){
   var missionRoh=entkleide(j2?hole(j2,['mission'],''):(z['MISSION']||''));
   var auftritt = entkleide(j2?hole(j2,['auftritt'],''):(z['AUFTRITT']||''));
   var abgang   = entkleide(j2?hole(j2,['abgang'],''):(z['ABGANG']||''));
+  var raumwechsel=entkleide(j2?hole(j2,['raumwechsel'],''):(z['RAUMWECHSEL']||''));
+  S.motivZug=motivSchluessel(j2?hole(j2,['motiv'],''):(z['MOTIV']||''));
   var weiterRoh= j2?j2.weiter:(z['WEITER']||'');
   var weiter   = (weiterRoh===true)||/^(ja|yes|true)/i.test(String(weiterRoh||''));
 
@@ -2196,13 +2278,16 @@ async function naechsterZug(erzwinge,autoModus){
     folgeBeziehungen(bezRoh,missionRoh);
     folgeZug(minutenRoh,wetterRoh,antwort,aufdeckRoh,etappeRoh);
     return {stop:false,held:true,text:antwort,weiter:false,auftritt:auftritt,abgang:abgang,
-            ortwechsel:ortwechsel,ortaenderung:ortaenderung,kleidung:kleidungNeu};
+            ortwechsel:ortwechsel,ortaenderung:ortaenderung,kleidung:kleidungNeu,raumwechsel:raumwechsel};
   }
-  var idx=0;
+  // "NPC2" meint die zweite Figur der ANWESENDEN LISTE, nicht die zweite Figur
+  // der Welt - sonst spraeche jemand aus einem anderen Raum.
+  var pos=0;
   var m=String(wer).match(/(\d+)/);
-  if(m)idx=parseInt(m[1],10)-1;
-  if(erzwinge>=0)idx=erzwinge;
-  if(idx<0||idx>=W.npcs.length)idx=0;
+  if(m)pos=parseInt(m[1],10)-1;
+  if(pos<0||pos>=spielbar.length)pos=0;
+  var idx=(spielbar.indexOf(erzwinge)>=0)?erzwinge:spielbar[pos];
+  if(!(idx>=0&&idx<W.npcs.length))return {stop:true,leer:true};
 
   if(handlung)S.handlung=handlung;
   if(fakt)merkeFakt(fakt);
@@ -2211,9 +2296,9 @@ async function naechsterZug(erzwinge,autoModus){
   folgeBeziehungen(bezRoh,missionRoh);
   folgeZug(minutenRoh,wetterRoh,antwort,aufdeckRoh,etappeRoh);
 
-  return {stop:false,idx:idx,text:antwort,stimmung:stimmung,weiter:(weiter&&W.npcs.length>1),
+  return {stop:false,idx:idx,text:antwort,stimmung:stimmung,weiter:(weiter&&mehrere),
           auftritt:auftritt,abgang:abgang,ortwechsel:ortwechsel,ortaenderung:ortaenderung,
-          kleidung:kleidungNeu};
+          kleidung:kleidungNeu,raumwechsel:raumwechsel};
 }
 
 // Eine Zeitueberschreitung heisst meist: die Anweisung war zu lang oder der
@@ -2279,8 +2364,21 @@ function kleidungAendern(eintrag){
 }
 // Reihenfolge: erst der Ort, dann wer bleibt und wer dazukommt. Sonst
 // tritt die neue Person noch am alten Schauplatz auf.
+// Spricht der Held, haengt es an der gespielten Rolle, wie die Zeile aussieht:
+// spielt der Mensch den Helden, ist es seine eigene Zeile - spielt er eine
+// Figur, ist der Held eine Rolle der KI wie jede andere.
+function antwortDesHelden(text){
+  if(S.spieltIdx==null){
+    ichSage(text,heldName());
+    S.verlauf.push({rolle:'ich',text:text,name:heldName()});
+  }else{
+    npcSagt(-1,text,heldName());
+    S.verlauf.push({rolle:'npc',idx:-1,text:text,name:heldName()});
+  }
+}
 async function folgeHandlung(res){
   if(!res)return;
+  if(CFG.autoBesetzung&&!leerAngabe(res.raumwechsel))folgeRaumwechsel(res.raumwechsel);
   if(CFG.autoBesetzung&&!leerAngabe(res.ortaenderung))ortNotiz(res.ortaenderung);
   if(CFG.autoBesetzung&&!leerAngabe(res.ortwechsel)&&!S.ortLaeuft)await ortWechseln(res.ortwechsel);
   await besetzungAendern(res);
@@ -2315,10 +2413,17 @@ async function fuehreSchlagabtausch(erzwungenerIdx){
     try{ res=await naechsterZug(erzwinge); }
     catch(e){ if(!pruefeZeitueberschreitung(e))zeigeFehler('NPC-Zug',e); break; }
     erzwinge=-1;
-    if(!res||res.stop)break;
-    npcSagt(res.idx,res.text);
-    S.verlauf.push({rolle:'npc',idx:res.idx,text:res.text,name:W.npcs[res.idx].name});
-    if(res.stimmung){ S.stimmung[res.idx]=res.stimmung; zeigeStimmung(); }
+    if(!res||res.stop){
+      if(res&&res.leer)sysZeile('— Hier ist niemand, der antworten könnte —');
+      break;
+    }
+    if(res.held){
+      antwortDesHelden(res.text);
+    }else{
+      npcSagt(res.idx,res.text);
+      S.verlauf.push({rolle:'npc',idx:res.idx,text:res.text,name:W.npcs[res.idx].name});
+      if(res.stimmung){ S.stimmung[res.idx]=res.stimmung; zeigeStimmung(); }
+    }
     await folgeHandlung(res);
     zuege++;
     if(!res.weiter)break;
@@ -2384,8 +2489,7 @@ async function autoSchleife(){
     if(!S.autoAktiv)break;
     if(res&&!res.stop){
       if(res.held){
-        ichSage(res.text);
-        S.verlauf.push({rolle:'ich',text:res.text});
+        antwortDesHelden(res.text);
       }else{
         npcSagt(res.idx,res.text);
         S.verlauf.push({rolle:'npc',idx:res.idx,text:res.text,name:W.npcs[res.idx].name});
@@ -2416,33 +2520,45 @@ function bauePrompt(opts,max){
   var figurenArr=[];
   var P=W.protagonist;
   var ichSicht=(W.perspektive==='ich');
-  // In der Ich-Perspektive taucht der Held nicht als eigene Figur auf -
-  // die Kamera ist sein Blick.
-  if(!ichSicht&&P&&(P.aussehen||'').trim()){
+  var motiv=motivSchluessel(opts&&opts.motiv)||bildMotiv();
+  // Wer im Bild erscheint, haengt an drei Dingen: am Motiv, am Raum (wer
+  // anderswo ist, ist nicht zu sehen) und an der Kamera - in der
+  // Ich-Perspektive ist die gespielte Figur der Blick und daher unsichtbar.
+  var heldRein=(motiv==='alle'||motiv==='held')&&heldAnwesend()&&
+               !(ichSicht&&S.spieltIdx==null);
+  if(heldRein&&P&&(P.aussehen||'').trim()){
     var pa=P.aussehen.trim().replace(/[.\s]+$/,'');
     var pg=geschlechtFuerBild();
     if(pg&&pa.toLowerCase().indexOf(pg)<0)pa=pg+', '+pa;
     var pk=(P.kleidung||'').trim().replace(/[.\s]+$/,'');
     figurenArr.push(pa+(pk?', wearing '+pk:''));
   }
-  W.npcs.forEach(function(n,i){
-    var a=(n.aussehen||'a person').trim().replace(/[.\s]+$/,'');
-    var k=(S.kleidung[i]||n.kleidung||'').trim().replace(/[.\s]+$/,'');
-    figurenArr.push(a+(k?', wearing '+k:''));
-  });
+  if(motiv==='alle'||motiv==='figuren'){
+    W.npcs.forEach(function(n,i){
+      if(!anwesendNpc(i))return;
+      if(ichSicht&&S.spieltIdx===i)return;
+      var a=(n.aussehen||'a person').trim().replace(/[.\s]+$/,'');
+      var k=(S.kleidung[i]||n.kleidung||'').trim().replace(/[.\s]+$/,'');
+      figurenArr.push(a+(k?', wearing '+k:''));
+    });
+  }
   var figuren=figurenArr.join(' AND ');
   var figCount=figurenArr.length;
   var szene=(opts.szene||S.szeneText||(W.ort&&W.ort.bildPrompt)||'').trim();
   var setting=(S.szeneGlobal||'').trim().replace(/[.\s]+$/,'');
-  var stimmungen=W.npcs.map(function(n,i){return S.stimmung[i];}).filter(Boolean).join(' and ');
-  var anzahl=figCount>1?(figCount+' distinct characters together in the scene, interacting'):'single character in the foreground';
+  var stimmungen=W.npcs.map(function(n,i){return anwesendNpc(i)?S.stimmung[i]:'';}).filter(Boolean).join(' and ');
+  var anzahl=figCount>1
+    ? (figCount+' distinct characters together in the scene, interacting')
+    : (figCount===1?'single character in the foreground'
+                   :'no people in frame, nobody visible, extreme close-up detail shot of an object');
 
-  var sicht=ichSicht
-    ? ', first person point of view, seen through the protagonist eyes, the viewer is the protagonist, protagonist himself not visible'
+  var sicht=(ichSicht||(figCount===0&&motiv==='ort'))
+    ? ', first person point of view, seen through the eyes of the protagonist, the viewer is the protagonist, protagonist himself not visible'
     : '';
   var schwanz=', '+aktuellerStil()+', '+anzahl+sicht+', '+zeitFuerBild()+', comic panel composition, dramatic lighting, detailed background';
   var mitte=(setting?'. Setting: '+setting:'')+(szene?'. Scene: '+szene:'')+(stimmungen?', mood: '+stimmungen:'');
-  var ganz=figuren+mitte+schwanz;
+  // Ohne Figur beginnt der Prompt sonst mit einem Punkt.
+  var ganz=(figuren?figuren:'an empty scene')+mitte+schwanz;
   if(!max||ganz.length<=max)return ganz;
 
   // Zu lang: Stil und Bildaufbau bleiben unangetastet, der Rest teilt sich den Platz.
@@ -2466,14 +2582,15 @@ function letzteZeilen(n){
   for(var i=Math.max(0,S.verlauf.length-n);i<S.verlauf.length;i++){
     var v=S.verlauf[i];
     if(!v||!v.text)continue;
-    raus.push((v.rolle==='ich'?(W.protagonist&&W.protagonist.name||'Held'):(v.name||'Figur'))+': '+v.text);
+    raus.push((v.rolle==='ich'?(v.name||(W.protagonist&&W.protagonist.name)||'Held'):(v.name||'Figur'))+': '+v.text);
   }
   return raus.join('\n');
 }
 function baueBildRegieAnweisung(){
-  var wer=W.npcs.map(function(n,i){
+  var wer=anwesendeNpcs().map(function(i){
+    var n=W.npcs[i];
     return (n.name||('Figur '+(i+1)))+(S.stimmung[i]?' ('+S.stimmung[i]+')':'');
-  }).join(', ');
+  }).concat(heldAnwesend()?[heldName()]:[]).join(', ')||'niemand';
   return 'Du bist die Bildregie eines Comics. Lies den Ausschnitt und sage, WAS IN DIESEM MOMENT ZU SEHEN IST.\n\n'+
     'Schauplatz: '+((S.szeneGlobal||(W.ort&&W.ort.name)||'unbekannt'))+'\n'+
     (wer?'Anwesend: '+wer+'\n':'')+
@@ -2615,6 +2732,8 @@ var BEFEHLE=[
    fn:function(){ nochmal(); }},
   {muster:/^\/speichern\b/i,                    hilfe:['/speichern','Spielstände öffnen'],
    fn:function(){ oeffneSpeicher(); }},
+  {muster:/^\/raeume\b|^\/räume\b/i,             hilfe:['/räume','Kachelübersicht aller Räume — wer wo ist, und wer wohin geht'],
+   fn:function(){ oeffneRaeume(); }},
   {muster:/^\/auswerten\b/i,                    hilfe:['/auswerten','ein übernommenes Gespräch (noch einmal) auswerten — Profile, Beziehungen, Gedächtnis'],
    fn:function(){ if(S.wartet){sysZeile('— Bitte kurz warten —');return;} chatAuswerten(true).catch(function(){}); }}
 ];
@@ -2698,8 +2817,9 @@ function sendeFreitext(){
 }
 function spielerSagt(txt){
   merkeSchnappschuss();
-  ichSage(txt);
-  S.verlauf.push({rolle:'ich',text:txt});
+  var name=gespielterName();
+  ichSage(txt,name);
+  S.verlauf.push({rolle:'ich',text:txt,name:name});
   var versuch=CFG.wuerfel?wagnisAus(txt):'';
   if(versuch){
     S.probe=wuerfle(versuch,letzterNpcIdx());
@@ -2836,7 +2956,7 @@ function zeichneVerlaufNeu(){
   tippenFertig();
   var g=el('gespraech');g.innerHTML='';
   S.verlauf.forEach(function(v){
-    if(v.rolle==='npc')npcZeileSofort(v.idx,v.text,v.name); else ichSage(v.text);
+    if(v.rolle==='npc')npcZeileSofort(v.idx,v.text,v.name); else ichSage(v.text,v.name);
   });
   zeigeStimmung();
   aktualisiereUI();
@@ -2896,6 +3016,7 @@ function figurEinfuegen(npc,bez,bezAndere){
   S.stimmung.push(npc.grundstimmung);
   S.kleidung.push(npc.kleidung);
   S.regieAnweisung.push('');
+  S.raumNpc.push(kameraRaum());   // wer auftritt, tritt dort auf, wo gespielt wird
   if(bez)setzeBeziehung(npc.name,heldName(),bez);
   if(bezAndere)uebernimmBeziehungen(bezAndere,npc.name);
   sysZeile('— '+npc.name+' erscheint —');
@@ -2989,6 +3110,11 @@ function entferneNPC(idx){
   S.stimmung.splice(idx,1);
   S.kleidung.splice(idx,1);
   S.regieAnweisung.splice(idx,1);
+  if(Array.isArray(S.raumNpc))S.raumNpc.splice(idx,1);
+  // Wer die gespielte Figur entfernt, spielt wieder den Helden.
+  if(S.spieltIdx===idx){ S.spieltIdx=null; sysZeile('— Du spielst wieder '+heldName()+' —'); }
+  else if(S.spieltIdx!=null&&S.spieltIdx>idx)S.spieltIdx--;
+  setzeKamera();
   S.autoForceIdx=null;
   beziehungenAufraeumen();
   merkeFakt(name+' hat den Ort verlassen.');
@@ -3017,8 +3143,9 @@ function npcZeileSofort(idx,text,name){
   var z=neueZeile('npc',npcName(idx,name));
   z.querySelector('.txt').innerHTML=formatAktionen(text);
 }
-function ichSage(text){
-  var z=neueZeile('ich',W.protagonist.name);
+// Der Mensch spricht - unter seinem Namen, und das ist nicht immer der Held.
+function ichSage(text,name){
+  var z=neueZeile('ich',name||gespielterName());
   z.querySelector('.txt').innerHTML=formatAktionen(text);
   scrolle();
 }
@@ -3083,7 +3210,8 @@ function aktualisiereUI(){
   var f=el('freitext');
   if(f)f.placeholder=S.autoAktiv
     ? 'Regie (gilt dauerhaft)   ·   /sag: selbst sprechen   ·   /hilfe'
-    : 'Sprich oder handle in \x5Beckigen Klammern\x5D   ·   /hilfe';
+    : ((S.spieltIdx!=null?('Du bist '+gespielterName()+'   ·   '):'')+
+       'Sprich oder handle in \x5Beckigen Klammern\x5D   ·   /hilfe');
   baueChronikNav();
 }
 // Kopfleiste ein-/ausklappen. Der Schalter bleibt sichtbar, damit sie
@@ -3105,9 +3233,21 @@ function zeigeStimmung(){
   var e=el('npcstatus'); if(!e)return;
   e.innerHTML='';
   var zeigeWeg=(W.npcs.length>=2);
+  // Wer den Raum verlassen hat, bleibt sichtbar in der Leiste - aber blass und
+  // mit dem Raum dahinter, damit klar ist, dass er gerade nicht dabei ist.
+  if(!heldAnwesend()){
+    var hchip=document.createElement('span');
+    hchip.className='npcchip fern'+(S.spieltIdx==null?' duselbst':'');
+    hchip.appendChild(document.createTextNode(heldName()+' ('+raumName(raumVonHeld())+')'));
+    e.appendChild(hchip);
+  }
   W.npcs.forEach(function(n,i){
-    var chip=document.createElement('span');chip.className='npcchip';
-    chip.appendChild(document.createTextNode(n.name+' ('+n.rolle+', '+S.stimmung[i]+')'));
+    var fern=!anwesendNpc(i);
+    var chip=document.createElement('span');
+    chip.className='npcchip'+(fern?' fern':'')+(S.spieltIdx===i?' duselbst':'');
+    chip.appendChild(document.createTextNode(
+      (S.spieltIdx===i?'◉ ':'')+n.name+
+      (fern?(' ('+raumName(raumVonNpc(i))+')'):(' ('+n.rolle+', '+S.stimmung[i]+')'))));
     if(zeigeWeg){
       var x=document.createElement('span');x.className='npcweg';x.textContent='✕';
       x.title=n.name+' entfernen';
@@ -3219,6 +3359,14 @@ function zeigeChronik(ziel){
 }
 
 // ── BILD-MENÜ ─────────────────────────────────
+// Die Wahl gilt dauerhaft, bis sie wieder auf "automatisch" steht.
+function motivGewechselt(){
+  var mo=el('bildMotiv');
+  if(!mo)return;
+  S.motiv=motivSchluessel(mo.value);
+  sysZeile('❖ Bildmotiv: '+(S.motiv?MOTIVE[S.motiv]:'automatisch'));
+  autosave();
+}
 function oeffneBildModal(){
   if(!S.imSpiel)return;
   if(!S.bildGeneriert&&!S.letzterPrompt&&!S.eigenerPrompt){ sysZeile('Das erste Bild entsteht gerade…'); return; }
@@ -3226,6 +3374,8 @@ function oeffneBildModal(){
   el('bildNegativFeld').value=S.eigenerNegativ||S.letzterNegativ||baueNegativ();
   el('bildSeedFeld').value=S.seed||'';
   el('bildFest').checked=!!S.promptFesthalten;
+  var mo=el('bildMotiv');
+  if(mo)mo.value=motivSchluessel(S.motiv)||'';
   fuelleStilWahl();
   el('bildQuelleInfo').textContent=(S.eigenerPrompt
       ? (S.promptFesthalten
@@ -3282,6 +3432,8 @@ function oeffneFigurMenu(){
     return '<option value="'+k+'"'+sel+'>'+(k?GESCHLECHTER[k].label:'nicht festgelegt')+'</option>';
   }).join('');
   var html='<div class="figblock"><div class="figtitel">HELD</div>'+
+    '<label class="feldlabel"><input type="checkbox" id="fig_rolle_held" onchange="rolleWaehlen(\'held\')"'+
+    (S.spieltIdx==null?' checked':'')+'> Diese Rolle spiele ich</label>'+
     (heldBlatt?'<img src="'+heldBlatt+'" alt="Charakterblatt" style="width:120px;max-width:40%;border:1px solid var(--border);display:block;margin:0 0 8px;">':'')+
     '<div class="reihe"><button onclick="zeichneBlatt(\'held\')" title="Porträt des Helden erzeugen">✎ '+(heldBlatt?'BLATT NEU':'CHARAKTERBLATT')+'</button></div>'+
     feld('fig_held_name','Name',P.name,false)+
@@ -3295,7 +3447,10 @@ function oeffneFigurMenu(){
     '</div>';
   W.npcs.forEach(function(n,i){
     var blatt=blattLesen(n.name);
-    html+='<div class="figblock"><div class="figtitel">'+escapeHtml(n.name||('NPC'+(i+1)))+'</div>'+
+    html+='<div class="figblock"><div class="figtitel">'+escapeHtml(n.name||('NPC'+(i+1)))+
+      ' <span style="color:var(--dim);letter-spacing:0.06em">· '+escapeHtml(raumName(raumVonNpc(i)))+'</span></div>'+
+      '<label class="feldlabel"><input type="checkbox" id="fig_rolle_npc'+i+'" onchange="rolleWaehlen('+i+')"'+
+      (S.spieltIdx===i?' checked':'')+'> Diese Rolle spiele ich</label>'+
       (blatt?'<img src="'+blatt+'" alt="Charakterblatt" style="width:120px;max-width:40%;border:1px solid var(--border);display:block;margin:0 0 8px;">':'')+
       '<div class="reihe"><button onclick="zeichneBlatt('+i+')" title="Porträt mit eigenem Seed erzeugen">✎ '+(blatt?'BLATT NEU':'CHARAKTERBLATT')+'</button></div>'+
       feld('fig_npc'+i+'_name','Name',n.name,false)+
@@ -3309,6 +3464,26 @@ function oeffneFigurMenu(){
   el('figurInhalt').innerHTML=html;
   werte.forEach(function(w){ var e=el(w.id); if(e)e.value=w.value; });
   oeffneModal('mFigur');
+}
+// Standardmaessig spielt der Mensch den Helden. Setzt er den Haken auf eine
+// Figur, spricht und handelt er als diese - und der Held antwortet von selbst.
+function rolleWaehlen(was){
+  var neu=(was==='held')?null:Number(was);
+  if(neu!=null&&!(neu>=0&&neu<W.npcs.length))return;
+  S.spieltIdx=neu;
+  // Die Kaestchen verhalten sich wie Radioknoepfe: nur eines bleibt an.
+  var e=el('fig_rolle_held');
+  if(e)e.checked=(neu==null);
+  W.npcs.forEach(function(n,i){
+    var b=el('fig_rolle_npc'+i);
+    if(b)b.checked=(neu===i);
+  });
+  var kameraZog=setzeKamera();
+  sysZeile('— Du spielst jetzt: '+gespielterName()+' —');
+  if(kameraZog){ zeigeRaumtitel(); S.bildZaehler=0; }
+  aktualisiereUI();
+  autosave();
+  if(kameraZog)zeichneBild({});
 }
 function speichereFiguren(){
   function g(id){ var e=el(id); return e?e.value.trim():''; }
@@ -3391,6 +3566,174 @@ function uebernehmeStil(){
     S.stil=STILE[wahl];S.stilLabel=wahl;
   }
   return S.stilLabel!==vorher;
+}
+
+// ── RÄUME UND ROLLEN ──────────────────────────
+// Bisher gab es EINEN Ort und alle standen darin. Jetzt hat jede Figur einen
+// Raum. Die Kamera haengt an der Figur, die der Mensch am Bildschirm spielt -
+// verlaesst sie den Raum, geht das Bild mit. Wer woanders ist, bleibt im Spiel,
+// ist aber weder zu sehen noch zu hoeren.
+var MAX_RAEUME=12;
+
+function raumListe(){
+  if(!Array.isArray(W.raeume)||!W.raeume.length){
+    W.raeume=[W.ort||{name:'Ein Ort',geschichte:'',bildPrompt:'',kulisse:''}];
+  }
+  return W.raeume;
+}
+function raumName(k){
+  var r=raumListe()[k];
+  return (r&&r.name)||'Ein Ort';
+}
+// Wer spielt gerade? null = der Held, sonst der Index einer Figur.
+function gespielteFigur(){
+  return (S.spieltIdx==null)?null:(W.npcs[S.spieltIdx]||null);
+}
+function gespielterName(){
+  var f=gespielteFigur();
+  return f?f.name:heldName();
+}
+function raumVonHeld(){ return (typeof S.raumHeld==='number')?S.raumHeld:0; }
+function raumVonNpc(i){ return (typeof S.raumNpc[i]==='number')?S.raumNpc[i]:0; }
+// Der Raum, in dem gespielt wird - und damit der, den die Kamera zeigt.
+function kameraRaum(){
+  return (S.spieltIdx==null)?raumVonHeld():raumVonNpc(S.spieltIdx);
+}
+// W.ort ist immer der Raum der Kamera. Gibt true zurueck, wenn sie umgezogen ist.
+function setzeKamera(){
+  var liste=raumListe();
+  var neu=liste[kameraRaum()]||liste[0];
+  if(!neu||W.ort===neu)return false;
+  if(W.ort)W.ort.kulisse=S.szeneGlobal||W.ort.kulisse||'';
+  W.ort=neu;
+  S.szeneGlobal=neu.kulisse||'';
+  S.szeneText=neu.bildPrompt||'';
+  return true;
+}
+// Bringt alles in einen gueltigen Zustand: Raumliste, Zuordnungen, Kamera.
+function raeumeOrdnen(){
+  var liste=raumListe();
+  if(!Array.isArray(S.raumNpc))S.raumNpc=[];
+  while(S.raumNpc.length<W.npcs.length)S.raumNpc.push(kameraRaum());
+  S.raumNpc=S.raumNpc.slice(0,W.npcs.length).map(function(k){
+    return (typeof k==='number'&&k>=0&&k<liste.length)?k:0;
+  });
+  if(typeof S.raumHeld!=='number'||S.raumHeld<0||S.raumHeld>=liste.length)S.raumHeld=0;
+  if(S.spieltIdx!=null&&!(S.spieltIdx>=0&&S.spieltIdx<W.npcs.length))S.spieltIdx=null;
+  setzeKamera();
+}
+// Sucht einen Raum am Namen und legt ihn sonst an.
+function raumFinden(name,vorlage){
+  var liste=raumListe();
+  var n=entkleide(String(name||'')).trim();
+  if(!n)return kameraRaum();
+  var klein=n.toLowerCase();
+  for(var i=0;i<liste.length;i++){
+    var r=liste[i];
+    if(r&&String(r.name||'').toLowerCase()===klein)return i;
+  }
+  if(liste.length>=MAX_RAEUME)return kameraRaum();
+  liste.push({name:kappe(n,60),
+              geschichte:(vorlage&&vorlage.geschichte)||'',
+              bildPrompt:(vorlage&&vorlage.bildPrompt)||'',
+              kulisse:(vorlage&&vorlage.kulisse)||''});
+  return liste.length-1;
+}
+// "held" oder ein Figurenindex zieht in Raum k um.
+function figurNachRaum(wer,k,still){
+  var liste=raumListe();
+  if(!(k>=0&&k<liste.length))return false;
+  var name='';
+  if(wer==='held'){
+    if(raumVonHeld()===k)return false;
+    S.raumHeld=k; name=heldName();
+  }else{
+    var i=Number(wer);
+    if(!(i>=0&&i<W.npcs.length))return false;
+    if(raumVonNpc(i)===k)return false;
+    S.raumNpc[i]=k; name=W.npcs[i].name;
+  }
+  var kameraZog=setzeKamera();
+  if(!still){
+    sysZeile('— '+name+' geht nach: '+raumName(k)+' —');
+    if(kameraZog){
+      zeigeRaumtitel();
+      S.bildZaehler=0;
+      zeichneBild({});
+    }
+    aktualisiereUI();
+    autosave();
+  }
+  return true;
+}
+// Anwesend heisst: im selben Raum wie die Kamera.
+function anwesendNpc(i){ return raumVonNpc(i)===kameraRaum(); }
+function anwesendeNpcs(){
+  var raus=[];
+  W.npcs.forEach(function(n,i){ if(anwesendNpc(i))raus.push(i); });
+  return raus;
+}
+function heldAnwesend(){ return raumVonHeld()===kameraRaum(); }
+// Wer nicht im Raum ist, gehoert trotzdem in die Anweisung - sonst laesst die
+// Regie ihn mitreden, als staende er daneben.
+function abwesendeText(){
+  var raus=[];
+  if(!heldAnwesend())raus.push(heldName()+' ('+raumName(raumVonHeld())+')');
+  W.npcs.forEach(function(n,i){
+    if(!anwesendNpc(i))raus.push(n.name+' ('+raumName(raumVonNpc(i))+')');
+  });
+  if(!raus.length)return '';
+  return 'NICHT IM RAUM (anderswo, weder zu sehen noch zu hoeren, dürfen NICHT sprechen): '+raus.join(', ')+'\n';
+}
+// "Ida > Küche; Jan > Hof" - so schickt die Regie einzelne Figuren durch Türen.
+function raumwechselAus(text){
+  var raus=[];
+  String(text==null?'':text).split(/[;\n]+/).forEach(function(t){
+    var m=t.match(/^\s*([^>:]{1,44}?)\s*(?:>|->|→|nach)\s*(.+)$/);
+    if(m)raus.push({wer:entkleide(m[1]).trim(),wohin:entkleide(m[2]).trim()});
+  });
+  return raus;
+}
+function folgeRaumwechsel(text){
+  if(leerAngabe(text))return 0;
+  var zahl=0;
+  raumwechselAus(text).forEach(function(e){
+    if(!e.wer||!e.wohin||leerAngabe(e.wohin))return;
+    var k=raumFinden(e.wohin,{});
+    var wer=istHeld(e.wer)?'held':findeNpc(e.wer);
+    if(wer!=='held'&&wer<0)return;
+    if(figurNachRaum(wer,k,true))zahl++;
+  });
+  if(zahl){
+    var kameraZog=setzeKamera();
+    sysZeile('— Ortswechsel im Haus: '+text+' —');
+    if(kameraZog){ zeigeRaumtitel(); S.bildZaehler=0; zeichneBild({}); }
+    aktualisiereUI();
+    autosave();
+  }
+  return zahl;
+}
+
+// ── WER IST IM BILD ───────────────────────────
+// Ein Bild muss nicht immer alle zeigen: mal nur die Figuren, mal nur den
+// Helden, mal gar keine Person, sondern ein Ding aus naechster Naehe.
+var MOTIVE={
+  alle:   'alle Anwesenden',
+  figuren:'nur die Figuren',
+  held:   'nur der Held',
+  ort:    'niemand — Detailaufnahme'
+};
+function motivSchluessel(t){
+  var s=String(t||'').toLowerCase().trim();
+  if(/^(figur|npc|nur die figuren|others)/.test(s))return 'figuren';
+  if(/^(held|protagonist|nur der held|self)/.test(s))return 'held';
+  if(/^(ort|ding|detail|gegenstand|nichts|niemand|none|object)/.test(s))return 'ort';
+  if(/^(alle|all|beide)/.test(s))return 'alle';
+  return '';
+}
+// Die Wahl des Spielers schlaegt den Vorschlag der Regie.
+function bildMotiv(){
+  return motivSchluessel(S.motiv)||motivSchluessel(S.motivZug)||'alle';
 }
 
 // ── ORT ───────────────────────────────────────
@@ -3480,6 +3823,7 @@ function speichereOrt(){
   W.ort.name=el('ortName').value.trim()||W.ort.name;
   W.ort.geschichte=el('ortGeschichte').value.trim()||W.ort.geschichte;
   S.szeneGlobal=el('ortKulisse').value.trim();
+  W.ort.kulisse=S.szeneGlobal;   // die Kulisse gehoert zum Raum, nicht zur Partie
   schliesseModal();
   zeigeRaumtitel();
   baueChronikNav();
@@ -3515,12 +3859,20 @@ async function ortWechseln(beschreibung){
       120000);
     var j=jsonAus(text), z=j?null:felderAus(text);
     var f=function(k,flach,ersatz){ return j?hole(j,[k],ersatz):((z&&z[flach])||ersatz); };
-    if(!W.ort)W.ort={};
-    W.ort.name=f('name','NAME',beschreibung.substring(0,40));
-    W.ort.geschichte=f('geschichte','GESCHICHTE',beschreibung);
-    W.ort.bildPrompt=f('bild','BILD',W.ort.bildPrompt||'');
-    S.szeneGlobal=f('kulisse','KULISSE',S.szeneGlobal||'');
-    S.szeneText=W.ort.bildPrompt;
+    // Alle, die JETZT im Raum stehen, gehen mit - wer anderswo ist, bleibt dort.
+    var mitNpcs=anwesendeNpcs(), mitHeld=heldAnwesend();
+    var k=raumFinden(f('name','NAME',beschreibung.substring(0,40)),{});
+    var raum=raumListe()[k];
+    raum.geschichte=f('geschichte','GESCHICHTE',beschreibung);
+    raum.bildPrompt=f('bild','BILD',raum.bildPrompt||'');
+    raum.kulisse=f('kulisse','KULISSE',raum.kulisse||'');
+    mitNpcs.forEach(function(i){ S.raumNpc[i]=k; });
+    if(mitHeld)S.raumHeld=k;
+    if(S.spieltIdx!=null)S.raumNpc[S.spieltIdx]=k;
+    setzeKamera();
+    W.ort=raum;
+    S.szeneGlobal=raum.kulisse||'';
+    S.szeneText=raum.bildPrompt;
     merkeFakt('Der Ort wechselte zu '+W.ort.name+'.');
     zeigeRaumtitel();
     baueChronikNav();
@@ -3542,6 +3894,74 @@ function ortNotiz(satz){
   if(W.ort.geschichte.length>1400)W.ort.geschichte=W.ort.geschichte.substring(W.ort.geschichte.length-1400);
   merkeFakt('Am Ort: '+satz);
   sysZeile('— '+satz+' —');
+}
+
+// ── KACHELÜBERSICHT DER RÄUME ─────────────────
+// Eine Kachel je Raum, darin wer sich dort aufhaelt. Der Raum mit der Kamera
+// ist hervorgehoben; von hier aus laesst sich jede Figur versetzen.
+function raumBelegung(){
+  var liste=raumListe();
+  var raus=liste.map(function(r,k){
+    return {name:(r&&r.name)||('Raum '+(k+1)),leute:[]};
+  });
+  raus[raumVonHeld()].leute.push({wer:'held',name:heldName(),selbst:(S.spieltIdx==null)});
+  W.npcs.forEach(function(n,i){
+    raus[raumVonNpc(i)].leute.push({wer:i,name:n.name,selbst:(S.spieltIdx===i)});
+  });
+  return raus;
+}
+function oeffneRaeume(){
+  if(!S.imSpiel)return;
+  raeumeOrdnen();
+  var hier=kameraRaum();
+  var belegung=raumBelegung();
+  var html='<div class="hinweis">Die Kamera bleibt bei der Figur, die du spielst. Wer in einem anderen Raum steht, '+
+           'bleibt im Spiel — ist dort aber weder zu sehen noch zu hören.</div><div class="raumgitter">';
+  belegung.forEach(function(r,k){
+    var leute=r.leute.map(function(p){
+      return '<span class="raumperson'+(p.selbst?' duselbst':'')+'">'+escapeHtml(p.name)+(p.selbst?' ◉':'')+'</span>';
+    }).join('');
+    var andere=[];
+    belegung.forEach(function(r2,k2){
+      if(k2===k)return;
+      r2.leute.forEach(function(p){ andere.push({wer:p.wer,name:p.name}); });
+    });
+    html+='<div class="raumkachel'+(k===hier?' hier':'')+'">'+
+      '<div class="raumkopf">'+escapeHtml(r.name)+(k===hier?' · HIER':'')+'</div>'+
+      '<div class="raumleute">'+(leute||'<span class="raumleer">leer</span>')+'</div>'+
+      '<button onclick="raumHin('+k+')"'+(k===hier?' disabled':'')+'>◎ DORTHIN</button>'+
+      (andere.length
+        ? '<select onchange="figurHolen(this.value,'+k+')"><option value="">Figur hierher holen…</option>'+
+          andere.map(function(p){ return '<option value="'+p.wer+'">'+escapeHtml(p.name)+'</option>'; }).join('')+
+          '</select>'
+        : '')+
+      '</div>';
+  });
+  html+='</div>'+
+    '<label class="feldlabel" for="raumNeuFeld">NEUER RAUM (nur Name — die Beschreibung schreibt der Ortswechsel)</label>'+
+    '<div class="reihe"><input id="raumNeuFeld" class="feld" type="text" placeholder="z.B. Die Küche">'+
+    '<button onclick="raumAnlegen()">＋</button></div>';
+  el('raeumeInhalt').innerHTML=html;
+  oeffneModal('mRaeume');
+}
+// Die gespielte Figur geht in Raum k - und die Kamera mit ihr.
+function raumHin(k){
+  figurNachRaum(S.spieltIdx==null?'held':S.spieltIdx,k);
+  oeffneRaeume();
+}
+function figurHolen(wer,k){
+  if(wer==='')return;
+  figurNachRaum(wer==='held'?'held':Number(wer),k);
+  oeffneRaeume();
+}
+function raumAnlegen(){
+  var e=el('raumNeuFeld');
+  var n=e?e.value.trim():'';
+  if(!n)return;
+  if(raumListe().length>=MAX_RAEUME){ sysZeile('Mehr als '+MAX_RAEUME+' Räume werden nicht geführt.'); return; }
+  raumFinden(n,{});
+  autosave();
+  oeffneRaeume();
 }
 
 // ── EINSTELLUNGEN ─────────────────────────────
@@ -3588,7 +4008,7 @@ function oeffneEinstellungen(){
 // Seit der Umstellung auf die Ladeschale ist die Frage berechtigt, welcher Stand
 // gerade laeuft. Die Schale legt den geholten Quelltext samt Zweig und Zeitpunkt
 // im localStorage ab; hier wird er nur abgelesen.
-var VERSION = 'V7.40';
+var VERSION = 'V7.41';
 // Ohne Browserkonsole — etwa am Handy — muss der Generator selbst sagen koennen,
 // woran es liegt, wenn ein Plugin von Perchance fehlt.
 function pluginLage(){
@@ -3968,6 +4388,29 @@ function migriere(d){
     if(typeof x.geheimnis!=='string')x.geheimnis='';
     x.aufgedeckt=!!x.aufgedeckt;
   });
+  // Vor V7.41 gab es nur EINEN Ort und alle standen darin.
+  if(!Array.isArray(w.raeume)||!w.raeume.length){
+    w.raeume=w.ort?[w.ort]:[{name:'Ein Ort',geschichte:'',bildPrompt:'',kulisse:''}];
+    if(!w.ort)w.ort=w.raeume[0];
+    if(typeof s.raumHeld!=='number')s.raumHeld=0;
+  }else if(w.ort&&w.ort.name){
+    // Nach dem Speichern ist W.ort eine Kopie - hier wieder auf den Raum zeigen.
+    var kOrt=-1;
+    w.raeume.forEach(function(r,ri){ if(kOrt<0&&r&&String(r.name)===String(w.ort.name))kOrt=ri; });
+    if(kOrt<0){ w.raeume.push(w.ort); kOrt=w.raeume.length-1; }
+    w.ort=w.raeume[kOrt];
+  }else{
+    w.ort=w.raeume[0];
+  }
+  if(!Array.isArray(s.raumNpc))s.raumNpc=[];
+  while(s.raumNpc.length<w.npcs.length)s.raumNpc.push(0);
+  s.raumNpc=s.raumNpc.slice(0,w.npcs.length).map(function(k){
+    return (typeof k==='number'&&k>=0&&k<w.raeume.length)?k:0;
+  });
+  if(typeof s.raumHeld!=='number'||s.raumHeld<0||s.raumHeld>=w.raeume.length)s.raumHeld=0;
+  if(s.spieltIdx==null||!(s.spieltIdx>=0&&s.spieltIdx<w.npcs.length))s.spieltIdx=null;
+  if(typeof s.motiv!=='string')s.motiv='';
+  s.motivZug='';
   if(typeof s.minuten!=='number')s.minuten=0;
   if(typeof s.startUhr!=='number')s.startUhr=19*60+30;
   if(typeof s.wetter!=='string')s.wetter='';
@@ -4043,6 +4486,7 @@ function slotLaden(i){
 function uebernehmeStand(d){
   migriere(d);
   W=d.welt;S=d.stand;
+  raeumeOrdnen();
   tipper=null;
   schliesseModal();
   if(el('start').style.display!=='none'&&!el('start').classList.contains('aus')){
@@ -4287,6 +4731,7 @@ function chatAnhaengen(plan){
       S.stimmung.push('neutral');
       S.kleidung.push(W.npcs[i].kleidung);
       S.regieAnweisung.push('');
+      S.raumNpc.push(kameraRaum());
       neu.push(name);
     }
     if(i>=0)karte[name]=i;
@@ -4324,8 +4769,11 @@ function chatAlsWelt(plan,heldWunsch,titel){
     name:       titel||'Fortgeführtes Gespräch',
     geschichte: 'Ein Gespräch, das anderswo begann, geht hier weiter.',
     bildPrompt: 'two people talking in a quiet room, warm evening light',
+    kulisse:    '',
     ausChat:    true   // Platzhalter, bis die Auswertung den Ort kennt
   };
+  W.raeume=[W.ort];
+  S.raumHeld=0;S.raumNpc=[];S.spieltIdx=null;S.motiv='';S.motivZug='';
   setzeNpcs(namen.length?namen.map(function(n){ return chatFigur(n,chatLetzterSatz(plan,n)); })
                         :[chatFigur('Gesprächspartner','…')]);
   var rahmen=W.protagonist.name+' setzt ein Gespräch fort'+
