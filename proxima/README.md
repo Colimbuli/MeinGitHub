@@ -51,6 +51,24 @@ Vier weitere Dinge, die mitgedacht sind:
 Wer den Generator forkt, ändert nur den Block `CFG` oben im Skript von `proxima.html`
 (`besitzer`, `repo`, `zweig`, `pfad`, `taktSekunden`).
 
+## Wie die Seite bei Suchmaschinen erscheint
+
+Titel, Beschreibung, Vorschaubild und Schlagworte stehen **nicht** im Generator-Quelltext,
+sondern auf der **linken Editorseite** von Perchance (dem Listen-Bereich — rechts steht die
+Ladeschale). Der fertige Block zum Kopieren liegt in [`meta.txt`](meta.txt), zusammen mit
+kürzeren und längeren Fassungen der Beschreibung und der Begründung, warum welcher Satz drinsteht.
+
+Zwei Dinge dazu:
+
+* Die linke Seite ist Generator-Syntax: Eckige und geschweifte Klammern haben dort eine
+  Bedeutung. Titel und Beschreibung kommen deshalb ohne aus.
+* Das Vorschaubild fehlt noch. Die Adresse in `meta.txt` zeigt bereits auf
+  `proxima/vorschau.jpg` in diesem Repository — sobald dort ein Bild liegt, stimmt sie.
+
+| Datei | Rolle |
+|---|---|
+| `meta.txt` | Titel, Beschreibung, Schlagworte für die linke Editorseite. Kein Code. |
+
 ## Voraussetzung: öffentliches Repository
 
 `raw.githubusercontent.com` liefert aus einem **privaten** Repository nichts — für alle 404, auch
