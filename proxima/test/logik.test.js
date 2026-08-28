@@ -1372,8 +1372,39 @@ pruefe('frivol lässt sich weiterhin wählen', /anzuegliche/.test(ctx.registerTe
 ctx.CFG.ton = 'sachlich';
 pruefe('sachlich streicht den Flirt', /ohne Flirt/.test(ctx.registerText()));
 ctx.CFG.ton = 'gibtsnicht';
-pruefe('ein unbekannter Ton fällt auf den natürlichen zurück', ctx.registerText() === ctx.TONFAELLE.natuerlich.text);
-ctx.CFG.ton = 'natuerlich';
+pruefe('ein unbekannter Ton fällt auf den natürlichen zurück',
+  ctx.registerText() === 'REGISTER: ' + ctx.TONFAELLE.natuerlich.roh + '\n');
+
+// Von Hand: eigener Wortlaut, per Feld oder per /ton.
+ctx.CFG.ton = 'eigen'; ctx.CFG.tonText = 'Trocken und wortkarg. Jeder Satz sitzt.';
+pruefe('ein eigener Ton geht wörtlich in die Anweisung',
+  /REGISTER: Trocken und wortkarg\. Jeder Satz sitzt\.\n/.test(ctx.registerText()), ctx.registerText());
+pruefe('und trägt seinen eigenen Namen', ctx.tonLabel() === 'eigener Ton');
+ctx.CFG.tonText = '';
+pruefe('ein leerer eigener Ton fällt auf den natürlichen zurück',
+  ctx.tonText() === ctx.TONFAELLE.natuerlich.roh);
+ctx.CFG.tonText = 'x'.repeat(600);
+pruefe('ein zu langer eigener Ton wird gekappt', ctx.registerText().length < 460);
+
+const echtesSpeichern = ctx.speichereCfg, echteSys = ctx.sysZeile;
+let gesagt = '';
+ctx.speichereCfg = () => {}; ctx.sysZeile = (t) => { gesagt = t; };
+ctx.tonBefehl('frivol');
+pruefe('/ton: mit bekanntem Namen wählt die Vorgabe',
+  ctx.CFG.ton === 'frivol' && /Frivol/.test(gesagt), gesagt);
+ctx.tonBefehl('Alle reden im Dialekt und lachen viel.');
+pruefe('/ton: mit freiem Text setzt den eigenen Wortlaut',
+  ctx.CFG.ton === 'eigen' && /Dialekt/.test(ctx.tonText()));
+gesagt = '';
+ctx.tonBefehl('');
+pruefe('/ton ohne Angabe zeigt den aktuellen', /Tonfall: eigener Ton/.test(gesagt), gesagt);
+ctx.speichereCfg = echtesSpeichern; ctx.sysZeile = echteSys;
+
+pruefe('das Feld dafür steht in den Einstellungen',
+  /id="cfgTonText"/.test(src) && /tonGewechselt\(\)/.test(src));
+pruefe('und wird mit der gewählten Vorgabe vorbelegt',
+  /if\(eigen&&!String\(feld\.value\|\|''\)\.trim\(\)\)feld\.value=tonText\(\);/.test(src));
+ctx.CFG.ton = 'natuerlich'; ctx.CFG.tonText = '';
 pruefe('der alte Zwang zum Obszönen ist raus', !/obszoene/.test(src));
 pruefe('der Tonfall lässt sich einstellen', /id="cfgTon"/.test(src) && /CFG\.ton=tonSchluessel/.test(src));
 

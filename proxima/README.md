@@ -482,6 +482,22 @@ Symmetrie mit meinem Wanderstock"). Dagegen stehen zwei Blöcke in **jeder** Anw
 | natürlich (Standard) | warm und respektvoll, alltagsnah; Necken und Ironie erlaubt |
 | frivol | frech und anzüglich, spielerisch und gutmütig |
 | sachlich | knapp und nüchtern, ohne Flirt und Ausschmückung |
+| eigener Ton | dein Wortlaut, wörtlich an die KI |
+
+**Von Hand.** Wählst du *eigener Ton*, erscheint ein Feld — **vorbelegt mit der Vorgabe, die gerade
+eingestellt war**. Meistens will man nur nachbessern („…, aber alle siezen sich"), nicht bei null
+anfangen. Was dort steht, geht wörtlich als `REGISTER:` in jede Anweisung (bis 400 Zeichen).
+
+Im Spiel geht dasselbe schneller mit **`/ton: …`**:
+
+| Eingabe | Wirkung |
+| --- | --- |
+| `/ton` | zeigt den aktuellen Tonfall im Wortlaut |
+| `/ton: frivol` | schaltet auf die Vorgabe dieses Namens |
+| `/ton: Alle reden knapp und im Dialekt.` | setzt genau diesen Wortlaut |
+
+Die Sprachregeln darüber gelten immer und unabhängig davon — der Tonfall bestimmt die Haltung,
+nicht die Erlaubnis zu geschraubten Sätzen.
 
 Klingen die Antworten trotzdem ausgedacht, hilft der **Lektor** — er prüft die Sprache inzwischen
 als Erstes.
@@ -748,6 +764,7 @@ ein neuer Befehl steht damit automatisch in der Hilfe, ohne Nachpflege. Ein Test
 | `/nochmal` | letzten Zug verwerfen und die Antwort neu würfeln |
 | `/speichern` | Spielstände öffnen |
 | `/räume` | Kachelübersicht aller Räume — wer wo ist, und wer wohin geht |
+| `/ton: …` | Tonfall der Figuren — natürlich, frivol, sachlich oder eigener Wortlaut |
 | `/auswerten` | ein übernommenes Gespräch (noch einmal) auswerten — Profile, Beziehungen, Gedächtnis |
 
 ## Was gegenüber V6 anders ist

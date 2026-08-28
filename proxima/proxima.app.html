@@ -192,7 +192,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.42</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.43</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -532,7 +532,8 @@ var CFG={
   lektor:false,    // zweiter KI-Aufruf prueft die Antwort, bevor sie erscheint
   tempo:16,        // ms pro Zeichen im Schreibmaschinen-Effekt (0 = sofort)
   bildTakt:2,      // alle N Zuege ein neues Bild (0 = nur auf Zuruf)
-  ton:'natuerlich',// Tonfall der Figuren: natuerlich, frivol oder sachlich
+  ton:'natuerlich',// Tonfall der Figuren: natuerlich, frivol, sachlich oder eigen
+  tonText:'',      // bei 'eigen' der selbst geschriebene Wortlaut
   wuerfel:true,    // Handlungen des Helden koennen misslingen
   geschlecht:'',   // zuletzt gewaehltes Geschlecht des Helden (leer = KI entscheidet)
   pollModell:'',
@@ -2148,19 +2149,49 @@ function kappe(t,max){
 // sondern der falsche Klang: gestelzte Bilder, erfundene Fachwoerter, Saetze,
 // die niemand ausspricht. Dagegen stehen zwei Bloecke in jeder Anweisung -
 // der Tonfall, den der Spieler waehlt, und die Sprachregeln, die immer gelten.
+var TON_MAX=400;   // laenger liest die KI ohnehin nicht mehr mit
 var TONFAELLE={
   natuerlich:{label:'Natürlich — wie Menschen wirklich reden',
-    text:'REGISTER: Warm, freundlich und respektvoll — vor allem aber alltagsnah. Necken, Ironie und ein trockener Spruch sind willkommen, solange sie klingen wie gesprochene Sprache. KEINE Beleidigungen, keine Herablassung, keine Feindseligkeit.\n'},
+    roh:'Warm, freundlich und respektvoll — vor allem aber alltagsnah. Necken, Ironie und ein trockener Spruch sind willkommen, solange sie klingen wie gesprochene Sprache. KEINE Beleidigungen, keine Herablassung, keine Feindseligkeit.'},
   frivol:{label:'Frivol — frech und anzüglich',
-    text:'REGISTER: Der Ton ist warm, freundlich und offen. Frivole, freche und anzuegliche Sprueche sind erlaubt und erwuenscht, solange sie SPIELERISCH und gutmuetig bleiben und wie gesprochene Sprache klingen. KEINE Beleidigungen, keine Herablassung, keine Feindseligkeit — necken ja, verletzen nein.\n'},
+    roh:'Der Ton ist warm, freundlich und offen. Frivole, freche und anzuegliche Sprueche sind erlaubt und erwuenscht, solange sie SPIELERISCH und gutmuetig bleiben und wie gesprochene Sprache klingen. KEINE Beleidigungen, keine Herablassung, keine Feindseligkeit — necken ja, verletzen nein.'},
   sachlich:{label:'Sachlich — knapp und nüchtern',
-    text:'REGISTER: Nuechtern und knapp. Die Figuren reden zur Sache, ohne Flirt und ohne Ausschmueckung. Hoeflich, aber sparsam mit Gefuehlen.\n'}
+    roh:'Nuechtern und knapp. Die Figuren reden zur Sache, ohne Flirt und ohne Ausschmueckung. Hoeflich, aber sparsam mit Gefuehlen.'}
 };
 function tonSchluessel(t){
   var k=String(t||'').toLowerCase().trim();
+  if(k==='eigen')return 'eigen';
   return TONFAELLE[k]?k:'natuerlich';
 }
-function registerText(){ return TONFAELLE[tonSchluessel(CFG.ton)].text; }
+// Der Wortlaut ohne Vorspann - so steht er auch im Feld, wenn man ihn von Hand
+// nachbessern will.
+function tonText(){
+  var k=tonSchluessel(CFG.ton);
+  if(k==='eigen'){
+    var t=String(CFG.tonText||'').trim();
+    return t||TONFAELLE.natuerlich.roh;
+  }
+  return TONFAELLE[k].roh;
+}
+function tonLabel(){
+  var k=tonSchluessel(CFG.ton);
+  return (k==='eigen')?'eigener Ton':TONFAELLE[k].label;
+}
+function registerText(){ return 'REGISTER: '+kappe(tonText(),TON_MAX)+'\n'; }
+// /ton: nimmt entweder eine Vorgabe beim Namen oder gleich den eigenen Wortlaut.
+function tonBefehl(raw){
+  var t=entkleide(String(raw==null?'':raw)).trim();
+  if(!t){ sysZeile('❖ Tonfall: '+tonLabel()+' — '+kappe(tonText(),160)); return; }
+  var k=t.toLowerCase();
+  if(TONFAELLE[k]){
+    CFG.ton=k;
+  }else{
+    CFG.ton='eigen';
+    CFG.tonText=kappe(t,TON_MAX);
+  }
+  speichereCfg();
+  sysZeile('❖ Tonfall: '+tonLabel()+' — '+kappe(tonText(),160));
+}
 function sprachRegeln(){
   return 'SPRACHE — hier geht am meisten schief, also lies es zweimal:\n'+
     '- Schreib GESPROCHENE Sprache: einfache Woerter, kurze Saetze, auch mal ein halber. So, wie Menschen wirklich reden.\n'+
@@ -2762,6 +2793,8 @@ var BEFEHLE=[
    fn:function(){ nochmal(); }},
   {muster:/^\/speichern\b/i,                    hilfe:['/speichern','Spielstände öffnen'],
    fn:function(){ oeffneSpeicher(); }},
+  {muster:/^\/ton\s*:?\s*([\s\S]*)$/i,           hilfe:['/ton: …','Tonfall der Figuren — natürlich, frivol, sachlich oder eigener Wortlaut (ohne Angabe: aktuellen zeigen)'],
+   fn:function(m){ tonBefehl(m[1]); }},
   {muster:/^\/raeume\b|^\/räume\b/i,             hilfe:['/räume','Kachelübersicht aller Räume — wer wo ist, und wer wohin geht'],
    fn:function(){ oeffneRaeume(); }},
   {muster:/^\/auswerten\b/i,                    hilfe:['/auswerten','ein übernommenes Gespräch (noch einmal) auswerten — Profile, Beziehungen, Gedächtnis'],
@@ -4013,11 +4046,17 @@ function oeffneEinstellungen(){
     '<label class="feldlabel"><input type="checkbox" id="cfgAutoBesetzung"'+(CFG.autoBesetzung?' checked':'')+
     '> Handlung verändert Ort, Besetzung und Kleidung</label>'+
     '<label class="feldlabel" for="cfgTon">TONFALL DER FIGUREN</label>'+
-    '<select id="cfgTon" class="feld">'+
+    '<select id="cfgTon" class="feld" onchange="tonGewechselt()">'+
     Object.keys(TONFAELLE).map(function(k){
       return '<option value="'+k+'"'+(tonSchluessel(CFG.ton)===k?' selected':'')+'>'+escapeHtml(TONFAELLE[k].label)+'</option>';
-    }).join('')+'</select>'+
-    '<div class="hinweis">Unabhängig davon gilt immer: gesprochene Sprache, kurze Sätze, höchstens ein Bild pro Zeile. '+
+    }).join('')+
+    '<option value="eigen"'+(tonSchluessel(CFG.ton)==='eigen'?' selected':'')+'>Eigener Ton — selbst formulieren</option>'+
+    '</select>'+
+    '<textarea id="cfgTonText" class="feld" rows="3" style="display:none" '+
+    'placeholder="z.B. Trocken und wortkarg. Die Figuren reden wenig, aber jeder Satz sitzt."></textarea>'+
+    '<div class="hinweis">Der eigene Ton wird beim Umschalten mit der gewählten Vorgabe vorbelegt — du kannst sie also '+
+    'auch nur nachbessern, statt bei null anzufangen. Im Spiel geht das ebenso mit <b>/ton: …</b>. '+
+    'Unabhängig davon gilt immer: gesprochene Sprache, kurze Sätze, höchstens ein Bild pro Zeile. '+
     'Klingen die Antworten trotzdem ausgedacht, hilft der Lektor darunter — er prüft jede Zeile auch darauf.</div>'+
     '<label class="feldlabel"><input type="checkbox" id="cfgWuerfel"'+(CFG.wuerfel?' checked':'')+
     '> Handlungen des Helden können misslingen (Würfelprobe)</label>'+
@@ -4039,13 +4078,16 @@ function oeffneEinstellungen(){
     datenschutzHtml();
   el('einstellInhalt').innerHTML=html;
   el('cfgNegativ').value=CFG.negativ||'';
+  var tf=el('cfgTonText');
+  if(tf)tf.value=String(CFG.tonText||'');
+  tonGewechselt();
   zeichneQuellenFelder();
   oeffneModal('mEinstellungen');
 }
 // Seit der Umstellung auf die Ladeschale ist die Frage berechtigt, welcher Stand
 // gerade laeuft. Die Schale legt den geholten Quelltext samt Zweig und Zeitpunkt
 // im localStorage ab; hier wird er nur abgelesen.
-var VERSION = 'V7.42';
+var VERSION = 'V7.43';
 // Ohne Browserkonsole — etwa am Handy — muss der Generator selbst sagen koennen,
 // woran es liegt, wenn ein Plugin von Perchance fehlt.
 function pluginLage(){
@@ -4263,6 +4305,7 @@ function leseEinstellungen(){
   var wf=el('cfgWuerfel'); if(wf)CFG.wuerfel=!!wf.checked;
   var lk=el('cfgLektor'); if(lk)CFG.lektor=!!lk.checked;
   var tn=el('cfgTon'); if(tn)CFG.ton=tonSchluessel(tn.value);
+  var tt=el('cfgTonText'); if(tt)CFG.tonText=kappe(tt.value.trim(),TON_MAX);
   var q=BILDQUELLEN[CFG.quelle];
   (q.felder||[]).forEach(function(f){
     var e=el('q_'+f.k);
@@ -4310,6 +4353,15 @@ function fuelleQuelleKurz(){
     if(k===CFG.quelle)o.selected=true;
     s.appendChild(o);
   });
+}
+// Beim Wechsel auf "eigen" steht der bisher gewaehlte Wortlaut schon im Feld -
+// justieren ist haeufiger noetig als neu schreiben.
+function tonGewechselt(){
+  var sel=el('cfgTon'), feld=el('cfgTonText');
+  if(!sel||!feld)return;
+  var eigen=(sel.value==='eigen');
+  feld.style.display=eigen?'block':'none';
+  if(eigen&&!String(feld.value||'').trim())feld.value=tonText();
 }
 function quelleKurzGewechselt(){
   CFG.quelle=el('quelleKurz').value;
