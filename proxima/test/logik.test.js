@@ -809,7 +809,10 @@ ctx.S.probe = { gelungen: false, versuch: 'nach dem Stift greifen' };
 const lAnw = ctx.baueLektorAnweisung('Sie lächelt und reicht ihm den Stift.', 'Marcelle');
 pruefe('die Anweisung nennt Mission, Etappe und Probe',
   /Die Unterschrift/.test(lAnw) && /Konrad ansprechen/.test(lAnw) && /MISSLUNGEN/.test(lAnw));
-pruefe('sie prüft genau vier Dinge', /1\. Wiederholung/.test(lAnw) && /4\. Probe/.test(lAnw));
+pruefe('sie prüft fünf Dinge, die Sprache zuerst',
+  /1\. Sprache/.test(lAnw) && /2\. Wiederholung/.test(lAnw) && /5\. Probe/.test(lAnw));
+pruefe('und zielt dabei auf gestelzte Sätze',
+  /wirklich so sagen/.test(lAnw) && /erfundene Fachwoerter/.test(lAnw));
 pruefe('OK lässt die Zeile stehen', ctx.lektorAntwort('OK', 'Der Originalsatz.') === '');
 pruefe('auch mit Beiwerk', ctx.lektorAntwort('ok\n', 'Der Originalsatz.') === '');
 pruefe('eine Korrektur kommt durch',
@@ -1345,6 +1348,34 @@ ctx.chatProfileEinsetzen({ npcs: [{ name: 'Ida', person: 'Wieder misstrauisch.' 
 pruefe('ohne Platzhalter bleibt ein Profil unangetastet', ida.person === 'Inzwischen aufgetaut.');
 ctx.chatProfileEinsetzen({ npcs: [{ name: 'Ida', person: 'Doch anders.' }] }, true);
 pruefe('/auswerten darf es trotzdem überschreiben', ida.person === 'Doch anders.');
+
+
+console.log('\n— Wie die Figuren reden —');
+// Der häufigste Fehler war nicht der Inhalt, sondern der Klang: gestelzte
+// Bilder und Sätze, die kein Mensch ausspricht.
+const sprache = ctx.sprachRegeln();
+pruefe('die Regeln verlangen gesprochene Sprache',
+  /GESPROCHENE Sprache/.test(sprache) && /kurze Saetze/.test(sprache));
+pruefe('sie lassen jeden Satz gegenprüfen',
+  /Wuerde ein Mensch in DIESER Lage das wirklich so sagen/.test(sprache));
+pruefe('sie deckeln die Bilder auf eines je Zeile',
+  /Hoechstens EIN Bild oder Vergleich/.test(sprache) && /Metapher auf der Metapher/.test(sprache));
+pruefe('erfundene Fachbegriffe sind verboten', /Keine erfundenen Fachbegriffe/.test(sprache));
+pruefe('auch Drohung und Scherz bleiben alltäglich', /Jetzt mach schon/.test(sprache));
+
+ctx.CFG.ton = '';
+pruefe('ohne Angabe gilt der natürliche Ton', ctx.tonSchluessel(ctx.CFG.ton) === 'natuerlich');
+pruefe('und der ist alltagsnah, nicht anzüglich',
+  /alltagsnah/.test(ctx.registerText()) && !/anzuegliche/.test(ctx.registerText()));
+ctx.CFG.ton = 'frivol';
+pruefe('frivol lässt sich weiterhin wählen', /anzuegliche/.test(ctx.registerText()));
+ctx.CFG.ton = 'sachlich';
+pruefe('sachlich streicht den Flirt', /ohne Flirt/.test(ctx.registerText()));
+ctx.CFG.ton = 'gibtsnicht';
+pruefe('ein unbekannter Ton fällt auf den natürlichen zurück', ctx.registerText() === ctx.TONFAELLE.natuerlich.text);
+ctx.CFG.ton = 'natuerlich';
+pruefe('der alte Zwang zum Obszönen ist raus', !/obszoene/.test(src));
+pruefe('der Tonfall lässt sich einstellen', /id="cfgTon"/.test(src) && /CFG\.ton=tonSchluessel/.test(src));
 
 console.log('\n— Räume, Kamera und Anwesenheit —');
 // Ab jetzt hat jede Figur einen Raum. Die Kamera hängt an der Figur, die der
@@ -1976,6 +2007,8 @@ async function zugPruefen() {
   let auftrag = '';
   ctx.frageKI = (t) => { auftrag = t; return Promise.resolve('{"wer":"NPC1","antwort":"Setz dich."}'); };
   let res = await ctx.naechsterZug(-1, false);
+  pruefe('die Sprachregeln stehen in jeder Anweisung',
+    /SPRACHE — hier geht am meisten schief/.test(auftrag) && /REGISTER:/.test(auftrag));
   pruefe('nur die anwesende Figur steht in der Anweisung',
     /NPC1 = Bero/.test(auftrag) && !/NPC1 = Alma/.test(auftrag), (auftrag.match(/- NPC.*/g) || []).join(' | '));
   pruefe('die abwesende Figur wird ausdrücklich ausgeschlossen',
