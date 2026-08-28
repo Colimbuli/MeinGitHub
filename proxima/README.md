@@ -51,6 +51,24 @@ Vier weitere Dinge, die mitgedacht sind:
 Wer den Generator forkt, ändert nur den Block `CFG` oben im Skript von `proxima.html`
 (`besitzer`, `repo`, `zweig`, `pfad`, `taktSekunden`).
 
+## Wie die Seite bei Suchmaschinen erscheint
+
+Titel, Beschreibung, Vorschaubild und Schlagworte stehen **nicht** im Generator-Quelltext,
+sondern auf der **linken Editorseite** von Perchance (dem Listen-Bereich — rechts steht die
+Ladeschale). Der fertige Block zum Kopieren liegt in [`meta.txt`](meta.txt), zusammen mit
+kürzeren und längeren Fassungen der Beschreibung und der Begründung, warum welcher Satz drinsteht.
+
+Zwei Dinge dazu:
+
+* Die linke Seite ist Generator-Syntax: Eckige und geschweifte Klammern haben dort eine
+  Bedeutung. Titel und Beschreibung kommen deshalb ohne aus.
+* Das Vorschaubild fehlt noch. Die Adresse in `meta.txt` zeigt bereits auf
+  `proxima/vorschau.jpg` in diesem Repository — sobald dort ein Bild liegt, stimmt sie.
+
+| Datei | Rolle |
+|---|---|
+| `meta.txt` | Titel, Beschreibung, Schlagworte für die linke Editorseite. Kein Code. |
+
 ## Voraussetzung: öffentliches Repository
 
 `raw.githubusercontent.com` liefert aus einem **privaten** Repository nichts — für alle 404, auch
@@ -464,6 +482,22 @@ Symmetrie mit meinem Wanderstock"). Dagegen stehen zwei Blöcke in **jeder** Anw
 | natürlich (Standard) | warm und respektvoll, alltagsnah; Necken und Ironie erlaubt |
 | frivol | frech und anzüglich, spielerisch und gutmütig |
 | sachlich | knapp und nüchtern, ohne Flirt und Ausschmückung |
+| eigener Ton | dein Wortlaut, wörtlich an die KI |
+
+**Von Hand.** Wählst du *eigener Ton*, erscheint ein Feld — **vorbelegt mit der Vorgabe, die gerade
+eingestellt war**. Meistens will man nur nachbessern („…, aber alle siezen sich"), nicht bei null
+anfangen. Was dort steht, geht wörtlich als `REGISTER:` in jede Anweisung (bis 400 Zeichen).
+
+Im Spiel geht dasselbe schneller mit **`/ton: …`**:
+
+| Eingabe | Wirkung |
+| --- | --- |
+| `/ton` | zeigt den aktuellen Tonfall im Wortlaut |
+| `/ton: frivol` | schaltet auf die Vorgabe dieses Namens |
+| `/ton: Alle reden knapp und im Dialekt.` | setzt genau diesen Wortlaut |
+
+Die Sprachregeln darüber gelten immer und unabhängig davon — der Tonfall bestimmt die Haltung,
+nicht die Erlaubnis zu geschraubten Sätzen.
 
 Klingen die Antworten trotzdem ausgedacht, hilft der **Lektor** — er prüft die Sprache inzwischen
 als Erstes.
@@ -730,6 +764,7 @@ ein neuer Befehl steht damit automatisch in der Hilfe, ohne Nachpflege. Ein Test
 | `/nochmal` | letzten Zug verwerfen und die Antwort neu würfeln |
 | `/speichern` | Spielstände öffnen |
 | `/räume` | Kachelübersicht aller Räume — wer wo ist, und wer wohin geht |
+| `/ton: …` | Tonfall der Figuren — natürlich, frivol, sachlich oder eigener Wortlaut |
 | `/auswerten` | ein übernommenes Gespräch (noch einmal) auswerten — Profile, Beziehungen, Gedächtnis |
 
 ## Was gegenüber V6 anders ist

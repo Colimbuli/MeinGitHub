@@ -1,0 +1,97 @@
+PROXIMA — Metadaten für die linke Editorseite (Listen-Bereich)
+==============================================================
+
+Diese Datei ist kein Code, sondern zum Kopieren gedacht. Der Block unten gehört in
+die LINKE Seite des Perchance-Editors (der Listen-Bereich, nicht der HTML-Bereich,
+in dem die Ladeschale steht). Perchance liest daraus Titel, Beschreibung, Vorschaubild
+und Schlagworte und gibt sie an Suchmaschinen und an geteilte Links weiter.
+
+Wichtig: Die linke Seite ist Generator-Syntax. Eckige Klammern und geschweifte
+Klammern haben dort eine Bedeutung — in Titel und Beschreibung deshalb keine
+verwenden. Der Text unten kommt ohne aus.
+
+Prüfe die Schreibweise einmal gegen perchance.org/metadata-example — dort steht die
+gültige Form. Der Inhalt darunter bleibt derselbe, auch wenn die Feldnamen anders
+heißen sollten.
+
+
+ZUM EINFÜGEN
+------------
+
+$meta
+  title = PROXIMA — KI-Dialogabenteuer mit Comic-Bildern
+  description = Ein Ort, lebendige Figuren, freies Gespräch. PROXIMA erfindet Welt, Personen und zu jedem Moment ein Comic-Panel. Deutsch, kostenlos, ohne Anmeldung.
+  image = https://raw.githubusercontent.com/Colimbuli/MeinGitHub/main/proxima/vorschau.jpg
+  tags = dialog-adventure, textadventure, rollenspiel, interactive fiction, ki, deutsch, comic, charaktere, geschichten, bildgenerator
+
+
+DIE EINZELNEN TEILE
+-------------------
+
+Titel (46 Zeichen — Suchmaschinen zeigen etwa 55 bis 60)
+
+    PROXIMA — KI-Dialogabenteuer mit Comic-Bildern
+
+  Der Name steht vorn, damit er in der Trefferliste als Erstes gelesen wird.
+  Dahinter in vier Wörtern, worum es geht. Kürzer geht auch:
+
+    PROXIMA — Dialogabenteuer mit KI-Figuren
+
+Beschreibung (149 Zeichen — Google schneidet meist bei 155 bis 160 ab)
+
+    Ein Ort, lebendige Figuren, freies Gespräch. PROXIMA erfindet Welt, Personen
+    und zu jedem Moment ein Comic-Panel. Deutsch, kostenlos, ohne Anmeldung.
+
+  Der erste Satz sagt, was passiert. Der zweite, was der Generator dafür tut.
+  Der dritte beantwortet die drei Fragen, die vor dem Klick kommen: welche
+  Sprache, was kostet es, muss ich mich anmelden.
+
+  Kürzere Fassung, falls das Feld begrenzt ist (117 Zeichen):
+
+    Deutsches Dialogabenteuer: Du triffst KI-Figuren an einem Ort, redest frei
+    mit ihnen und siehst jede Szene als Comic.
+
+  Längere Fassung für das Teilen in sozialen Netzen, wo mehr Platz ist:
+
+    Du kommst an einen Ort und triffst Menschen, die eigene Ziele, Stimmungen und
+    Geheimnisse haben. Kein Rätsel, keine Auswahlmenüs — du schreibst frei, was du
+    sagst und tust. Zu jedem Moment zeichnet PROXIMA ein Comic-Panel. Deutsch,
+    kostenlos, ohne Anmeldung.
+
+Schlagworte
+
+  Nach vorn, was Suchende wirklich eintippen, danach das Genre:
+
+    dialog-adventure, textadventure, rollenspiel, interactive fiction, ki, deutsch,
+    comic, charaktere, geschichten, bildgenerator
+
+Vorschaubild
+
+  Das Bild erscheint in geteilten Links und in der Übersicht von Perchance.
+  Es fehlt noch. Zwei Wege:
+
+  1. Einen Bildschirmausschnitt aus dem laufenden Spiel als proxima/vorschau.jpg
+     ins Repository legen. Die Adresse oben zeigt bereits darauf und stimmt dann
+     ohne weiteres Zutun.
+  2. Eine beliebige andere öffentliche Bildadresse eintragen.
+
+  Gute Maße sind 1200 x 630 Pixel. Ein Panel mit Figur und Ort wirkt besser als
+  ein Bild der Oberfläche; steht der Name mit im Bild, ist der Treffer auch
+  ohne Text erkennbar.
+
+
+WAS DIESE SEITE VON ANDEREN UNTERSCHEIDET
+-----------------------------------------
+
+Falls die Beschreibung später umgeschrieben wird — das sind die Punkte, die
+PROXIMA von den übrigen Chat-Generatoren abheben und deshalb hineingehören:
+
+  - freies Schreiben statt Auswahlmenüs
+  - mehrere Figuren gleichzeitig, die sich auch untereinander unterhalten
+  - zu jeder Szene ein gezeichnetes Bild
+  - deutschsprachig
+  - kostenlos und ohne Anmeldung
+
+Nicht hineingehören Wortlisten ohne Satzbau und Versprechen, die die Seite nicht
+hält. Beides kostet mehr, als es bringt: Suchmaschinen kürzen solche Beschreibungen
+weg, und Besucher, die etwas anderes erwartet haben, springen sofort wieder ab.
