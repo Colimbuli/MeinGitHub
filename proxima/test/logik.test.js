@@ -1346,6 +1346,143 @@ pruefe('ohne Platzhalter bleibt ein Profil unangetastet', ida.person === 'Inzwis
 ctx.chatProfileEinsetzen({ npcs: [{ name: 'Ida', person: 'Doch anders.' }] }, true);
 pruefe('/auswerten darf es trotzdem überschreiben', ida.person === 'Doch anders.');
 
+console.log('\n— Räume, Kamera und Anwesenheit —');
+// Ab jetzt hat jede Figur einen Raum. Die Kamera hängt an der Figur, die der
+// Mensch spielt; wer woanders steht, bleibt im Spiel, ist aber nicht zu sehen.
+const echteRaumFns = { zeichneBild: ctx.zeichneBild, zeigeRaumtitel: ctx.zeigeRaumtitel,
+                       aktualisiereUI: ctx.aktualisiereUI, zeigeStimmung: ctx.zeigeStimmung };
+ctx.zeichneBild = () => Promise.resolve();
+ctx.zeigeRaumtitel = () => {};
+ctx.aktualisiereUI = () => {};
+ctx.zeigeStimmung = () => {};
+
+ctx.W.raeume = [ctx.W.ort];
+ctx.S.raumHeld = 0; ctx.S.raumNpc = []; ctx.S.spieltIdx = null; ctx.S.motiv = ''; ctx.S.motivZug = '';
+ctx.raeumeOrdnen();
+pruefe('ohne Zutun stehen alle im selben Raum',
+  ctx.anwesendeNpcs().length === ctx.W.npcs.length && ctx.heldAnwesend());
+pruefe('die Kamera zeigt den Raum des Helden', ctx.kameraRaum() === 0 && ctx.W.ort === ctx.W.raeume[0]);
+
+const kueche = ctx.raumFinden('Die Küche', {});
+pruefe('ein neuer Raum entsteht', kueche === 1 && ctx.raumName(1) === 'Die Küche');
+pruefe('derselbe Name gibt denselben Raum', ctx.raumFinden('die küche', {}) === 1);
+
+// Eine Figur geht hinaus: sie bleibt im Spiel, ist aber nicht mehr im Bild.
+ctx.figurNachRaum(1, kueche, true);
+pruefe('die Figur steht jetzt woanders', ctx.raumVonNpc(1) === 1 && !ctx.anwesendNpc(1));
+pruefe('die Kamera bleibt beim Helden', ctx.kameraRaum() === 0);
+pruefe('die Abwesenden stehen in der Anweisung',
+  /NICHT IM RAUM/.test(ctx.abwesendeText()) && new RegExp(ctx.W.npcs[1].name).test(ctx.abwesendeText()),
+  ctx.abwesendeText());
+pruefe('wer da ist, taucht dort nicht auf',
+  ctx.abwesendeText().indexOf(ctx.W.npcs[0].name) < 0, ctx.abwesendeText());
+
+// Der Held geht hinterher: die Kamera folgt ihm.
+ctx.figurNachRaum('held', kueche, true);
+pruefe('die Kamera folgt dem Helden', ctx.kameraRaum() === 1 && ctx.W.ort === ctx.W.raeume[1]);
+pruefe('jetzt ist die andere Figur die Abwesende',
+  ctx.anwesendNpc(1) && !ctx.anwesendNpc(0));
+
+// Bild: wer erscheint, hängt an Raum und Motiv.
+ctx.W.protagonist.aussehen = 'a lean man in his thirties';
+ctx.W.npcs[0].aussehen = 'A_ERSTE'; ctx.W.npcs[1].aussehen = 'B_ZWEITE';
+ctx.W.perspektive = 'er';
+ctx.S.motiv = ''; ctx.S.motivZug = '';
+let bild = ctx.bauePrompt({}, 0);
+pruefe('nur wer im Raum ist, kommt ins Bild',
+  /B_ZWEITE/.test(bild) && !/A_ERSTE/.test(bild), bild.substring(0, 90));
+pruefe('und der Held steht mit drin', /lean man/.test(bild));
+
+ctx.S.motiv = 'figuren';
+bild = ctx.bauePrompt({}, 0);
+pruefe('„nur die Figuren" lässt den Helden weg', /B_ZWEITE/.test(bild) && !/lean man/.test(bild));
+ctx.S.motiv = 'held';
+bild = ctx.bauePrompt({}, 0);
+pruefe('„nur der Held" lässt die Figuren weg', /lean man/.test(bild) && !/B_ZWEITE/.test(bild));
+ctx.S.motiv = 'ort';
+bild = ctx.bauePrompt({}, 0);
+pruefe('„niemand" zeigt gar keine Person',
+  !/lean man/.test(bild) && !/B_ZWEITE/.test(bild) && /no people in frame/.test(bild), bild.substring(0, 120));
+pruefe('und rückt ein Ding ganz nah heran', /close-up detail shot/.test(bild));
+ctx.S.motiv = '';
+ctx.S.motivZug = 'ort';
+pruefe('die Regie darf das Motiv vorschlagen', ctx.bildMotiv() === 'ort');
+ctx.S.motiv = 'alle';
+pruefe('die Wahl des Spielers schlägt den Vorschlag', ctx.bildMotiv() === 'alle');
+ctx.S.motiv = ''; ctx.S.motivZug = '';
+
+// Die Regie schickt einzelne Figuren durch Türen.
+const wechsel = ctx.raumwechselAus('Ida > Der Keller; ' + ctx.W.npcs[0].name + ' > Die Küche');
+pruefe('Raumwechsel werden gelesen',
+  wechsel.length === 2 && wechsel[0].wohin === 'Der Keller', JSON.stringify(wechsel));
+ctx.folgeRaumwechsel(ctx.W.npcs[0].name + ' > Die Küche');
+pruefe('und ausgeführt', ctx.raumVonNpc(0) === 1 && ctx.anwesendNpc(0));
+
+// Rollenwahl: der Mensch spielt eine Figur, die Kamera zieht mit.
+ctx.figurNachRaum(2, 0, true);
+ctx.rolleWaehlen(2);
+pruefe('die gespielte Rolle ist gesetzt', ctx.S.spieltIdx === 2);
+pruefe('der eigene Name ist der der Figur', ctx.gespielterName() === ctx.W.npcs[2].name);
+pruefe('die Kamera steht bei der gespielten Figur', ctx.kameraRaum() === 0);
+pruefe('der Held ist jetzt der Abwesende', !ctx.heldAnwesend());
+ctx.rolleWaehlen('held');
+pruefe('zurück zum Helden', ctx.S.spieltIdx === null && ctx.gespielterName() === ctx.W.protagonist.name);
+pruefe('und die Kamera geht mit', ctx.kameraRaum() === ctx.raumVonHeld());
+
+// Die Kachelübersicht.
+const belegung = ctx.raumBelegung();
+pruefe('jede Kachel kennt ihren Namen und ihre Leute',
+  belegung.length === 2 && belegung.every(r => r.name && Array.isArray(r.leute)));
+pruefe('jede Figur steht in genau einer Kachel',
+  belegung.reduce((n, r) => n + r.leute.length, 0) === ctx.W.npcs.length + 1);
+pruefe('der Held ist als „du selbst" markiert',
+  belegung.some(r => r.leute.some(p => p.wer === 'held' && p.selbst)));
+pruefe('die Räume stehen auch im Weltkontext',
+  /RAEUME \(wer wo ist/.test(ctx.raeumeText()) && /\[hier\]/.test(ctx.raeumeText()), ctx.raeumeText());
+
+// Eine Figur entfernen darf die Zuordnung nicht verschieben.
+ctx.S.spieltIdx = 2;
+ctx.entferneNPC(0);
+pruefe('nach dem Entfernen zeigt die Rolle noch auf dieselbe Figur',
+  ctx.S.spieltIdx === 1 && ctx.W.npcs.length === 2);
+pruefe('und die Raumliste ist gleich lang', ctx.S.raumNpc.length === ctx.W.npcs.length);
+ctx.entferneNPC(1);
+pruefe('wird die gespielte Figur entfernt, spielt man wieder den Helden', ctx.S.spieltIdx === null);
+
+// Alte Spielstände kennen nur einen Ort.
+const raumStand = {
+  version: 7, zeit: 0,
+  welt: { protagonist: { name: 'Egon' }, stadt: 'Prag', ort: { name: 'Der Hof', geschichte: 'x', bildPrompt: 'y' },
+          npcs: [{ name: 'Ida', grundstimmung: 'ruhig', kleidung: 'a coat' }], perspektive: 'er' },
+  stand: { verlauf: [], fakten: [] }
+};
+ctx.migriere(raumStand);
+pruefe('ein alter Stand bekommt seine Raumliste',
+  Array.isArray(raumStand.welt.raeume) && raumStand.welt.raeume.length === 1);
+pruefe('und der Ort zeigt auf den Raum', raumStand.welt.ort === raumStand.welt.raeume[0]);
+pruefe('alle stehen darin', raumStand.stand.raumNpc.length === 1 && raumStand.stand.raumHeld === 0);
+pruefe('und der Mensch spielt den Helden', raumStand.stand.spieltIdx === null);
+// Nach dem Speichern ist der Ort eine Kopie — die muss wieder auf den Raum zeigen.
+const kopie = JSON.parse(JSON.stringify(raumStand));
+ctx.migriere(kopie);
+pruefe('auch nach Speichern und Laden zeigt der Ort auf den Raum',
+  kopie.welt.ort === kopie.welt.raeume[0] && kopie.welt.raeume.length === 1);
+
+// Bedienung
+pruefe('das Figurenmenü bietet die Rollenwahl an',
+  /id="fig_rolle_held"/.test(src) && /onchange="rolleWaehlen\(/.test(src));
+pruefe('das Bildmenü bietet das Motiv an', /id="bildMotiv"/.test(html) && /motivGewechselt\(\)/.test(html));
+pruefe('es gibt ein Fenster mit Raumkacheln',
+  /id="mRaeume"/.test(html) && /class="raumkachel/.test(src) && /raumgitter/.test(html));
+pruefe('und einen Befehl dafür', /\/räume/.test(src) && /oeffneRaeume\(\)/.test(src));
+
+// Zustand für die folgenden Abschnitte zurücksetzen.
+Object.keys(echteRaumFns).forEach(k => { ctx[k] = echteRaumFns[k]; });
+ctx.W.raeume = [ctx.W.raeume[0]];
+ctx.S.raumHeld = 0; ctx.S.raumNpc = ctx.W.npcs.map(() => 0); ctx.S.spieltIdx = null;
+ctx.S.motiv = ''; ctx.S.motivZug = '';
+ctx.raeumeOrdnen();
+
 console.log('\n— Ex- und Import als Datei —');
 // EXPORT soll eine Datei anlegen, IMPORT den Dateiexplorer öffnen. Beides
 // hängt an Elementen, die zur Laufzeit entstehen — die werden hier mitgeschrieben.
@@ -1809,6 +1946,87 @@ async function chatAuswertungPruefen() {
   ctx.frageKI = echteFrage; ctx.console.warn = echteWarnung; ctx.console.error = echterFehler;
 }
 
+async function zugPruefen() {
+  console.log('\n— Ein Zug mit Räumen und Rollen —');
+  // Die Regie darf nur Figuren sprechen lassen, die im Raum der Kamera stehen —
+  // und "NPC2" meint die zweite ANWESENDE Figur, nicht die zweite der Welt.
+  const echteFrage = ctx.frageKI, echteWarnung = ctx.console.warn;
+  ctx.console.warn = function () {};
+  ctx.sysZeile = () => {}; ctx.autosave = () => {};
+  ctx.zeichneBild = () => Promise.resolve();
+  ctx.zeigeRaumtitel = () => {}; ctx.aktualisiereUI = () => {}; ctx.zeigeStimmung = () => {};
+
+  ctx.W.npcs = [
+    { name: 'Alma', rolle: 'Wirtin', person: 'trocken', aussehen: 'a woman', kleidung: 'an apron',
+      grundstimmung: 'ruhig', ziel: '', geheimnis: '', aufgedeckt: false, eroeffnung: '…' },
+    { name: 'Bero', rolle: 'Gast', person: 'laut', aussehen: 'a man', kleidung: 'a jacket',
+      grundstimmung: 'heiter', ziel: '', geheimnis: '', aufgedeckt: false, eroeffnung: '…' }
+  ];
+  ctx.S.stimmung = ['ruhig', 'heiter'];
+  ctx.S.kleidung = ['an apron', 'a jacket'];
+  ctx.S.regieAnweisung = ['', ''];
+  ctx.W.raeume = [{ name: 'Die Schänke', geschichte: 'Warm.', bildPrompt: 'a tavern', kulisse: '' },
+                  { name: 'Der Hof', geschichte: 'Kalt.', bildPrompt: 'a yard', kulisse: '' }];
+  ctx.W.ort = ctx.W.raeume[0];
+  ctx.S.raumHeld = 0; ctx.S.raumNpc = [1, 0]; ctx.S.spieltIdx = null;
+  ctx.S.verlauf = [{ rolle: 'ich', text: 'Guten Abend.' }];
+  ctx.S.probe = null; ctx.CFG.lektor = false;
+  ctx.raeumeOrdnen();
+
+  let auftrag = '';
+  ctx.frageKI = (t) => { auftrag = t; return Promise.resolve('{"wer":"NPC1","antwort":"Setz dich."}'); };
+  let res = await ctx.naechsterZug(-1, false);
+  pruefe('nur die anwesende Figur steht in der Anweisung',
+    /NPC1 = Bero/.test(auftrag) && !/NPC1 = Alma/.test(auftrag), (auftrag.match(/- NPC.*/g) || []).join(' | '));
+  pruefe('die abwesende Figur wird ausdrücklich ausgeschlossen',
+    /NICHT IM RAUM.*Alma \(Der Hof\)/.test(auftrag));
+  pruefe('„NPC1" trifft die anwesende Figur, nicht die erste der Welt',
+    res && res.idx === 1, res && ('idx=' + res.idx));
+
+  // Niemand mehr im Raum: der Zug bricht sauber ab, statt jemanden zu erfinden.
+  ctx.S.raumNpc = [1, 1];
+  res = await ctx.naechsterZug(-1, false);
+  pruefe('ohne Gegenüber gibt es keinen Zug', !!(res && res.stop && res.leer));
+
+  // Rollentausch: der Mensch spielt Alma, der Held antwortet von selbst.
+  ctx.S.raumNpc = [0, 0];
+  ctx.S.spieltIdx = 0;
+  ctx.raeumeOrdnen();
+  ctx.frageKI = (t) => { auftrag = t; return Promise.resolve('{"wer":"HELD","antwort":"Ich bin ja schon da."}'); };
+  res = await ctx.naechsterZug(-1, false);
+  pruefe('der Rollentausch steht in der Anweisung',
+    /ROLLENTAUSCH: Der Mensch am Bildschirm spielt Alma/.test(auftrag));
+  pruefe('die gespielte Figur ist für die KI gesperrt', !/= Alma/.test(auftrag), auftrag.match(/- NPC.*/g).join(' | '));
+  pruefe('der Held steht als Rolle zur Wahl', /"wer": "NPC1 oder HELD/.test(auftrag),
+    (auftrag.match(/"wer":.*/) || [''])[0]);
+  pruefe('und er darf antworten', !!(res && res.held && /schon da/.test(res.text)));
+
+  ctx.S.verlauf = [];
+  ctx.antwortDesHelden('Ich bin ja schon da.');
+  const zeile = ctx.S.verlauf[0];
+  pruefe('spielt man eine Figur, ist der Held eine Figurenzeile',
+    zeile.rolle === 'npc' && zeile.idx === -1 && zeile.name === ctx.W.protagonist.name, JSON.stringify(zeile));
+
+  ctx.S.verlauf = [];
+  const echterSchlag = ctx.fuehreSchlagabtausch;
+  ctx.fuehreSchlagabtausch = () => {};
+  ctx.spielerSagt('Ich schenke nach.');
+  pruefe('die eigene Zeile trägt den Namen der gespielten Figur',
+    ctx.S.verlauf[0].rolle === 'ich' && ctx.S.verlauf[0].name === 'Alma', JSON.stringify(ctx.S.verlauf[0]));
+  pruefe('und der Verlauf für die KI nennt sie so',
+    /^Alma: Ich schenke nach\./.test(ctx.verlaufText(3)), ctx.verlaufText(3));
+
+  ctx.S.spieltIdx = null;
+  ctx.S.verlauf = [];
+  ctx.antwortDesHelden('Und hier bin ich selbst.');
+  pruefe('spielt man den Helden, bleibt es die eigene Zeile',
+    ctx.S.verlauf[0].rolle === 'ich' && ctx.S.verlauf[0].name === ctx.W.protagonist.name);
+
+  ctx.fuehreSchlagabtausch = echterSchlag;
+  ctx.frageKI = echteFrage;
+  ctx.console.warn = echteWarnung;
+}
+
 async function ladeschalePruefen() {
   console.log('\n— Ladeschale: Aufteilen —');
   const nur = ladeUmgebung(netzStummel([]), {});
@@ -1903,7 +2121,7 @@ async function ladeschalePruefen() {
 
 // Der asynchrone Teil (Quellenwechsel, dann die Ladeschale) laeuft zum Schluss,
 // danach die Auswertung.
-laufen().then(lektorPruefen).then(bildRegiePruefen).then(chatAuswertungPruefen).then(ladeschalePruefen).then(() => {
+laufen().then(lektorPruefen).then(bildRegiePruefen).then(chatAuswertungPruefen).then(zugPruefen).then(ladeschalePruefen).then(() => {
   console.log('\n' + (bad ? '✗ ' + bad + ' Fehler, ' : '✓ alles grün — ') + ok + ' Prüfungen bestanden');
   process.exit(bad ? 1 : 0);
 }).catch(e => {
