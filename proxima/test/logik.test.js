@@ -1408,6 +1408,51 @@ ctx.CFG.ton = 'natuerlich'; ctx.CFG.tonText = '';
 pruefe('der alte Zwang zum Obszönen ist raus', !/obszoene/.test(src));
 pruefe('der Tonfall lässt sich einstellen', /id="cfgTon"/.test(src) && /CFG\.ton=tonSchluessel/.test(src));
 
+console.log('\n— Eigener Bildstil erbt den vorherigen —');
+// Wer auf "Eigener Stil" umschaltet, will nachbessern, nicht neu schreiben.
+pruefe('ein leeres Feld gilt als unberührt', ctx.stilFeldUnberuehrt('') && ctx.stilFeldUnberuehrt('   '));
+pruefe('ein wörtlicher Vorgabe-Stil gilt auch als unberührt',
+  ctx.stilFeldUnberuehrt(ctx.STILE.aquarell) && ctx.stilFeldUnberuehrt(ctx.STILE.pixel));
+pruefe('selbst geschriebener Text nicht', !ctx.stilFeldUnberuehrt('noir ink sketch, high contrast'));
+
+// Für die Feldpflege braucht es Elemente, die zwischen zwei el()-Aufrufen
+// dieselben bleiben — der Stub gibt sonst jedes Mal ein neues zurück.
+const feste = {};
+const echtesHolen = ctx.document.getElementById;
+ctx.document.getElementById = (id) => (feste[id] || (feste[id] = fakeEl(id)));
+
+feste.stilwahl = fakeEl('stilwahl'); feste.stilEigen = fakeEl('stilEigen');
+feste.stilwahl.value = 'aquarell';
+ctx.stilGewechselt();
+pruefe('eine Vorgabe blendet das Feld aus', feste.stilEigen.style.display === 'none');
+feste.stilwahl.value = 'eigen';
+ctx.stilGewechselt();
+pruefe('beim Umschalten auf eigen erscheint das Feld', feste.stilEigen.style.display === 'block');
+pruefe('und darin steht der Prompt des zuvor gewählten Stils',
+  feste.stilEigen.value === ctx.STILE.aquarell, feste.stilEigen.value);
+
+// Ein zweiter Wechsel folgt der neuen Vorgabe …
+feste.stilwahl.value = 'pixel'; ctx.stilGewechselt();
+feste.stilwahl.value = 'eigen'; ctx.stilGewechselt();
+pruefe('ein weiterer Wechsel bringt den neuen Stil mit',
+  feste.stilEigen.value === ctx.STILE.pixel, feste.stilEigen.value);
+
+// … aber selbst Geschriebenes bleibt stehen.
+feste.stilEigen.value = 'noir ink sketch, high contrast';
+feste.stilwahl.value = 'comic'; ctx.stilGewechselt();
+feste.stilwahl.value = 'eigen'; ctx.stilGewechselt();
+pruefe('eigene Arbeit wird nicht überschrieben',
+  feste.stilEigen.value === 'noir ink sketch, high contrast', feste.stilEigen.value);
+
+// Dasselbe im Bildmenü.
+feste.szeneStil = fakeEl('szeneStil'); feste.szeneStilEigen = fakeEl('szeneStilEigen');
+feste.szeneStil.value = 'oel'; ctx.szeneStilGewechselt();
+feste.szeneStil.value = 'eigen'; ctx.szeneStilGewechselt();
+pruefe('das Bildmenü macht es genauso',
+  feste.szeneStilEigen.value === ctx.STILE.oel, feste.szeneStilEigen.value);
+
+ctx.document.getElementById = echtesHolen;
+
 console.log('\n— Guidance —');
 // Wie streng das Bild dem Prompt folgt. Steht unter dem Seed und wird über
 // {guidance} in die Vorlagen eingesetzt.

@@ -192,7 +192,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.45</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.46</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -519,11 +519,31 @@ function aktuellerStilSchluessel(){
   var wahl=el('stilwahl')?el('stilwahl').value:'manga';
   return STILE[wahl]?wahl:'';
 }
-function stilGewechselt(){
-  var e=el('stilEigen');
-  e.style.display=el('stilwahl').value==='eigen'?'block':'none';
-  if(e.style.display==='block')e.focus();
+// Wer auf "Eigener Stil" umschaltet, will meistens den bisherigen Stil
+// nachbessern und nicht bei null anfangen. Also steht der Prompt, der eben noch
+// galt, schon im Feld - solange dort nichts Selbstgeschriebenes steht.
+var STIL_ZULETZT={stilwahl:'manga',szeneStil:'manga'};
+function stilVorschlag(selId){
+  var k=STIL_ZULETZT[selId];
+  return STILE[k]||S.stil||STILE.manga;
 }
+// Unberuehrt ist ein Feld, das leer ist oder woertlich einen der Vorgabe-Stile
+// enthaelt - dann darf nachgefuellt werden, ohne eigene Arbeit zu ueberschreiben.
+function stilFeldUnberuehrt(t){
+  t=String(t||'').trim();
+  if(!t)return true;
+  return Object.keys(STILE).some(function(k){ return STILE[k]===t; });
+}
+function stilFeldPflegen(selId,feldId,fokus){
+  var sel=el(selId), feld=el(feldId);
+  if(!sel||!feld)return;
+  var eigen=(sel.value==='eigen');
+  feld.style.display=eigen?'block':'none';
+  if(!eigen){ STIL_ZULETZT[selId]=sel.value; return; }
+  if(stilFeldUnberuehrt(feld.value))feld.value=stilVorschlag(selId);
+  if(fokus)feld.focus();
+}
+function stilGewechselt(){ stilFeldPflegen('stilwahl','stilEigen',true); }
 
 // ── KONFIGURATION (gilt generatorweit, nicht pro Spielstand) ──
 var CFG_KEY='proxima_cfg_v1';
@@ -3669,12 +3689,14 @@ function fuelleStilWahl(){
   var eigen=el('szeneStilEigen');
   if(S.stilLabel&&STILE[S.stilLabel]){
     sel.value=S.stilLabel;eigen.value='';
+    STIL_ZULETZT.szeneStil=S.stilLabel;
   }else if(S.stil){
     sel.value='eigen';eigen.value=S.stilLabel||S.stil;
   }else{
     var start=el('stilwahl');
     sel.value=(start&&STILE[start.value])?start.value:'manga';
     eigen.value='';
+    STIL_ZULETZT.szeneStil=sel.value;
   }
   szeneStilGewechselt();
   el('szeneStilHinweis').textContent=S.eigenerPrompt
@@ -3683,10 +3705,7 @@ function fuelleStilWahl(){
 }
 // Alter Name, damit /stil ohne Text und aeltere Aufrufe weiter greifen.
 function oeffneSzeneMenu(){ oeffneBildModal(); }
-function szeneStilGewechselt(){
-  var eigen=el('szeneStilEigen');
-  eigen.style.display=(el('szeneStil').value==='eigen')?'block':'none';
-}
+function szeneStilGewechselt(){ stilFeldPflegen('szeneStil','szeneStilEigen',false); }
 // Liest die Stilwahl aus dem Bildmenue. Gibt zurueck, ob sich etwas geaendert
 // hat — dann meldet der Aufrufer es in der Dialogzeile.
 function uebernehmeStil(){
@@ -4159,7 +4178,7 @@ function oeffneEinstellungen(){
 // Seit der Umstellung auf die Ladeschale ist die Frage berechtigt, welcher Stand
 // gerade laeuft. Die Schale legt den geholten Quelltext samt Zweig und Zeitpunkt
 // im localStorage ab; hier wird er nur abgelesen.
-var VERSION = 'V7.45';
+var VERSION = 'V7.46';
 // Ohne Browserkonsole — etwa am Handy — muss der Generator selbst sagen koennen,
 // woran es liegt, wenn ein Plugin von Perchance fehlt.
 function pluginLage(){

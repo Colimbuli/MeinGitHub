@@ -562,6 +562,12 @@ Der Bildstil hatte einmal ein eigenes Fenster. Er gehört zum Bild, also steht e
 damit `/stil` und ältere Aufrufe nichts merken. Die Stilwahl greift, sobald **NEU ZEICHNEN** oder
 **AUS SZENE** gedrückt wird.
 
+Wählst du **Eigener Stil…**, steht der Prompt des Stils, der eben noch galt, bereits im Feld —
+auf dem Startbildschirm wie im Bildmenü. Nachbessern ist häufiger nötig als bei null anfangen, und
+so sieht man auch, wie die Vorgaben aufgebaut sind. Sobald du dort etwas Eigenes hineinschreibst,
+bleibt es stehen: Nachgefüllt wird nur ein Feld, das leer ist oder noch wörtlich eine der Vorgaben
+enthält.
+
 Die Knöpfe stehen in einem festen Raster statt auf Padding: ein Zeichen quadratisch (1:1), die
 beiden beschrifteten (**+ NPC**, **▶ AUTO**) doppelt so breit wie hoch (1:2). Der Ort trägt eine
 gezeichnete Ortsmarke — eine umgekehrte Tropfenform — statt der runden Stecknadel, die auf vielen
