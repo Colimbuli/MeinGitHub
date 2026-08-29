@@ -1408,6 +1408,155 @@ ctx.CFG.ton = 'natuerlich'; ctx.CFG.tonText = '';
 pruefe('der alte Zwang zum Obszönen ist raus', !/obszoene/.test(src));
 pruefe('der Tonfall lässt sich einstellen', /id="cfgTon"/.test(src) && /CFG\.ton=tonSchluessel/.test(src));
 
+console.log('\n— Eigener Bildstil erbt den vorherigen —');
+// Wer auf "Eigener Stil" umschaltet, will nachbessern, nicht neu schreiben.
+pruefe('ein leeres Feld gilt als unberührt', ctx.stilFeldUnberuehrt('') && ctx.stilFeldUnberuehrt('   '));
+pruefe('ein wörtlicher Vorgabe-Stil gilt auch als unberührt',
+  ctx.stilFeldUnberuehrt(ctx.STILE.aquarell) && ctx.stilFeldUnberuehrt(ctx.STILE.pixel));
+pruefe('selbst geschriebener Text nicht', !ctx.stilFeldUnberuehrt('noir ink sketch, high contrast'));
+
+// Für die Feldpflege braucht es Elemente, die zwischen zwei el()-Aufrufen
+// dieselben bleiben — der Stub gibt sonst jedes Mal ein neues zurück.
+const feste = {};
+const echtesHolen = ctx.document.getElementById;
+ctx.document.getElementById = (id) => (feste[id] || (feste[id] = fakeEl(id)));
+
+feste.stilwahl = fakeEl('stilwahl'); feste.stilEigen = fakeEl('stilEigen');
+feste.stilwahl.value = 'aquarell';
+ctx.stilGewechselt();
+pruefe('eine Vorgabe blendet das Feld aus', feste.stilEigen.style.display === 'none');
+feste.stilwahl.value = 'eigen';
+ctx.stilGewechselt();
+pruefe('beim Umschalten auf eigen erscheint das Feld', feste.stilEigen.style.display === 'block');
+pruefe('und darin steht der Prompt des zuvor gewählten Stils',
+  feste.stilEigen.value === ctx.STILE.aquarell, feste.stilEigen.value);
+
+// Ein zweiter Wechsel folgt der neuen Vorgabe …
+feste.stilwahl.value = 'pixel'; ctx.stilGewechselt();
+feste.stilwahl.value = 'eigen'; ctx.stilGewechselt();
+pruefe('ein weiterer Wechsel bringt den neuen Stil mit',
+  feste.stilEigen.value === ctx.STILE.pixel, feste.stilEigen.value);
+
+// … aber selbst Geschriebenes bleibt stehen.
+feste.stilEigen.value = 'noir ink sketch, high contrast';
+feste.stilwahl.value = 'comic'; ctx.stilGewechselt();
+feste.stilwahl.value = 'eigen'; ctx.stilGewechselt();
+pruefe('eigene Arbeit wird nicht überschrieben',
+  feste.stilEigen.value === 'noir ink sketch, high contrast', feste.stilEigen.value);
+
+// Dasselbe im Bildmenü.
+feste.szeneStil = fakeEl('szeneStil'); feste.szeneStilEigen = fakeEl('szeneStilEigen');
+feste.szeneStil.value = 'oel'; ctx.szeneStilGewechselt();
+feste.szeneStil.value = 'eigen'; ctx.szeneStilGewechselt();
+pruefe('das Bildmenü macht es genauso',
+  feste.szeneStilEigen.value === ctx.STILE.oel, feste.szeneStilEigen.value);
+
+ctx.document.getElementById = echtesHolen;
+
+console.log('\n— Guidance —');
+// Wie streng das Bild dem Prompt folgt. Steht unter dem Seed und wird über
+// {guidance} in die Vorlagen eingesetzt.
+ctx.S.guidance = 7;
+pruefe('ohne Angabe gilt der Vorgabewert', ctx.guidanceWert() === 7 && ctx.guidanceWert(null) === 7);
+pruefe('Unsinn fällt auf die Vorgabe zurück', ctx.guidanceWert('abc') === 7);
+pruefe('zu klein und zu groß werden begrenzt',
+  ctx.guidanceWert(-5) === ctx.GUIDANCE_MIN && ctx.guidanceWert(999) === ctx.GUIDANCE_MAX);
+pruefe('Kommazahlen bleiben erhalten', ctx.guidanceWert('4.5') === 4.5);
+pruefe('mehr als eine Nachkommastelle wird gerundet', ctx.guidanceWert(6.789) === 6.8);
+
+const guidDaten = ctx.gradioDaten('["{prompt}", {seed}, {guidance}, "{cfg}"]',
+  { prompt: 'a', seed: 3, guidance: 4.5 });
+pruefe('{guidance} wird in die Gradio-Vorlage eingesetzt', guidDaten[2] === 4.5, JSON.stringify(guidDaten));
+pruefe('{cfg} ist derselbe Wert, auch in Anführungszeichen', guidDaten[3] === 4.5, JSON.stringify(guidDaten));
+pruefe('fehlt der Wert, steht dort die Vorgabe',
+  ctx.gradioDaten('[{guidance}]', { prompt: 'a', seed: 1 })[0] === 7);
+
+pruefe('die eigene URL-Vorlage kennt den Platzhalter auch',
+  /\{guidance\}/.test(ctx.BILDQUELLEN.url.info) && /replace\(\/\\\{guidance\\\}\/g/.test(src));
+pruefe('AI Horde schickt ihn als cfg_scale', /cfg_scale:guidanceWert\(a\.guidance\)/.test(src));
+pruefe('Perchance bekommt ihn als (guidanceScale:::…) im Prompt',
+  /\(guidanceScale:::'\+guidanceWert\(a\.guidance\)/.test(src));
+// Der Aufruf des Plugins im Ganzen: Negativprompt, Seed und Guidance hängen in
+// der Schreibweise (name:::wert) hinten am Prompt.
+let anPlugin = '';
+ctx.image = (o) => { anPlugin = o.prompt; return Promise.resolve({ dataUrl: 'data:image/png;base64,xx' }); };
+// Der Prompt steht schon fest, bevor das Plugin antwortet — deshalb reicht der
+// Aufruf ohne await, um ihn zu prüfen.
+ctx.BILDQUELLEN.perchance.zeichne(
+  { prompt: 'a quiet room', negativ: 'blurry', seed: 42, guidance: 5, breite: 1024, hoehe: 1024 })
+  .catch(() => {});
+pruefe('der Prompt trägt Negativprompt, Seed und Guidance',
+  /^a quiet room \(negativePrompt:::blurry\) \(seed:::42\) \(guidanceScale:::5\)$/.test(anPlugin), anPlugin);
+ctx.image = undefined;
+pruefe('der Wert geht an jede Bildquelle', /guidance:guid,/.test(src));
+
+pruefe('das Feld steht unter dem Seed',
+  html.indexOf('id="bildGuidanceFeld"') > html.indexOf('id="bildSeedFeld"'));
+pruefe('es lässt sich zurücksetzen', /guidanceZurueck\(\)/.test(html) && /guidanceGeaendert\(\)/.test(html));
+
+const h7 = ctx.guidanceHinweis(7), h2 = ctx.guidanceHinweis(2), h20 = ctx.guidanceHinweis(20);
+pruefe('der Hinweis erklärt kleine Werte', /sehr frei/.test(h2), h2);
+pruefe('mittlere Werte gelten als übliche Wahl', /ausgewogen/.test(h7), h7);
+pruefe('große Werte werden als überzeichnet gewarnt', /überzeichnet/.test(h20), h20);
+ctx.CFG.quelle = 'pollinations';
+pruefe('und sagt, wenn die Quelle ihn gar nicht kennt',
+  /keine Guidance/.test(ctx.guidanceHinweis(7)), ctx.guidanceHinweis(7));
+ctx.CFG.quelle = 'perchance';
+pruefe('bei Perchance verweist er auf die :::-Schreibweise',
+  /guidanceScale:::/.test(ctx.guidanceHinweis(7)), ctx.guidanceHinweis(7));
+ctx.CFG.quelle = 'horde';
+pruefe('bei der Horde sagt er, dass er wirkt', /cfg_scale/.test(ctx.guidanceHinweis(7)));
+ctx.CFG.quelle = 'gradio';
+pruefe('beim Space verweist er auf die Vorlage', /Parameter-Vorlage/.test(ctx.guidanceHinweis(7)));
+ctx.CFG.quelle = 'perchance';
+
+const altOhne = { version: 7, zeit: 0,
+  welt: { protagonist: { name: 'Egon' }, ort: { name: 'Der Hof' }, npcs: [{ name: 'Ida' }], perspektive: 'er' },
+  stand: { verlauf: [], fakten: [], seed: 5 } };
+ctx.migriere(altOhne);
+pruefe('alte Spielstände bekommen eine Guidance', altOhne.stand.guidance === 7);
+
+console.log('\n— Wo die Zeit hingeht —');
+// "Dauert das zu lange?" soll man ablesen können, statt zu raten.
+pruefe('Sekunden werden lesbar', ctx.sekunden(4200) === '4.2 s' && ctx.sekunden(0) === '—');
+ctx.S.msText = 4200; ctx.S.msAnweisung = 6368; ctx.S.msBild = 38100;
+ctx.S.msLektor = 0; ctx.S.msRegie = 0;
+ctx.CFG.lektor = false; ctx.CFG.bildBot = false;
+ctx.CFG.bildTakt = 2; ctx.S.bildZaehler = 1; ctx.S.bildPauseBis = 0;
+const zeilen = ctx.tempoZeilen();
+const alsText = zeilen.map(r => r[0] + ': ' + r[1]).join(' | ');
+pruefe('der Textaufruf steht drin, mit der Größe der Anweisung',
+  /Text der Regie: 4\.2 s\s+\(6368 Zeichen/.test(alsText), alsText);
+pruefe('abgeschaltete Helfer stehen als aus da',
+  /Lektor: aus/.test(alsText) && /Bildregie-Bot: aus/.test(alsText));
+pruefe('der Bilddienst steht mit Namen da', /Bild \(.+\): 38\.1 s/.test(alsText), alsText);
+pruefe('der Takt sagt, wie lange es noch dauert',
+  /Bild-Takt: alle 2 Züge — noch 1 Zug/.test(alsText), alsText);
+pruefe('ohne Drosselung steht dort keine', /Zwangspause: keine/.test(alsText));
+ctx.S.bildPauseBis = Date.now() + 60000;
+pruefe('eine laufende Zwangspause wird in Sekunden genannt',
+  /Zwangspause: \d+ s — der Bilddienst hat gedrosselt/.test(ctx.tempoZeilen().map(r => r[0] + ': ' + r[1]).join(' | ')),
+  ctx.tempoZeilen().map(r => r[0] + ': ' + r[1]).join(' | '));
+ctx.S.bildPauseBis = 0;
+
+pruefe('das Urteil zeigt auf den Bilddienst', /Bilddienst ist der langsame Teil/.test(ctx.tempoUrteil()),
+  ctx.tempoUrteil());
+ctx.S.msBild = 2000; ctx.CFG.bildBot = true; ctx.S.msRegie = 9000;
+pruefe('bei eingeschaltetem Bot zeigt es auf den Bot', /Bildregie-Bot kostet/.test(ctx.tempoUrteil()));
+ctx.CFG.bildBot = false; ctx.CFG.lektor = true; ctx.S.msLektor = 9000;
+pruefe('beim Lektor auf den Lektor', /Lektor verdoppelt/.test(ctx.tempoUrteil()));
+ctx.CFG.lektor = false; ctx.S.msLektor = 0; ctx.S.msText = 40000;
+pruefe('ist der Textdienst langsam, sagt es das', /Textdienst von Perchance/.test(ctx.tempoUrteil()));
+ctx.S.msText = 3000; ctx.S.msBild = 4000;
+pruefe('sonst ist nichts auffällig', /Nichts Auffälliges/.test(ctx.tempoUrteil()));
+ctx.S.msText = 0; ctx.S.msBild = 0; ctx.S.msRegie = 0;
+pruefe('vor dem ersten Zug wird nichts behauptet', /Noch nichts gemessen/.test(ctx.tempoUrteil()));
+
+pruefe('die Dauern werden auch wirklich gemessen',
+  /S\.msText=Date\.now\(\)-tText;/.test(src) && /S\.msBild=Date\.now\(\)-tBild;/.test(src) &&
+  /S\.msLektor=Date\.now\(\)-tLekt;/.test(src) && /S\.msRegie=Date\.now\(\)-tRegie;/.test(src));
+pruefe('und es gibt einen Befehl dafür', /\/tempo/.test(src) && /zeigeTempo\(\)/.test(src));
+
 console.log('\n— Räume, Kamera und Anwesenheit —');
 // Ab jetzt hat jede Figur einen Raum. Die Kamera hängt an der Figur, die der
 // Mensch spielt; wer woanders steht, bleibt im Spiel, ist aber nicht zu sehen.
@@ -1725,7 +1874,9 @@ const vorlage = ctx.gradioVorlageAus([
   { parameter_name: 'num_inference_steps', python_type: { type: 'float' }, parameter_has_default: true, parameter_default: 28 }
 ]);
 pruefe('Vorlage aus Parameterliste',
-  vorlage === '["{prompt}", "{negativ}", {seed}, false, {breite}, {hoehe}, 7, 28]', vorlage);
+  vorlage === '["{prompt}", "{negativ}", {seed}, false, {breite}, {hoehe}, {guidance}, 28]', vorlage);
+pruefe('guidance_scale wird als Platzhalter erkannt, nicht als fester Wert',
+  /\{guidance\}/.test(vorlage));
 pruefe('negative_prompt wird nicht als prompt erkannt', vorlage.indexOf('"{negativ}"') > vorlage.indexOf('"{prompt}"'));
 // Wichtig: randomize_seed muss aus bleiben, sonst würfelt der Space selbst
 // und die Figuren verlieren ihre Wiedererkennbarkeit.
@@ -1765,7 +1916,9 @@ const spaceComps = [
 ];
 const v = ctx.gradioVorlageAusConfig(spaceParams, spaceDep, spaceComps);
 const geparst = JSON.parse(v.replace(/"\{prompt\}"/, '"P"').replace(/"\{negativ\}"/, '"N"')
-  .replace(/\{seed\}/, '1').replace(/\{breite\}/, '2').replace(/\{hoehe\}/, '3'));
+  .replace(/\{seed\}/, '1').replace(/\{breite\}/, '2').replace(/\{hoehe\}/, '3')
+  .replace(/\{guidance\}/, '7'));
+pruefe('guidance_scale wird auch hier zum Platzhalter', /\{guidance\}/.test(v), v);
 pruefe('alle 14 Parameter in der Vorlage', geparst.length === 14, String(geparst.length));
 pruefe('Platzhalter an den richtigen Stellen', geparst[0] === 'P' && geparst[1] === 'N' && geparst[2] === 1 && geparst[3] === 2 && geparst[4] === 3, JSON.stringify(geparst.slice(0, 5)));
 pruefe('sampler kommt aus der Vorgabe des Space', geparst[7] === 'Euler a', String(geparst[7]));

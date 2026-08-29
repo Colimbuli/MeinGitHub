@@ -104,12 +104,12 @@ Die Auswahl gilt generatorweit und überlebt Spielstände.
 
 | Quelle | Schlüssel nötig | Anmerkung |
 |---|---|---|
-| **Perchance** | nein | Das eingebaute Plugin. Nichts verlässt Perchance. Standard. |
+| **Perchance** | nein | Das eingebaute Plugin. Nichts verlässt Perchance. Standard. Seed, Negativprompt und Guidance gehen in der Schreibweise `(name:::wert)` am Prompt mit. |
 | **Pollinations** | nein | Offener Dienst, Bild kommt als URL. Anderes Modell als Perchance — dieselbe Beschreibung ergibt sichtbar andere Bilder. Negativprompt wird mitgeschickt, aber nicht von jedem Modell dort beachtet. |
 | **AI Horde** | nein (`0000000000`) | Gratis über freiwillige Rechner; anonym langsam, mit eigenem Schlüssel von [aihorde.net](https://aihorde.net) deutlich schneller. Bei hoher Auslastung sperrt sie alles über 907×907 und über 50 Schritte — die Bildgröße wird automatisch darunter gehalten (1024×1024 wird zu 896×896). |
 | **OpenAI-kompatible API** | ja | Alles, was `POST {basis}/images/generations` versteht. |
 | **Hugging-Face-Space (Gradio)** | meist ja | Spricht einen Space ueber seine Warteschlange an. Endpunkt und Parameter holt **API ERKUNDEN** beim Space ab. ZeroGPU-Spaces brauchen ein Token und haben ein Kontingent. |
-| **Eigene URL-Vorlage** | je nachdem | Platzhalter `{prompt}` `{negativ}` `{seed}` `{breite}` `{hoehe}`. |
+| **Eigene URL-Vorlage** | je nachdem | Platzhalter `{prompt}` `{negativ}` `{seed}` `{breite}` `{hoehe}` `{guidance}`. |
 
 Zwei Dinge, die man wissen sollte:
 
@@ -356,6 +356,34 @@ Der Held hat dort auch ein Feld **Aussehen**. Bleibt es leer, baut PROXIMA beim 
 eine Beschreibung aus Geschlecht und Beruf — und hält sie fest, damit sie nicht bei jedem Bild anders
 ausfällt.
 
+### Guidance — wie streng das Bild dem Prompt folgt
+
+Im Bildmenü steht direkt unter dem Seed ein Feld **GUIDANCE** (bei manchen Diensten heißt der Wert
+*CFG scale*). Er entscheidet, wie wörtlich der Bilddienst den Prompt nimmt:
+
+| Wert | Wirkung |
+| --- | --- |
+| 1–4 | sehr frei — der Dienst darf weit abweichen, weiche Bilder |
+| 5–6 | locker — mehr eigene Handschrift des Modells |
+| 7–9 | ausgewogen — die übliche Wahl, Vorgabe ist **7** |
+| 10–14 | streng — hält sich eng an den Prompt, Farben werden härter |
+| ab 15 | sehr streng — meist überzeichnet und verbrannt |
+
+Der Wert gehört zur Partie und wird mitgespeichert, der Knopf **↺** setzt ihn auf 7 zurück. Unter
+dem Feld steht, was der eingestellte Wert bewirkt **und ob die gewählte Bildquelle ihn überhaupt
+beachtet** — denn das ist verschieden:
+
+| Quelle | wirkt? |
+| --- | --- |
+| Perchance | ja, geht als `(guidanceScale:::…)` im Prompt mit — dieselbe Schreibweise, die dort schon Seed und Negativprompt trägt |
+| AI Horde | ja, wird als `cfg_scale` mitgeschickt |
+| Gradio-Space | ja, sobald `{guidance}` in der Parameter-Vorlage steht — **API ERKUNDEN** setzt den Platzhalter selbst ein, wenn der Space einen solchen Parameter hat |
+| Eigene URL-Vorlage | ja, über den Platzhalter `{guidance}` |
+| Pollinations, OpenAI-API | nein — diese Dienste kennen keinen solchen Wert |
+
+In beiden Vorlagen ist `{cfg}` dasselbe wie `{guidance}`, und beide werden mit und ohne
+Anführungszeichen erkannt.
+
 ### Referenzbild (img2img) für Gradio-Spaces
 
 Spricht dein Space auch img2img, kann PROXIMA ein **Referenzbild** mitschicken. Der Anker ist
@@ -535,6 +563,12 @@ Der Bildstil hatte einmal ein eigenes Fenster. Er gehört zum Bild, also steht e
 damit `/stil` und ältere Aufrufe nichts merken. Die Stilwahl greift, sobald **NEU ZEICHNEN** oder
 **AUS SZENE** gedrückt wird.
 
+Wählst du **Eigener Stil…**, steht der Prompt des Stils, der eben noch galt, bereits im Feld —
+auf dem Startbildschirm wie im Bildmenü. Nachbessern ist häufiger nötig als bei null anfangen, und
+so sieht man auch, wie die Vorgaben aufgebaut sind. Sobald du dort etwas Eigenes hineinschreibst,
+bleibt es stehen: Nachgefüllt wird nur ein Feld, das leer ist oder noch wörtlich eine der Vorgaben
+enthält.
+
 Die Knöpfe stehen in einem festen Raster statt auf Padding: ein Zeichen quadratisch (1:1), die
 beiden beschrifteten (**+ NPC**, **▶ AUTO**) doppelt so breit wie hoch (1:2). Der Ort trägt eine
 gezeichnete Ortsmarke — eine umgekehrte Tropfenform — statt der runden Stecknadel, die auf vielen
@@ -673,6 +707,32 @@ Unveraenderte Angaben werden verworfen, damit nicht bei jedem Zug dasselbe Bild 
 Der Held kann sich ebenso umziehen. Von Hand geht es weiter mit `/kleidungN: …` oder im
 Figurenmenue.
 
+### Wenn es lange dauert
+
+**`/tempo`** zeigt, wo die Zeit hingeht — gemessen, nicht geschätzt:
+
+```
+WO DIE ZEIT HINGEHT
+Text der Regie: 4.2 s  (6368 Zeichen Anweisung)
+Lektor: aus
+Bildregie-Bot: aus
+Bild (Perchance): 38.1 s
+Bild-Takt: alle 2 Züge — noch 1 Zug bis zum nächsten
+Zwangspause: keine
+
+Der Bilddienst ist der langsame Teil. …
+```
+
+Ein Zug kostet **einen** Textaufruf. Zwei Schalter machen daraus mehr, und beide sind ab Werk aus:
+der **Lektor** (ein zweiter Textaufruf je Zug) und die **Bildregie** (ein eigener Textaufruf vor
+jedem Bild). Steht in `/tempo` bei einem von beiden eine hohe Sekundenzahl, ist die Ursache
+gefunden.
+
+Das Bild selbst hängt am gewählten Dienst und nicht am Generator. Dagegen helfen: kleinere
+Bildgröße, höherer Bild-Takt (⚙ EINSTELLUNGEN, `0` = nur auf Zuruf) oder eine andere Quelle.
+Hat ein Dienst gedrosselt, steht die verbleibende **Zwangspause** ebenfalls in `/tempo` — in dieser
+Zeit fragt PROXIMA bewusst nicht nach, statt weiter anzuklopfen.
+
 ### Wenn eine Aenderung nicht ankommt
 
 Die Regie antwortet mit einem JSON-Objekt, in dem `auftritt`, `abgang`, `ortwechsel` und
@@ -765,6 +825,7 @@ ein neuer Befehl steht damit automatisch in der Hilfe, ohne Nachpflege. Ein Test
 | `/speichern` | Spielstände öffnen |
 | `/räume` | Kachelübersicht aller Räume — wer wo ist, und wer wohin geht |
 | `/ton: …` | Tonfall der Figuren — natürlich, frivol, sachlich oder eigener Wortlaut |
+| `/tempo` | zeigt, wo die Zeit hingeht — Text, Lektor, Bildregie, Bilddienst, Takt, Pausen |
 | `/auswerten` | ein übernommenes Gespräch (noch einmal) auswerten — Profile, Beziehungen, Gedächtnis |
 
 ## Was gegenüber V6 anders ist

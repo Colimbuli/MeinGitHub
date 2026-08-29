@@ -192,7 +192,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.43</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.47</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -320,6 +320,12 @@ select.feld option{background:var(--panel);}
         <input id="bildSeedFeld" class="feld" type="text" inputmode="numeric">
         <button onclick="wuerfelSeed()" title="Zufalls-Seed" aria-label="Zufalls-Seed" data-sym="wuerfel"></button>
       </div>
+      <label class="feldlabel" for="bildGuidanceFeld">GUIDANCE — wie streng das Bild dem Prompt folgt</label>
+      <div class="reihe">
+        <input id="bildGuidanceFeld" class="feld" type="number" step="0.5" min="1" max="30" inputmode="decimal" oninput="guidanceGeaendert()">
+        <button onclick="guidanceZurueck()" title="Zurück auf 7">↺</button>
+      </div>
+      <div class="hinweis" id="bildGuidanceHinweis"></div>
       <div class="hinweis" id="bildQuelleInfo"></div>
     </div>
     <div class="modalNav">
@@ -513,11 +519,31 @@ function aktuellerStilSchluessel(){
   var wahl=el('stilwahl')?el('stilwahl').value:'manga';
   return STILE[wahl]?wahl:'';
 }
-function stilGewechselt(){
-  var e=el('stilEigen');
-  e.style.display=el('stilwahl').value==='eigen'?'block':'none';
-  if(e.style.display==='block')e.focus();
+// Wer auf "Eigener Stil" umschaltet, will meistens den bisherigen Stil
+// nachbessern und nicht bei null anfangen. Also steht der Prompt, der eben noch
+// galt, schon im Feld - solange dort nichts Selbstgeschriebenes steht.
+var STIL_ZULETZT={stilwahl:'manga',szeneStil:'manga'};
+function stilVorschlag(selId){
+  var k=STIL_ZULETZT[selId];
+  return STILE[k]||S.stil||STILE.manga;
 }
+// Unberuehrt ist ein Feld, das leer ist oder woertlich einen der Vorgabe-Stile
+// enthaelt - dann darf nachgefuellt werden, ohne eigene Arbeit zu ueberschreiben.
+function stilFeldUnberuehrt(t){
+  t=String(t||'').trim();
+  if(!t)return true;
+  return Object.keys(STILE).some(function(k){ return STILE[k]===t; });
+}
+function stilFeldPflegen(selId,feldId,fokus){
+  var sel=el(selId), feld=el(feldId);
+  if(!sel||!feld)return;
+  var eigen=(sel.value==='eigen');
+  feld.style.display=eigen?'block':'none';
+  if(!eigen){ STIL_ZULETZT[selId]=sel.value; return; }
+  if(stilFeldUnberuehrt(feld.value))feld.value=stilVorschlag(selId);
+  if(fokus)feld.focus();
+}
+function stilGewechselt(){ stilFeldPflegen('stilwahl','stilEigen',true); }
 
 // ── KONFIGURATION (gilt generatorweit, nicht pro Spielstand) ──
 var CFG_KEY='proxima_cfg_v1';
@@ -542,7 +568,7 @@ var CFG={
   urlVorlage:'https://example.org/bild?p={prompt}&seed={seed}&w={breite}&h={hoehe}',
   gradioHost:'https://ibarakidouji-wai-nsfw-illustrious-sdxl.hf.space',
   gradioApi:'/generate', gradioFnIndex:'', gradioToken:'', gradioBreite:1024, gradioHoehe:1024,
-  gradioVorlage:'["{prompt}", "{negativ}", {seed}, false, {breite}, {hoehe}, 7, 28]',
+  gradioVorlage:'["{prompt}", "{negativ}", {seed}, false, {breite}, {hoehe}, {guidance}, 28]',
   gradioReferenz:false,      // Referenzbild mitschicken (img2img)
   gradioStaerke:0.65,        // wie stark das neue Bild vom Referenzbild abweichen darf
   gradioReferenzForm:'roh'   // 'roh' = Data-URL, 'datei' = Gradio-Dateiobjekt
@@ -565,11 +591,15 @@ function speichereCfg(){
 var BILDQUELLEN={
   perchance:{
     label:'Perchance (Standard, ohne Schlüssel)',
-    info:'Nutzt das eingebaute Bild-Plugin des Generators. Kein Schlüssel, keine Fremdserver.',
+    info:'Nutzt das eingebaute Bild-Plugin des Generators. Kein Schlüssel, keine Fremdserver. Seed, Negativprompt und Guidance gehen als (name:::wert) mit.',
     felder:[],
     zeichne:async function(a){
       if(typeof image!=='function')throw new Error('image() ist nicht verfügbar — Bild-Plugin im Generator eingebunden? — '+pluginLage());
-      var p=a.prompt+(a.negativ?' (negativePrompt:::'+a.negativ+')':'')+' (seed:::'+a.seed+')';
+      // Das Plugin nimmt Zusatzwerte in der Schreibweise (name:::wert) im
+      // Prompt entgegen - so kommt auch die Guidance dort an.
+      var p=a.prompt+(a.negativ?' (negativePrompt:::'+a.negativ+')':'')+
+            ' (seed:::'+a.seed+')'+
+            ' (guidanceScale:::'+guidanceWert(a.guidance)+')';
       var r=await image({prompt:p});
       var src=r&&(r.dataUrl||r.url||r.imageUrl||r.src);
       if(!src)throw new Error('Bild-Plugin lieferte keine Bilddaten.');
@@ -657,6 +687,7 @@ var BILDQUELLEN={
       var koerper={
         prompt:a.prompt+(a.negativ?' ### '+a.negativ:''),
         params:{n:1,width:m.breite,height:m.hoehe,seed:String(seedFuerDienst(a.seed)),
+                cfg_scale:guidanceWert(a.guidance),
                 steps:Math.max(1,Math.min(50,Number(CFG.hordeSchritte)||25)),sampler_name:'k_euler_a'},
         nsfw:true, censor_nsfw:false
       };
@@ -721,7 +752,7 @@ var BILDQUELLEN={
       {k:'gradioToken',l:'Hugging-Face-Token (nur bei ZeroGPU oder privat)',typ:'passwort'},
       {k:'gradioBreite',l:'Breite für diesen Space (viele SDXL-Spaces verlangen mindestens 1024)',typ:'zahl'},
       {k:'gradioHoehe',l:'Höhe für diesen Space',typ:'zahl'},
-      {k:'gradioVorlage',l:'Parameter-Vorlage — Platzhalter: "{prompt}" "{negativ}" {seed} {breite} {hoehe} "{referenz}" {staerke}',typ:'text'},
+      {k:'gradioVorlage',l:'Parameter-Vorlage — Platzhalter: "{prompt}" "{negativ}" {seed} {breite} {hoehe} {guidance} "{referenz}" {staerke}',typ:'text'},
       {k:'gradioReferenz',l:'Referenzbild mitschicken (img2img) — nur bei Spaces mit Bild-Eingang',typ:'schalter'},
       {k:'gradioStaerke',l:'Stärke 0–1: wie weit das Bild vom Referenzbild abweichen darf (0.65 ist ein guter Start)',typ:'komma'},
       {k:'gradioReferenzForm',l:'Form des Bildes: roh (Data-URL) oder datei (Gradio-Dateiobjekt)',typ:'text'}
@@ -742,7 +773,7 @@ var BILDQUELLEN={
         else { S.referenzWoher=''; }
       }
       var daten=gradioDaten(CFG.gradioVorlage,{
-        prompt:a.prompt, negativ:a.negativ, seed:a.seed,
+        prompt:a.prompt, negativ:a.negativ, seed:a.seed, guidance:a.guidance,
         breite:auf64(CFG.gradioBreite||a.breite), hoehe:auf64(CFG.gradioHoehe||a.hoehe),
         referenz:referenzWert(ref), staerke:CFG.gradioStaerke
       });
@@ -792,7 +823,7 @@ var BILDQUELLEN={
   url:{
     label:'Eigene URL-Vorlage',
     maxPrompt:1200,
-    info:'Für alles, was ein Bild per einfachem Aufruf liefert. Platzhalter: {prompt} {negativ} {seed} {breite} {hoehe}.',
+    info:'Für alles, was ein Bild per einfachem Aufruf liefert. Platzhalter: {prompt} {negativ} {seed} {breite} {hoehe} {guidance}.',
     felder:[{k:'urlVorlage',l:'URL-Vorlage',typ:'text'}],
     zeichne:async function(a){
       if(!CFG.urlVorlage)throw new Error('Keine URL-Vorlage hinterlegt.');
@@ -801,7 +832,9 @@ var BILDQUELLEN={
         .replace(/\{negativ\}/g,encodeURIComponent(a.negativ||''))
         .replace(/\{seed\}/g,String(seedFuerDienst(a.seed)))
         .replace(/\{breite\}/g,String(a.breite))
-        .replace(/\{hoehe\}/g,String(a.hoehe));
+        .replace(/\{hoehe\}/g,String(a.hoehe))
+        .replace(/\{guidance\}/g,String(guidanceWert(a.guidance)))
+        .replace(/\{cfg\}/g,String(guidanceWert(a.guidance)));
       return await ladeBildUrl(u,120000);
     }
   }
@@ -814,6 +847,7 @@ function gradioDaten(vorlage,a){
   // jemand die Vorlage getippt hat, und JSON.parse wirft.
   var referenz=JSON.stringify(a.referenz==null?null:a.referenz);
   var staerke=String(isFinite(parseFloat(a.staerke))?parseFloat(a.staerke):0.65);
+  var guidance=String(guidanceWert(a.guidance));
   var t=String(vorlage||'[]')
     .replace(/"\{prompt\}"/g,JSON.stringify(String(a.prompt||'')))
     .replace(/"\{negativ\}"/g,JSON.stringify(String(a.negativ||'')))
@@ -821,7 +855,9 @@ function gradioDaten(vorlage,a){
     .replace(/\{breite\}/g,String(auf64(a.breite)))
     .replace(/\{hoehe\}/g,String(auf64(a.hoehe)))
     .replace(/"\{referenz\}"/g,referenz).replace(/\{referenz\}/g,referenz)
-    .replace(/"\{staerke\}"/g,staerke).replace(/\{staerke\}/g,staerke);
+    .replace(/"\{staerke\}"/g,staerke).replace(/\{staerke\}/g,staerke)
+    .replace(/"\{guidance\}"/g,guidance).replace(/\{guidance\}/g,guidance)
+    .replace(/"\{cfg\}"/g,guidance).replace(/\{cfg\}/g,guidance);
   var d=JSON.parse(t);
   if(!Array.isArray(d))throw new Error('Die Parameter-Vorlage muss eine Liste sein, z.B. ["{prompt}", 0].');
   return d;
@@ -926,6 +962,7 @@ function gradioVorlageAus(params){
     if(/seed/.test(n))return '{seed}';
     if(/width|breite/.test(n))return '{breite}';
     if(/height/.test(n))return '{hoehe}';
+    if(/guidance|cfg/.test(n))return '{guidance}';
     if(pa.parameter_has_default&&pa.parameter_default!==undefined)return JSON.stringify(pa.parameter_default);
     var t=String((pa.type&&pa.type.type)||(pa.python_type&&pa.python_type.type)||'').toLowerCase();
     if(/bool/.test(t))return 'false';
@@ -951,6 +988,7 @@ function gradioVorlageAusConfig(params,dep,components){
     if(/seed/.test(n))return '{seed}';
     if(/width|breite/.test(n))return '{breite}';
     if(/height/.test(n))return '{hoehe}';
+    if(/guidance|cfg/.test(n))return '{guidance}';
     var comp=nachId[eingaben[i]], props=(comp&&comp.props)||{};
     // Seitenverhaeltnis auf "Custom" stellen, sonst bleiben Breite und Hoehe wirkungslos.
     if(/aspect|ratio/.test(n)&&Array.isArray(props.choices)){
@@ -1142,12 +1180,15 @@ function lektorAntwort(roh,original){
   return t;
 }
 async function lektor(antwort,name){
-  if(!CFG.lektor||!antwort)return antwort;
+  if(!CFG.lektor||!antwort){ S.msLektor=0; return antwort; }
+  var tLekt=Date.now();
   try{
     var roh=await frageKI(baueLektorAnweisung(antwort,name),45000);
+    S.msLektor=Date.now()-tLekt;
     var besser=lektorAntwort(roh,antwort);
     if(besser){ S.lektorGriff=(S.lektorGriff||0)+1; return besser; }
   }catch(e){
+    S.msLektor=Date.now()-tLekt;
     console.warn('Lektor ohne Antwort:',e);
   }
   return antwort;
@@ -1222,8 +1263,11 @@ var S = {
   spieltIdx:null,                   // wen der Mensch spielt: null = Held, sonst Figurenindex
   motiv:'', motivZug:'',            // wer ins Bild gehoert: Wahl des Spielers, Vorschlag der Regie
   seed:0,                           // fest, damit Figuren wiedererkennbar bleiben
+  guidance:7,                       // wie streng der Bilddienst dem Prompt folgt
   bildGeneriert:false, bildZaehler:0, bildLaeuft:false, bildAusstehend:null, bildPauseBis:0,
   letzteRohantwort:'', letzteJsonOk:false, kurzKontext:false,
+  msText:0, msBild:0, msRegie:0, msLektor:0, msAnweisung:0,   // Dauer der letzten Aufrufe
+
   szeneText:'', szeneGlobal:'', letzterPrompt:'', letzterNegativ:'', letzteBildUrl:'',
   // Von Hand geschriebener Prompt. Solange gesetzt, gilt er statt des aus der
   // Szene gebauten — auch ueber einen Wechsel der Bildquelle hinweg.
@@ -1489,6 +1533,16 @@ function setzeNpcs(liste){
   S.spieltIdx=null;
 }
 function neuerSeed(){ return Math.floor(1+Math.random()*999999998); }   // 32-Bit-sicher
+// Guidance (bei manchen Diensten "CFG scale"): wie streng das Bild dem Prompt
+// folgt. Niedrig heisst freier und weicher, hoch heisst woertlich und hart -
+// zu hoch verbrennt die Farben. Brauchbar ist 4 bis 12, ueblich 7.
+var GUIDANCE_MIN=1, GUIDANCE_MAX=30, GUIDANCE_STD=7;
+function guidanceWert(roh){
+  var v=parseFloat(roh==null?S.guidance:roh);
+  if(!isFinite(v))v=GUIDANCE_STD;
+  v=Math.max(GUIDANCE_MIN,Math.min(GUIDANCE_MAX,v));
+  return Math.round(v*10)/10;
+}
 
 // ── SPIEL STARTEN ─────────────────────────────
 async function leiteNpcAusStoryAb(story){
@@ -2302,7 +2356,10 @@ async function naechsterZug(erzwinge,autoModus){
     (autoModus?'"wer": Es MUSS eine Figur sprechen, niemals STOP.':'"wer": STOP heisst, der Held ist wieder dran.')+
     ' "weiter": true, wenn sofort noch eine ANDERE Figur reagieren sollte.';
 
+  var tText=Date.now();
   var text=await frageKI(instruction,150000);
+  S.msText=Date.now()-tText;
+  S.msAnweisung=instruction.length;
   var j2=jsonAus(text), z=j2?null:felderAus(text);
   // Fuer /roh aufheben: ohne Blick auf die Rohantwort ist nicht zu erkennen,
   // ob ein Feld fehlte, leer war oder die Antwort abgeschnitten wurde.
@@ -2673,13 +2730,16 @@ function saeubereBildIdee(roh){
   return t;
 }
 async function bildRegie(){
+  var tRegie=Date.now();
   try{
     var roh=await frageKI(baueBildRegieAnweisung(),45000);
+    S.msRegie=Date.now()-tRegie;
     var idee=saeubereBildIdee(roh);
     return idee.length>=8?idee:null;
   }catch(e){
     // Faellt der Bot aus, uebernimmt die alte Methode - lieber ein Bild aus
     // der Dialogregie als gar keines.
+    S.msRegie=Date.now()-tRegie;
     console.warn('Bildregie-Bot ohne Antwort:',e);
     return null;
   }
@@ -2713,7 +2773,12 @@ async function zeichneBild(opts){
                  ?(parseInt(opts.seedOverride,10)||S.seed)
                  :(S.seed||(S.seed=neuerSeed()));
     S.seed=seed;
-    var src=await quelle().zeichne({prompt:prompt,negativ:negativ,seed:seed,breite:auf64(CFG.breite),hoehe:auf64(CFG.hoehe)});
+    var tBild=Date.now();
+    var guid=guidanceWert(opts.guidanceOverride);
+    S.guidance=guid;
+    var src=await quelle().zeichne({prompt:prompt,negativ:negativ,seed:seed,guidance:guid,
+                                    breite:auf64(CFG.breite),hoehe:auf64(CFG.hoehe)});
+    S.msBild=Date.now()-tBild;
     if(S.letzteBildUrl&&S.letzteBildUrl.indexOf('blob:')===0&&S.letzteBildUrl!==src){
       try{ URL.revokeObjectURL(S.letzteBildUrl); }catch(e1){}
     }
@@ -2724,6 +2789,7 @@ async function zeichneBild(opts){
     S.letzterPrompt=prompt;
     S.letzterNegativ=negativ;
   }catch(e){
+    if(typeof tBild==='number')S.msBild=Date.now()-tBild;
     var m=String((e&&e.message)||e);
     var gedrosselt=/HTTP 429/.test(m);
     // Ein erschöpftes Kontingent meldet nicht jeder Dienst als 429 — ZeroGPU
@@ -2769,6 +2835,8 @@ var BEFEHLE=[
    fn:function(m){ stilBefehl(m[1]); }},
   {muster:/^\/quelle\b\s*:?\s*([\s\S]*)$/i,     hilfe:['/quelle','Bildquelle wechseln (öffnet die Einstellungen)'],
    fn:function(m){ quelleBefehl(m[1]); }},
+  {muster:/^\/tempo\b/i,                        hilfe:['/tempo','zeigt, wo die Zeit hingeht — Text, Lektor, Bildregie, Bilddienst, Takt und Pausen'],
+   fn:function(){ zeigeTempo(); }},
   {muster:/^\/roh\b/i,                          hilfe:['/roh','zeigt die letzte Antwort der Regie im Original — zur Fehlersuche'],
    fn:function(){ zeigeRohantwort(); }},
   {muster:/^\/blatt\s*:?\s*([a-zA-Zäöü0-9]*)\s*$/i,  hilfe:['/blatt N','Charakterblatt zeichnen — N ist die Figurennummer, „held" der Held (ohne Angabe: Figurenmenü)'],
@@ -3436,6 +3504,8 @@ function oeffneBildModal(){
   el('bildPromptFeld').value=S.eigenerPrompt||S.letzterPrompt||'';
   el('bildNegativFeld').value=S.eigenerNegativ||S.letzterNegativ||baueNegativ();
   el('bildSeedFeld').value=S.seed||'';
+  el('bildGuidanceFeld').value=guidanceWert();
+  el('bildGuidanceHinweis').textContent=guidanceHinweis();
   el('bildFest').checked=!!S.promptFesthalten;
   var mo=el('bildMotiv');
   if(mo)mo.value=motivSchluessel(S.motiv)||'';
@@ -3445,16 +3515,43 @@ function oeffneBildModal(){
          ? '✎ Prompt festgehalten — das Bild bleibt so, bis du den Haken entfernst oder „AUS SZENE" drückst. '
          : '✎ Eigener Prompt — er überlebt den Wechsel der Bildquelle, beim nächsten Bildtakt übernimmt aber wieder die Handlung. ')
       : 'Automatisch aus der Szene gebaut. ')
-    +'Quelle: '+quelle().label+' — '+quelle().info;
+    +'Quelle: '+quelle().label+' — '+quelle().info+
+    (S.msBild?('  Letztes Bild: '+sekunden(S.msBild)+' (/tempo zeigt mehr).'):'');
   oeffneModal('mBild');
 }
 function wuerfelSeed(){ el('bildSeedFeld').value=String(neuerSeed()); }
+function guidanceGeaendert(){
+  var e=el('bildGuidanceHinweis');
+  if(e)e.textContent=guidanceHinweis(el('bildGuidanceFeld').value);
+}
+function guidanceZurueck(){
+  el('bildGuidanceFeld').value=GUIDANCE_STD;
+  el('bildGuidanceHinweis').textContent=guidanceHinweis(GUIDANCE_STD);
+}
+// Der Hinweis sagt zweierlei: was der Wert bewirkt, und ob die eingestellte
+// Quelle ihn ueberhaupt beachtet.
+function guidanceHinweis(roh){
+  var v=guidanceWert(roh);
+  var wirkung=(v<=4)?'sehr frei — der Dienst darf weit vom Prompt abweichen, weiche Bilder'
+            :(v<=6)?'locker — mehr eigene Handschrift des Modells'
+            :(v<=9)?'ausgewogen — die übliche Wahl'
+            :(v<=14)?'streng — hält sich eng an den Prompt, Farben werden härter'
+            :'sehr streng — meist überzeichnet und verbrannt';
+  var k=CFG.quelle;
+  var beachtet=(k==='perchance')?'Perchance hängt ihn als (guidanceScale:::…) an den Prompt.'
+             :(k==='horde')?'AI Horde setzt ihn als cfg_scale.'
+             :(k==='gradio')?'Beim Gradio-Space wirkt er nur, wenn {guidance} in der Parameter-Vorlage steht.'
+             :(k==='url')?'Bei der eigenen URL wirkt er nur, wenn {guidance} in der Vorlage steht.'
+             :'Diese Bildquelle kennt keine Guidance — der Wert bleibt hier ohne Wirkung.';
+  return v+': '+wirkung+' · '+beachtet;
+}
 function bildNeuZeichnen(){
   if(!S.imSpiel)return;
   if(uebernehmeStil())sysZeile('✦ Stil: '+(S.stilLabel||'unverändert')+' ✦');
   var p=el('bildPromptFeld').value.trim();
   var n=el('bildNegativFeld').value.trim();
   var s=el('bildSeedFeld').value.trim();
+  var g=el('bildGuidanceFeld').value.trim();
   // Bearbeitung festhalten, statt sie beim naechsten automatischen Bild oder
   // beim Wechsel der Bildquelle zu verlieren.
   S.eigenerPrompt=p;
@@ -3462,7 +3559,7 @@ function bildNeuZeichnen(){
   S.promptFesthalten=!!(el('bildFest')&&el('bildFest').checked);
   schliesseModal();
   autosave();
-  zeichneBild({seedOverride:s});
+  zeichneBild({seedOverride:s,guidanceOverride:g});
 }
 // Zurueck zur Automatik: Prompt und Negativprompt entstehen wieder aus der Szene.
 function bildAusSzene(){
@@ -3597,12 +3694,14 @@ function fuelleStilWahl(){
   var eigen=el('szeneStilEigen');
   if(S.stilLabel&&STILE[S.stilLabel]){
     sel.value=S.stilLabel;eigen.value='';
+    STIL_ZULETZT.szeneStil=S.stilLabel;
   }else if(S.stil){
     sel.value='eigen';eigen.value=S.stilLabel||S.stil;
   }else{
     var start=el('stilwahl');
     sel.value=(start&&STILE[start.value])?start.value:'manga';
     eigen.value='';
+    STIL_ZULETZT.szeneStil=sel.value;
   }
   szeneStilGewechselt();
   el('szeneStilHinweis').textContent=S.eigenerPrompt
@@ -3611,10 +3710,7 @@ function fuelleStilWahl(){
 }
 // Alter Name, damit /stil ohne Text und aeltere Aufrufe weiter greifen.
 function oeffneSzeneMenu(){ oeffneBildModal(); }
-function szeneStilGewechselt(){
-  var eigen=el('szeneStilEigen');
-  eigen.style.display=(el('szeneStil').value==='eigen')?'block':'none';
-}
+function szeneStilGewechselt(){ stilFeldPflegen('szeneStil','szeneStilEigen',false); }
 // Liest die Stilwahl aus dem Bildmenue. Gibt zurueck, ob sich etwas geaendert
 // hat — dann meldet der Aufrufer es in der Dialogzeile.
 function uebernehmeStil(){
@@ -4087,7 +4183,7 @@ function oeffneEinstellungen(){
 // Seit der Umstellung auf die Ladeschale ist die Frage berechtigt, welcher Stand
 // gerade laeuft. Die Schale legt den geholten Quelltext samt Zweig und Zeitpunkt
 // im localStorage ab; hier wird er nur abgelesen.
-var VERSION = 'V7.43';
+var VERSION = 'V7.47';
 // Ohne Browserkonsole — etwa am Handy — muss der Generator selbst sagen koennen,
 // woran es liegt, wenn ein Plugin von Perchance fehlt.
 function pluginLage(){
@@ -4522,6 +4618,7 @@ function migriere(d){
   if(typeof s.eigenerNegativ!=='string')s.eigenerNegativ='';
   s.promptFesthalten=!!s.promptFesthalten;
   if(!s.seed)s.seed=(w.ort&&parseInt(w.ort.seed,10))||neuerSeed();   // V6 hielt den Seed am Ort
+  if(!isFinite(parseFloat(s.guidance)))s.guidance=7;   // vor V7.45 gab es keine Guidance
   if(w.perspektive!=='ich'&&w.perspektive!=='er')w.perspektive='er';
   if(w.protagonist){
     if(typeof w.protagonist.geschlecht!=='string')w.protagonist.geschlecht='';
@@ -5081,6 +5178,55 @@ async function chatAuswerten(alle){
            (b.ort?', Ort und Zeit':'')+' —');
   if(b.figuren)zeichneBild({});   // das erste Bild zeigte noch Platzhalter
   return true;
+}
+
+// ── WO DIE ZEIT HINGEHT ───────────────────────
+// "Warum dauert das Bild so lange?" laesst sich nicht raten. Hier steht, was
+// der letzte Zug wirklich gekostet hat - und was gerade bremst.
+function sekunden(ms){
+  if(!ms||ms<0)return '—';
+  return (ms/1000).toFixed(1)+' s';
+}
+function tempoZeilen(){
+  var takt=Number(CFG.bildTakt)||0;
+  var rest=S.bildPauseBis?Math.ceil((S.bildPauseBis-Date.now())/1000):0;
+  var z=[];
+  z.push(['Text der Regie',sekunden(S.msText)+(S.msAnweisung?'  ('+S.msAnweisung+' Zeichen Anweisung)':'')]);
+  z.push(['Lektor',CFG.lektor?(sekunden(S.msLektor)+'  — zweiter Textaufruf je Zug'):'aus']);
+  z.push(['Bildregie-Bot',CFG.bildBot?(sekunden(S.msRegie)+'  — eigener Textaufruf vor jedem Bild'):'aus']);
+  z.push(['Bild ('+quelle().label+')',sekunden(S.msBild)+(S.bildLaeuft?'  — läuft gerade':'')]);
+  z.push(['Bild-Takt',takt?('alle '+takt+' Züge — noch '+Math.max(0,takt-(S.bildZaehler||0))+' Zug bis zum nächsten'):'nur auf Zuruf']);
+  z.push(['Zwangspause',rest>0?(rest+' s — der Bilddienst hat gedrosselt'):'keine']);
+  if(S.promptFesthalten)z.push(['Prompt festgehalten','ja — es entsteht absichtlich kein neues Bild']);
+  return z;
+}
+// Ein Satz dazu, was der groesste Posten ist. Meist ist es der Bilddienst.
+function tempoUrteil(){
+  var text=(S.msText||0)+(S.msLektor||0);
+  var bild=(S.msBild||0)+(S.msRegie||0);
+  if(!text&&!bild)return 'Noch nichts gemessen — spiel einen Zug, dann steht hier, wo die Zeit hingeht.';
+  if(bild>text*2&&bild>15000)
+    return 'Der Bilddienst ist der langsame Teil. Daran ändert der Generator nichts: kleinere Bildgröße, '+
+           'ein höherer Bild-Takt oder eine andere Quelle in ⚙ EINSTELLUNGEN helfen.';
+  if(CFG.bildBot&&S.msRegie>4000)
+    return 'Der Bildregie-Bot kostet vor jedem Bild einen eigenen Textaufruf. Ausschalten macht die Bilder '+
+           'schneller, aber ungenauer zum Moment.';
+  if(CFG.lektor&&S.msLektor>4000)
+    return 'Der Lektor verdoppelt die Wartezeit je Zug. Er ist es meist wert — abschalten geht in ⚙ EINSTELLUNGEN.';
+  if(text>25000)
+    return 'Der Textdienst von Perchance antwortet gerade langsam. Das liegt an seiner Auslastung, nicht an dieser Partie.';
+  return 'Nichts Auffälliges — die Zeit verteilt sich wie erwartet.';
+}
+function zeigeTempo(){
+  var g=el('gespraech');
+  if(!g)return;
+  var z=document.createElement('div');
+  z.className='zeile hilfe';
+  z.innerHTML='<div class="txt"><b>WO DIE ZEIT HINGEHT</b><br>'+
+    tempoZeilen().map(function(r){ return escapeHtml(r[0])+': '+escapeHtml(r[1]); }).join('<br>')+
+    '<br><br>'+escapeHtml(tempoUrteil())+'</div>';
+  g.appendChild(z);
+  scrolle();
 }
 
 // ── HELFER ────────────────────────────────────
