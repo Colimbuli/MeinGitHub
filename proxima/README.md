@@ -109,7 +109,7 @@ Die Auswahl gilt generatorweit und überlebt Spielstände.
 | **AI Horde** | nein (`0000000000`) | Gratis über freiwillige Rechner; anonym langsam, mit eigenem Schlüssel von [aihorde.net](https://aihorde.net) deutlich schneller. Bei hoher Auslastung sperrt sie alles über 907×907 und über 50 Schritte — die Bildgröße wird automatisch darunter gehalten (1024×1024 wird zu 896×896). |
 | **OpenAI-kompatible API** | ja | Alles, was `POST {basis}/images/generations` versteht. |
 | **Hugging-Face-Space (Gradio)** | meist ja | Spricht einen Space ueber seine Warteschlange an. Endpunkt und Parameter holt **API ERKUNDEN** beim Space ab. ZeroGPU-Spaces brauchen ein Token und haben ein Kontingent. |
-| **Eigene URL-Vorlage** | je nachdem | Platzhalter `{prompt}` `{negativ}` `{seed}` `{breite}` `{hoehe}`. |
+| **Eigene URL-Vorlage** | je nachdem | Platzhalter `{prompt}` `{negativ}` `{seed}` `{breite}` `{hoehe}` `{guidance}`. |
 
 Zwei Dinge, die man wissen sollte:
 
@@ -355,6 +355,33 @@ nicht von Panel zu Panel wechselt). Ändern lässt sie sich jederzeit im Figuren
 Der Held hat dort auch ein Feld **Aussehen**. Bleibt es leer, baut PROXIMA beim ersten Charakterblatt
 eine Beschreibung aus Geschlecht und Beruf — und hält sie fest, damit sie nicht bei jedem Bild anders
 ausfällt.
+
+### Guidance — wie streng das Bild dem Prompt folgt
+
+Im Bildmenü steht direkt unter dem Seed ein Feld **GUIDANCE** (bei manchen Diensten heißt der Wert
+*CFG scale*). Er entscheidet, wie wörtlich der Bilddienst den Prompt nimmt:
+
+| Wert | Wirkung |
+| --- | --- |
+| 1–4 | sehr frei — der Dienst darf weit abweichen, weiche Bilder |
+| 5–6 | locker — mehr eigene Handschrift des Modells |
+| 7–9 | ausgewogen — die übliche Wahl, Vorgabe ist **7** |
+| 10–14 | streng — hält sich eng an den Prompt, Farben werden härter |
+| ab 15 | sehr streng — meist überzeichnet und verbrannt |
+
+Der Wert gehört zur Partie und wird mitgespeichert, der Knopf **↺** setzt ihn auf 7 zurück. Unter
+dem Feld steht, was der eingestellte Wert bewirkt **und ob die gewählte Bildquelle ihn überhaupt
+beachtet** — denn das ist verschieden:
+
+| Quelle | wirkt? |
+| --- | --- |
+| AI Horde | ja, wird als `cfg_scale` mitgeschickt |
+| Gradio-Space | ja, sobald `{guidance}` in der Parameter-Vorlage steht — **API ERKUNDEN** setzt den Platzhalter selbst ein, wenn der Space einen solchen Parameter hat |
+| Eigene URL-Vorlage | ja, über den Platzhalter `{guidance}` |
+| Perchance, Pollinations, OpenAI-API | nein — diese Dienste kennen keinen solchen Wert |
+
+In beiden Vorlagen ist `{cfg}` dasselbe wie `{guidance}`, und beide werden mit und ohne
+Anführungszeichen erkannt.
 
 ### Referenzbild (img2img) für Gradio-Spaces
 

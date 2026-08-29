@@ -1408,6 +1408,52 @@ ctx.CFG.ton = 'natuerlich'; ctx.CFG.tonText = '';
 pruefe('der alte Zwang zum Obszönen ist raus', !/obszoene/.test(src));
 pruefe('der Tonfall lässt sich einstellen', /id="cfgTon"/.test(src) && /CFG\.ton=tonSchluessel/.test(src));
 
+console.log('\n— Guidance —');
+// Wie streng das Bild dem Prompt folgt. Steht unter dem Seed und wird über
+// {guidance} in die Vorlagen eingesetzt.
+ctx.S.guidance = 7;
+pruefe('ohne Angabe gilt der Vorgabewert', ctx.guidanceWert() === 7 && ctx.guidanceWert(null) === 7);
+pruefe('Unsinn fällt auf die Vorgabe zurück', ctx.guidanceWert('abc') === 7);
+pruefe('zu klein und zu groß werden begrenzt',
+  ctx.guidanceWert(-5) === ctx.GUIDANCE_MIN && ctx.guidanceWert(999) === ctx.GUIDANCE_MAX);
+pruefe('Kommazahlen bleiben erhalten', ctx.guidanceWert('4.5') === 4.5);
+pruefe('mehr als eine Nachkommastelle wird gerundet', ctx.guidanceWert(6.789) === 6.8);
+
+const guidDaten = ctx.gradioDaten('["{prompt}", {seed}, {guidance}, "{cfg}"]',
+  { prompt: 'a', seed: 3, guidance: 4.5 });
+pruefe('{guidance} wird in die Gradio-Vorlage eingesetzt', guidDaten[2] === 4.5, JSON.stringify(guidDaten));
+pruefe('{cfg} ist derselbe Wert, auch in Anführungszeichen', guidDaten[3] === 4.5, JSON.stringify(guidDaten));
+pruefe('fehlt der Wert, steht dort die Vorgabe',
+  ctx.gradioDaten('[{guidance}]', { prompt: 'a', seed: 1 })[0] === 7);
+
+pruefe('die eigene URL-Vorlage kennt den Platzhalter auch',
+  /\{guidance\}/.test(ctx.BILDQUELLEN.url.info) && /replace\(\/\\\{guidance\\\}\/g/.test(src));
+pruefe('AI Horde schickt ihn als cfg_scale', /cfg_scale:guidanceWert\(a\.guidance\)/.test(src));
+pruefe('der Wert geht an jede Bildquelle', /guidance:guid,/.test(src));
+
+pruefe('das Feld steht unter dem Seed',
+  html.indexOf('id="bildGuidanceFeld"') > html.indexOf('id="bildSeedFeld"'));
+pruefe('es lässt sich zurücksetzen', /guidanceZurueck\(\)/.test(html) && /guidanceGeaendert\(\)/.test(html));
+
+const h7 = ctx.guidanceHinweis(7), h2 = ctx.guidanceHinweis(2), h20 = ctx.guidanceHinweis(20);
+pruefe('der Hinweis erklärt kleine Werte', /sehr frei/.test(h2), h2);
+pruefe('mittlere Werte gelten als übliche Wahl', /ausgewogen/.test(h7), h7);
+pruefe('große Werte werden als überzeichnet gewarnt', /überzeichnet/.test(h20), h20);
+ctx.CFG.quelle = 'perchance';
+pruefe('und sagt, wenn die Quelle ihn gar nicht kennt',
+  /keine Guidance/.test(ctx.guidanceHinweis(7)), ctx.guidanceHinweis(7));
+ctx.CFG.quelle = 'horde';
+pruefe('bei der Horde sagt er, dass er wirkt', /cfg_scale/.test(ctx.guidanceHinweis(7)));
+ctx.CFG.quelle = 'gradio';
+pruefe('beim Space verweist er auf die Vorlage', /Parameter-Vorlage/.test(ctx.guidanceHinweis(7)));
+ctx.CFG.quelle = 'perchance';
+
+const altOhne = { version: 7, zeit: 0,
+  welt: { protagonist: { name: 'Egon' }, ort: { name: 'Der Hof' }, npcs: [{ name: 'Ida' }], perspektive: 'er' },
+  stand: { verlauf: [], fakten: [], seed: 5 } };
+ctx.migriere(altOhne);
+pruefe('alte Spielstände bekommen eine Guidance', altOhne.stand.guidance === 7);
+
 console.log('\n— Wo die Zeit hingeht —');
 // "Dauert das zu lange?" soll man ablesen können, statt zu raten.
 pruefe('Sekunden werden lesbar', ctx.sekunden(4200) === '4.2 s' && ctx.sekunden(0) === '—');
@@ -1766,7 +1812,9 @@ const vorlage = ctx.gradioVorlageAus([
   { parameter_name: 'num_inference_steps', python_type: { type: 'float' }, parameter_has_default: true, parameter_default: 28 }
 ]);
 pruefe('Vorlage aus Parameterliste',
-  vorlage === '["{prompt}", "{negativ}", {seed}, false, {breite}, {hoehe}, 7, 28]', vorlage);
+  vorlage === '["{prompt}", "{negativ}", {seed}, false, {breite}, {hoehe}, {guidance}, 28]', vorlage);
+pruefe('guidance_scale wird als Platzhalter erkannt, nicht als fester Wert',
+  /\{guidance\}/.test(vorlage));
 pruefe('negative_prompt wird nicht als prompt erkannt', vorlage.indexOf('"{negativ}"') > vorlage.indexOf('"{prompt}"'));
 // Wichtig: randomize_seed muss aus bleiben, sonst würfelt der Space selbst
 // und die Figuren verlieren ihre Wiedererkennbarkeit.
@@ -1806,7 +1854,9 @@ const spaceComps = [
 ];
 const v = ctx.gradioVorlageAusConfig(spaceParams, spaceDep, spaceComps);
 const geparst = JSON.parse(v.replace(/"\{prompt\}"/, '"P"').replace(/"\{negativ\}"/, '"N"')
-  .replace(/\{seed\}/, '1').replace(/\{breite\}/, '2').replace(/\{hoehe\}/, '3'));
+  .replace(/\{seed\}/, '1').replace(/\{breite\}/, '2').replace(/\{hoehe\}/, '3')
+  .replace(/\{guidance\}/, '7'));
+pruefe('guidance_scale wird auch hier zum Platzhalter', /\{guidance\}/.test(v), v);
 pruefe('alle 14 Parameter in der Vorlage', geparst.length === 14, String(geparst.length));
 pruefe('Platzhalter an den richtigen Stellen', geparst[0] === 'P' && geparst[1] === 'N' && geparst[2] === 1 && geparst[3] === 2 && geparst[4] === 3, JSON.stringify(geparst.slice(0, 5)));
 pruefe('sampler kommt aus der Vorgabe des Space', geparst[7] === 'Euler a', String(geparst[7]));
