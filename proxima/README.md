@@ -104,7 +104,7 @@ Die Auswahl gilt generatorweit und überlebt Spielstände.
 
 | Quelle | Schlüssel nötig | Anmerkung |
 |---|---|---|
-| **Perchance** | nein | Das eingebaute Plugin. Nichts verlässt Perchance. Standard. |
+| **Perchance** | nein | Das eingebaute Plugin. Nichts verlässt Perchance. Standard. Seed, Negativprompt und Guidance gehen in der Schreibweise `(name:::wert)` am Prompt mit. |
 | **Pollinations** | nein | Offener Dienst, Bild kommt als URL. Anderes Modell als Perchance — dieselbe Beschreibung ergibt sichtbar andere Bilder. Negativprompt wird mitgeschickt, aber nicht von jedem Modell dort beachtet. |
 | **AI Horde** | nein (`0000000000`) | Gratis über freiwillige Rechner; anonym langsam, mit eigenem Schlüssel von [aihorde.net](https://aihorde.net) deutlich schneller. Bei hoher Auslastung sperrt sie alles über 907×907 und über 50 Schritte — die Bildgröße wird automatisch darunter gehalten (1024×1024 wird zu 896×896). |
 | **OpenAI-kompatible API** | ja | Alles, was `POST {basis}/images/generations` versteht. |
@@ -375,10 +375,11 @@ beachtet** — denn das ist verschieden:
 
 | Quelle | wirkt? |
 | --- | --- |
+| Perchance | ja, geht als `(guidanceScale:::…)` im Prompt mit — dieselbe Schreibweise, die dort schon Seed und Negativprompt trägt |
 | AI Horde | ja, wird als `cfg_scale` mitgeschickt |
 | Gradio-Space | ja, sobald `{guidance}` in der Parameter-Vorlage steht — **API ERKUNDEN** setzt den Platzhalter selbst ein, wenn der Space einen solchen Parameter hat |
 | Eigene URL-Vorlage | ja, über den Platzhalter `{guidance}` |
-| Perchance, Pollinations, OpenAI-API | nein — diese Dienste kennen keinen solchen Wert |
+| Pollinations, OpenAI-API | nein — diese Dienste kennen keinen solchen Wert |
 
 In beiden Vorlagen ist `{cfg}` dasselbe wie `{guidance}`, und beide werden mit und ohne
 Anführungszeichen erkannt.

@@ -192,7 +192,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.46</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.47</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -591,11 +591,15 @@ function speichereCfg(){
 var BILDQUELLEN={
   perchance:{
     label:'Perchance (Standard, ohne Schlüssel)',
-    info:'Nutzt das eingebaute Bild-Plugin des Generators. Kein Schlüssel, keine Fremdserver.',
+    info:'Nutzt das eingebaute Bild-Plugin des Generators. Kein Schlüssel, keine Fremdserver. Seed, Negativprompt und Guidance gehen als (name:::wert) mit.',
     felder:[],
     zeichne:async function(a){
       if(typeof image!=='function')throw new Error('image() ist nicht verfügbar — Bild-Plugin im Generator eingebunden? — '+pluginLage());
-      var p=a.prompt+(a.negativ?' (negativePrompt:::'+a.negativ+')':'')+' (seed:::'+a.seed+')';
+      // Das Plugin nimmt Zusatzwerte in der Schreibweise (name:::wert) im
+      // Prompt entgegen - so kommt auch die Guidance dort an.
+      var p=a.prompt+(a.negativ?' (negativePrompt:::'+a.negativ+')':'')+
+            ' (seed:::'+a.seed+')'+
+            ' (guidanceScale:::'+guidanceWert(a.guidance)+')';
       var r=await image({prompt:p});
       var src=r&&(r.dataUrl||r.url||r.imageUrl||r.src);
       if(!src)throw new Error('Bild-Plugin lieferte keine Bilddaten.');
@@ -3534,7 +3538,8 @@ function guidanceHinweis(roh){
             :(v<=14)?'streng — hält sich eng an den Prompt, Farben werden härter'
             :'sehr streng — meist überzeichnet und verbrannt';
   var k=CFG.quelle;
-  var beachtet=(k==='horde')?'AI Horde setzt ihn als cfg_scale.'
+  var beachtet=(k==='perchance')?'Perchance hängt ihn als (guidanceScale:::…) an den Prompt.'
+             :(k==='horde')?'AI Horde setzt ihn als cfg_scale.'
              :(k==='gradio')?'Beim Gradio-Space wirkt er nur, wenn {guidance} in der Parameter-Vorlage steht.'
              :(k==='url')?'Bei der eigenen URL wirkt er nur, wenn {guidance} in der Vorlage steht.'
              :'Diese Bildquelle kennt keine Guidance — der Wert bleibt hier ohne Wirkung.';
@@ -4178,7 +4183,7 @@ function oeffneEinstellungen(){
 // Seit der Umstellung auf die Ladeschale ist die Frage berechtigt, welcher Stand
 // gerade laeuft. Die Schale legt den geholten Quelltext samt Zweig und Zeitpunkt
 // im localStorage ab; hier wird er nur abgelesen.
-var VERSION = 'V7.46';
+var VERSION = 'V7.47';
 // Ohne Browserkonsole — etwa am Handy — muss der Generator selbst sagen koennen,
 // woran es liegt, wenn ein Plugin von Perchance fehlt.
 function pluginLage(){

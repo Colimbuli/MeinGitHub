@@ -1474,6 +1474,20 @@ pruefe('fehlt der Wert, steht dort die Vorgabe',
 pruefe('die eigene URL-Vorlage kennt den Platzhalter auch',
   /\{guidance\}/.test(ctx.BILDQUELLEN.url.info) && /replace\(\/\\\{guidance\\\}\/g/.test(src));
 pruefe('AI Horde schickt ihn als cfg_scale', /cfg_scale:guidanceWert\(a\.guidance\)/.test(src));
+pruefe('Perchance bekommt ihn als (guidanceScale:::…) im Prompt',
+  /\(guidanceScale:::'\+guidanceWert\(a\.guidance\)/.test(src));
+// Der Aufruf des Plugins im Ganzen: Negativprompt, Seed und Guidance hängen in
+// der Schreibweise (name:::wert) hinten am Prompt.
+let anPlugin = '';
+ctx.image = (o) => { anPlugin = o.prompt; return Promise.resolve({ dataUrl: 'data:image/png;base64,xx' }); };
+// Der Prompt steht schon fest, bevor das Plugin antwortet — deshalb reicht der
+// Aufruf ohne await, um ihn zu prüfen.
+ctx.BILDQUELLEN.perchance.zeichne(
+  { prompt: 'a quiet room', negativ: 'blurry', seed: 42, guidance: 5, breite: 1024, hoehe: 1024 })
+  .catch(() => {});
+pruefe('der Prompt trägt Negativprompt, Seed und Guidance',
+  /^a quiet room \(negativePrompt:::blurry\) \(seed:::42\) \(guidanceScale:::5\)$/.test(anPlugin), anPlugin);
+ctx.image = undefined;
 pruefe('der Wert geht an jede Bildquelle', /guidance:guid,/.test(src));
 
 pruefe('das Feld steht unter dem Seed',
@@ -1484,9 +1498,12 @@ const h7 = ctx.guidanceHinweis(7), h2 = ctx.guidanceHinweis(2), h20 = ctx.guidan
 pruefe('der Hinweis erklärt kleine Werte', /sehr frei/.test(h2), h2);
 pruefe('mittlere Werte gelten als übliche Wahl', /ausgewogen/.test(h7), h7);
 pruefe('große Werte werden als überzeichnet gewarnt', /überzeichnet/.test(h20), h20);
-ctx.CFG.quelle = 'perchance';
+ctx.CFG.quelle = 'pollinations';
 pruefe('und sagt, wenn die Quelle ihn gar nicht kennt',
   /keine Guidance/.test(ctx.guidanceHinweis(7)), ctx.guidanceHinweis(7));
+ctx.CFG.quelle = 'perchance';
+pruefe('bei Perchance verweist er auf die :::-Schreibweise',
+  /guidanceScale:::/.test(ctx.guidanceHinweis(7)), ctx.guidanceHinweis(7));
 ctx.CFG.quelle = 'horde';
 pruefe('bei der Horde sagt er, dass er wirkt', /cfg_scale/.test(ctx.guidanceHinweis(7)));
 ctx.CFG.quelle = 'gradio';
