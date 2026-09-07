@@ -41,7 +41,10 @@ const ctx = {
   window: { open() {}, addEventListener() {} },
   Image: function () { this.src = ''; },
   Blob: function (teile, opt) { this.teile = teile; this.type = opt && opt.type; },
-  FileReader: function () { this.readAsText = function () {}; },
+  FileReader: function () {
+    this.readAsText = function () {};
+    this.readAsDataURL = (b) => { this.result = 'data:image/png;base64,' + ((b && b.inhalt) || 'XX'); setTimeout(() => this.onload(), 0); };
+  },
   URL: { createObjectURL: () => 'blob:test', revokeObjectURL() {} },
   fetch: () => Promise.reject(new Error('kein Netz im Test')),
   Date, Math, JSON, Object, Array, String, Number, RegExp, Promise, isNaN, parseInt, parseFloat, encodeURIComponent
@@ -286,6 +289,49 @@ const laufen = async () => {
   pruefe('Quellenwechsel reicht den festgehaltenen Prompt weiter', gesendet.at(-1).prompt === 'mein prompt');
   ctx.CFG.quelle = 'perchance';
   ctx.S.eigenerPrompt = ''; ctx.S.promptFesthalten = false; ctx.CFG.bildTakt = 2;
+
+  console.log('\n— ComfyUI —');
+  // Ein typischer Arbeitsablauf im API-Format, wie ihn "Export (API)" liefert.
+  const wf = {
+    '3': { class_type: 'KSampler', inputs: { seed: 0, steps: 20, cfg: 7, positive: ['6', 0], negative: ['7', 0], latent_image: ['5', 0] } },
+    '5': { class_type: 'EmptyLatentImage', inputs: { width: 512, height: 512, batch_size: 1 } },
+    '6': { class_type: 'CLIPTextEncode', inputs: { text: 'ein alter Text', clip: ['4', 1] } },
+    '7': { class_type: 'CLIPTextEncode', inputs: { text: 'schlechte Qualität', clip: ['4', 1] } },
+    '9': { class_type: 'SaveImage', inputs: { images: ['8', 0] } }
+  };
+  const comfyBericht = ctx.comfyPlatzhalter(wf);
+  pruefe('Prompt landet am positiven Textknoten', wf['6'].inputs.text === '{prompt}', wf['6'].inputs.text);
+  pruefe('Negativprompt am negativen Textknoten', wf['7'].inputs.text === '{negativ}', wf['7'].inputs.text);
+  pruefe('Seed am Sampler', wf['3'].inputs.seed === '{seed}');
+  pruefe('Bildmaße am Latentknoten', wf['5'].inputs.width === '{breite}' && wf['5'].inputs.height === '{hoehe}');
+  pruefe('Bericht nennt die geänderten Knoten', comfyBericht.length === 4, comfyBericht.join(' | '));
+  pruefe('andere Knoten bleiben unangetastet', wf['9'].inputs.images[0] === '8');
+
+  const wfAdv = { '3': { class_type: 'KSamplerAdvanced', inputs: { noise_seed: 5, positive: ['6', 0], negative: ['7', 0] } },
+                  '6': { class_type: 'CLIPTextEncode', inputs: { text: 'x' } }, '7': { class_type: 'CLIPTextEncode', inputs: { text: 'y' } } };
+  ctx.comfyPlatzhalter(wfAdv);
+  pruefe('noise_seed wird ebenso erkannt', wfAdv['3'].inputs.noise_seed === '{seed}');
+
+  const comfyGefuellt = ctx.comfyDaten(JSON.stringify(wf), { prompt: 'eine "Szene"', negativ: 'blurry', seed: 4242, breite: 1024, hoehe: 1024 });
+  pruefe('Prompt eingesetzt, Anführungszeichen heil', comfyGefuellt['6'].inputs.text === 'eine "Szene"', comfyGefuellt['6'].inputs.text);
+  pruefe('Negativprompt eingesetzt', comfyGefuellt['7'].inputs.text === 'blurry');
+  pruefe('Seed ist eine Zahl, kein Text', comfyGefuellt['3'].inputs.seed === 4242 && typeof comfyGefuellt['3'].inputs.seed === 'number');
+  pruefe('Maße sind Zahlen', comfyGefuellt['5'].inputs.width === 1024 && typeof comfyGefuellt['5'].inputs.width === 'number');
+  pruefe('großer Seed wird auf 32 Bit gefaltet',
+    ctx.comfyDaten(JSON.stringify(wf), { prompt: 'a', negativ: '', seed: 777777777777, breite: 512, hoehe: 512 })['3'].inputs.seed <= 2147483647);
+
+  let comfyListenFehler = '';
+  try { ctx.comfyDaten('[1,2,3]', { prompt: 'a', seed: 1, breite: 512, hoehe: 512 }); } catch (e) { comfyListenFehler = e.message; }
+  pruefe('Liste statt Objekt wird abgelehnt', /API-Format/.test(comfyListenFehler), comfyListenFehler);
+
+  const comfyFehler = ctx.comfyFehlertext({ error: { message: 'Prompt outputs failed validation' },
+    node_errors: { '6': { class_type: 'CheckpointLoaderSimple', errors: [{ message: 'Modell nicht gefunden' }] } } });
+  pruefe('Fehlermeldung nennt Knoten und Ursache',
+    /Knoten 6/.test(comfyFehler) && /Modell nicht gefunden/.test(comfyFehler), comfyFehler);
+
+  pruefe('Bild kommt als Base64-Adresse zurück, wie vom Perchance-Plugin',
+    (await ctx.blobZuBase64({ inhalt: 'ABC' })) === 'data:image/png;base64,ABC');
+  pruefe('ComfyUI ist als Quelle registriert', !!ctx.BILDQUELLEN.comfy && typeof ctx.BILDQUELLEN.comfy.zeichne === 'function');
 
   console.log('\n— Modell-Listen der Dienste —');
   // Die Listen kommen vom jeweiligen Dienst. Pollinations antwortet mal mit

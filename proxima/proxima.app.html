@@ -192,7 +192,7 @@ select.feld option{background:var(--panel);}
 
 <!-- STARTSCREEN -->
 <div id="start">
-  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.47</div>
+  <div class="sub">EIN DIALOG-ABENTEUER &middot; V7.48</div>
   <h1>PROXIMA</h1>
   <div id="eingabe-wrap">
     <textarea id="begriffe" rows="3" placeholder="Schreibe eine Story-Idee – oder würfle einen Vorschlag mit ⚄"></textarea>
@@ -568,6 +568,7 @@ var CFG={
   urlVorlage:'https://example.org/bild?p={prompt}&seed={seed}&w={breite}&h={hoehe}',
   gradioHost:'https://ibarakidouji-wai-nsfw-illustrious-sdxl.hf.space',
   gradioApi:'/generate', gradioFnIndex:'', gradioToken:'', gradioBreite:1024, gradioHoehe:1024,
+  comfyUrl:'http://127.0.0.1:8188', comfyBreite:1024, comfyHoehe:1024, comfyWorkflow:'',
   gradioVorlage:'["{prompt}", "{negativ}", {seed}, false, {breite}, {hoehe}, {guidance}, 28]',
   gradioReferenz:false,      // Referenzbild mitschicken (img2img)
   gradioStaerke:0.65,        // wie stark das neue Bild vom Referenzbild abweichen darf
@@ -740,6 +741,71 @@ var BILDQUELLEN={
       if(d.b64_json)return 'data:image/png;base64,'+d.b64_json;
       if(d.url)return await ladeBildUrl(d.url,60000);
       throw new Error('API-Antwort ohne Bild.');
+    }
+  },
+  comfy:{
+    label:'ComfyUI (lokal auf deinem Rechner)',
+    info:'Spricht deine ComfyUI-Anwendung direkt an: Auftrag an /prompt, Ergebnis aus /history, Bild über /view — und gibt es als Base64 zurück, genau wie das Perchance-Plugin. In ComfyUI den Arbeitsablauf über „Export (API)" speichern und hier einfügen. ComfyUI muss Fremdzugriffe erlauben (CORS).',
+    felder:[
+      {k:'comfyUrl',l:'Adresse von ComfyUI (ohne Schrägstrich am Ende)',typ:'text'},
+      {k:'comfyBreite',l:'Breite',typ:'zahl'},
+      {k:'comfyHoehe',l:'Höhe',typ:'zahl'},
+      {k:'comfyWorkflow',l:'Arbeitsablauf im API-Format — Platzhalter "{prompt}" "{negativ}" "{seed}" "{breite}" "{hoehe}"',typ:'text'}
+    ],
+    zeichne:async function(a){
+      var host=String(CFG.comfyUrl||'').replace(/\/+$/,'');
+      if(!host)throw new Error('Keine Adresse für ComfyUI hinterlegt.');
+      if(!String(CFG.comfyWorkflow||'').trim())
+        throw new Error('Kein Arbeitsablauf hinterlegt. In ComfyUI über „Export (API)" speichern und hier einfügen.');
+
+      var wf=comfyDaten(CFG.comfyWorkflow,{
+        prompt:a.prompt, negativ:a.negativ, seed:a.seed,
+        breite:auf64(CFG.comfyBreite||a.breite), hoehe:auf64(CFG.comfyHoehe||a.hoehe)
+      });
+      var kennung=sitzungsNummer();
+      var r=await fetch(host+'/prompt',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({prompt:wf,client_id:kennung})
+      });
+      if(!r.ok){
+        var fj=null;
+        try{ fj=JSON.parse(await r.text()); }catch(e0){}
+        throw new Error('ComfyUI lehnte den Auftrag ab (HTTP '+r.status+'): '+(fj?comfyFehlertext(fj):'ohne nähere Angabe'));
+      }
+      var auftrag=(await r.json()).prompt_id;
+      if(!auftrag)throw new Error('ComfyUI nannte keine Auftragsnummer.');
+
+      // ComfyUI meldet nichts, solange es rechnet - also nachfragen, bis das
+      // Ergebnis im Verlauf steht.
+      var bild=null;
+      for(var i=0;i<120&&!bild;i++){
+        await warte(1500);
+        var h=await fetch(host+'/history/'+encodeURIComponent(auftrag));
+        if(!h.ok)continue;
+        var hj=await h.json();
+        var eintrag=hj&&hj[auftrag];
+        if(!eintrag)continue;
+        var st=eintrag.status;
+        if(st&&st.status_str==='error')
+          throw new Error('ComfyUI meldete einen Fehler beim Ausführen: '+
+            JSON.stringify(st.messages||st).substring(0,220));
+        var aus=eintrag.outputs||{};
+        Object.keys(aus).forEach(function(k){
+          if(bild)return;
+          var b=aus[k]&&aus[k].images&&aus[k].images[0];
+          if(b&&b.filename)bild=b;
+        });
+      }
+      if(!bild)throw new Error('ComfyUI wurde nicht rechtzeitig fertig (3 Minuten).');
+
+      var adresse=host+'/view?filename='+encodeURIComponent(bild.filename)+
+        '&subfolder='+encodeURIComponent(bild.subfolder||'')+
+        '&type='+encodeURIComponent(bild.type||'output');
+      var v=await fetch(adresse);
+      if(!v.ok)throw new Error('Bild nicht abrufbar (HTTP '+v.status+') von '+adresse.substring(0,120));
+      var blob=await v.blob();
+      if(!blob||blob.size<200)throw new Error('ComfyUI lieferte kein Bild ('+(blob?blob.size:0)+' Bytes).');
+      return await blobZuBase64(blob);
     }
   },
   gradio:{
@@ -1020,6 +1086,76 @@ function sseDaten(text){
 // Anfrage. Meist voruebergehend, ein zweiter Anlauf lohnt sich.
 function istServerPanne(m){
   return /internal assert|nvml|cuda|out of memory|oom|allocator|device-side/i.test(String(m||''));
+}
+// ComfyUI erwartet einen Arbeitsablauf im API-Format: ein Objekt aus Knoten,
+// jeder mit class_type und inputs. Die Platzhalter stehen darin als Werte.
+function comfyDaten(vorlage,a){
+  var t=String(vorlage||'')
+    .replace(/"\{prompt\}"/g,JSON.stringify(String(a.prompt||'')))
+    .replace(/"\{negativ\}"/g,JSON.stringify(String(a.negativ||'')))
+    .replace(/"\{seed\}"/g,String(seedFuerDienst(a.seed)))
+    .replace(/"\{breite\}"/g,String(auf64(a.breite)))
+    .replace(/"\{hoehe\}"/g,String(auf64(a.hoehe)));
+  var o=JSON.parse(t);
+  if(!o||typeof o!=='object'||Array.isArray(o))
+    throw new Error('Der Arbeitsablauf muss ein JSON-Objekt im API-Format sein (in ComfyUI: „Export (API)").');
+  return o;
+}
+// Setzt die Platzhalter selbst an die richtigen Stellen: der Sampler verweist
+// auf seine beiden Textknoten, daran haengen Prompt und Negativprompt.
+function comfyPlatzhalter(wf){
+  var bericht=[], samplerId=null;
+  Object.keys(wf).forEach(function(id){
+    var n=wf[id];
+    if(samplerId||!n||!n.class_type)return;
+    if(/KSampler/i.test(n.class_type)&&n.inputs)samplerId=id;
+  });
+  if(samplerId){
+    var sampler=wf[samplerId];
+    var seedFeld=('seed' in sampler.inputs)?'seed':(('noise_seed' in sampler.inputs)?'noise_seed':null);
+    if(seedFeld){ sampler.inputs[seedFeld]='{seed}'; bericht.push('Seed → Knoten '+samplerId); }
+    [['positive','{prompt}','Prompt'],['negative','{negativ}','Negativprompt']].forEach(function(r){
+      var v=sampler.inputs[r[0]];
+      var zielId=Array.isArray(v)?String(v[0]):null;
+      var ziel=zielId?wf[zielId]:null;
+      if(ziel&&ziel.inputs&&typeof ziel.inputs.text==='string'){
+        ziel.inputs.text=r[1];
+        bericht.push(r[2]+' → Knoten '+zielId);
+      }
+    });
+  }
+  Object.keys(wf).forEach(function(id){
+    var n=wf[id];
+    if(!n||!n.inputs||!/EmptyLatent|EmptySD3Latent/i.test(n.class_type||''))return;
+    if('width' in n.inputs)n.inputs.width='{breite}';
+    if('height' in n.inputs)n.inputs.height='{hoehe}';
+    bericht.push('Bildmaße → Knoten '+id);
+  });
+  return bericht;
+}
+// Perchance liefert seine Bilder als data:-Adresse. Damit ComfyUI sich genauso
+// verhaelt, wird das fertige Bild in Base64 umgewandelt.
+function blobZuBase64(b){
+  return new Promise(function(res,rej){
+    try{
+      var r=new FileReader();
+      r.onload=function(){ res(String(r.result||'')); };
+      r.onerror=function(){ rej(new Error('Bild ließ sich nicht in Base64 umwandeln.')); };
+      r.readAsDataURL(b);
+    }catch(e){ rej(e); }
+  });
+}
+function comfyFehlertext(j){
+  var t=(j&&j.error&&(j.error.message||j.error.type))||'';
+  var knoten=j&&j.node_errors;
+  if(knoten&&typeof knoten==='object'){
+    Object.keys(knoten).slice(0,3).forEach(function(id){
+      var e=knoten[id];
+      var m=(e&&e.errors&&e.errors[0]&&(e.errors[0].message||e.errors[0].details))||'';
+      t+=' | Knoten '+id+(e&&e.class_type?' ('+e.class_type+')':'')+': '+m;
+    });
+  }
+  return t||'ohne nähere Angabe';
 }
 function quelle(){ return BILDQUELLEN[CFG.quelle]||BILDQUELLEN.perchance; }
 function auf64(n){ n=Math.round((Number(n)||1024)/64)*64; return Math.max(256,Math.min(2048,n)); }
@@ -4183,7 +4319,7 @@ function oeffneEinstellungen(){
 // Seit der Umstellung auf die Ladeschale ist die Frage berechtigt, welcher Stand
 // gerade laeuft. Die Schale legt den geholten Quelltext samt Zweig und Zeitpunkt
 // im localStorage ab; hier wird er nur abgelesen.
-var VERSION = 'V7.47';
+var VERSION = 'V7.48';
 // Ohne Browserkonsole — etwa am Handy — muss der Generator selbst sagen koennen,
 // woran es liegt, wenn ein Plugin von Perchance fehlt.
 function pluginLage(){
@@ -4247,6 +4383,11 @@ function zeichneQuellenFelder(){
   if((q.felder||[]).some(function(f){return f.typ==='passwort';})){
     html+='<div class="warnung">Schlüssel werden unverschlüsselt im Browser (localStorage) abgelegt und bei jedem Bild an den Dienst geschickt. Nur eigene Schlüssel mit Ausgabenlimit verwenden.</div>';
   }
+  if(k==='comfy'){
+    html+='<div class="reihe" style="margin-top:6px"><button class="feld" style="cursor:pointer" onclick="comfyVorbereiten()">'+
+          '&#9670; VERBINDUNG PRÜFEN &amp; PLATZHALTER SETZEN</button></div>'+
+          '<div class="hinweis" id="comfyInfo"></div>';
+  }
   if(k==='gradio'){
     html+='<div class="reihe" style="margin-top:6px"><button class="feld" style="cursor:pointer" onclick="gradioErkunden()">'+
           '&#9670; API ERKUNDEN &amp; VORLAGE BAUEN</button></div>'+
@@ -4306,6 +4447,52 @@ function modellGewaehlt(){
 
 // Endpunkte und Parameter beim Space erfragen und die Vorlage daraus bauen.
 // Erspart das Abtippen aus "Use via API" und deckt Tippfehler sofort auf.
+// Prueft, ob ComfyUI erreichbar ist, und setzt die Platzhalter selbst in den
+// eingefuegten Arbeitsablauf - das Suchen der richtigen Knoten von Hand ist
+// die fehleranfaelligste Stelle der Einrichtung.
+async function comfyVorbereiten(){
+  leseEinstellungen();
+  var pr=el('quellePruef'), info=el('comfyInfo');
+  var host=String(CFG.comfyUrl||'').replace(/\/+$/,'');
+  if(!host){ pr.className='pruefzeile fehler'; pr.textContent='Erst die Adresse von ComfyUI eintragen.'; return; }
+  pr.className='pruefzeile'; pr.textContent='Frage ComfyUI…';
+  var meldungen=[];
+  try{
+    var r=await fetch(host+'/system_stats');
+    if(!r.ok)throw new Error('HTTP '+r.status+' auf /system_stats');
+    var st=await r.json();
+    var sys=(st&&st.system)||{}, geraet=(st&&st.devices&&st.devices[0])||{};
+    meldungen.push('Verbunden'+(sys.comfyui_version?' mit ComfyUI '+sys.comfyui_version:'')+
+      (geraet.name?' · '+geraet.name:''));
+  }catch(e){
+    pr.className='pruefzeile fehler';
+    pr.textContent='✕ ComfyUI nicht erreichbar: '+((e&&e.message)||e)+
+      ' — läuft es, stimmt die Adresse, und sind Fremdzugriffe (CORS) erlaubt?';
+    return;
+  }
+  var feld=el('q_comfyWorkflow');
+  var roh=feld?feld.value.trim():'';
+  if(roh){
+    try{
+      var wf=JSON.parse(roh);
+      if(wf&&wf.nodes&&Array.isArray(wf.nodes))
+        throw new Error('Das ist das Bearbeitungsformat. In ComfyUI stattdessen „Export (API)" verwenden.');
+      var bericht=comfyPlatzhalter(wf);
+      feld.value=JSON.stringify(wf);
+      meldungen.push(bericht.length?('Platzhalter gesetzt: '+bericht.join(' · '))
+                                   :'Kein Sampler gefunden — Platzhalter bitte von Hand eintragen.');
+      leseEinstellungen();
+    }catch(e2){
+      meldungen.push('Arbeitsablauf nicht verwendbar: '+((e2&&e2.message)||e2));
+    }
+  }else{
+    meldungen.push('Noch kein Arbeitsablauf eingefügt — in ComfyUI „Export (API)" und hier einsetzen.');
+  }
+  info.textContent=meldungen.join('  |  ');
+  pr.className='pruefzeile ok';
+  pr.textContent='\u2713 Bitte prüfen, dann ÜBERNEHMEN und QUELLE TESTEN.';
+}
+
 async function gradioErkunden(){
   leseEinstellungen();
   var pr=el('quellePruef'), info=el('gradioInfo');

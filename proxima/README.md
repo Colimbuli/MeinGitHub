@@ -108,6 +108,7 @@ Die Auswahl gilt generatorweit und überlebt Spielstände.
 | **Pollinations** | nein | Offener Dienst, Bild kommt als URL. Anderes Modell als Perchance — dieselbe Beschreibung ergibt sichtbar andere Bilder. Negativprompt wird mitgeschickt, aber nicht von jedem Modell dort beachtet. |
 | **AI Horde** | nein (`0000000000`) | Gratis über freiwillige Rechner; anonym langsam, mit eigenem Schlüssel von [aihorde.net](https://aihorde.net) deutlich schneller. Bei hoher Auslastung sperrt sie alles über 907×907 und über 50 Schritte — die Bildgröße wird automatisch darunter gehalten (1024×1024 wird zu 896×896). |
 | **OpenAI-kompatible API** | ja | Alles, was `POST {basis}/images/generations` versteht. |
+| **ComfyUI (lokal)** | nein | Spricht deine eigene ComfyUI-Anwendung an und gibt das fertige Bild als Base64 zurück — für den Rest des Generators verhält es sich wie das Perchance-Plugin. Braucht einen Arbeitsablauf im API-Format und erlaubte Fremdzugriffe (CORS). |
 | **Hugging-Face-Space (Gradio)** | meist ja | Spricht einen Space ueber seine Warteschlange an. Endpunkt und Parameter holt **API ERKUNDEN** beim Space ab. ZeroGPU-Spaces brauchen ein Token und haben ein Kontingent. |
 | **Eigene URL-Vorlage** | je nachdem | Platzhalter `{prompt}` `{negativ}` `{seed}` `{breite}` `{hoehe}` `{guidance}`. |
 
@@ -147,6 +148,30 @@ wie viele Aufträge warten — sortiert ist nach Rechnerzahl, oben stehen also d
 Die Liste ist nur eine Hilfe: Das Textfeld darunter bleibt maßgeblich, ein Modellname lässt sich
 also weiterhin von Hand eintragen. Ist der Dienst gerade nicht erreichbar, sagt die Statuszeile das
 und ändert sonst nichts.
+
+### ComfyUI anbinden
+
+1. In ComfyUI den Arbeitsablauf bauen und über **Export (API)** speichern — nicht das normale
+   Speichern, das ergibt das Bearbeitungsformat und wird abgewiesen.
+2. In PROXIMA Bildquelle **ComfyUI (lokal)** wählen, Adresse prüfen (Vorgabe
+   `http://127.0.0.1:8188`), den Inhalt der API-Datei ins Feld *Arbeitsablauf* einfügen.
+3. **VERBINDUNG PRÜFEN & PLATZHALTER SETZEN** drücken. Das meldet ComfyUI-Version und Gerät und
+   trägt die Platzhalter selbst an den richtigen Knoten ein: Es sucht den Sampler, folgt seinen
+   Verweisen `positive` und `negative` zu den beiden Textknoten und setzt dort `{prompt}` und
+   `{negativ}`, dazu `{seed}` am Sampler und `{breite}`/`{hoehe}` am Latentknoten.
+4. **ÜBERNEHMEN**, dann **QUELLE TESTEN**.
+
+Der Ablauf beim Zeichnen: Auftrag an `POST /prompt`, danach `GET /history/<id>` abfragen, bis das
+Ergebnis dasteht (höchstens drei Minuten), Bild über `GET /view` holen und als **Base64**
+zurückgeben — für den Rest des Generators nicht von einem Perchance-Bild zu unterscheiden.
+
+Lehnt ComfyUI den Auftrag ab, nennt die Meldung den Knoten und die Ursache (fehlendes Modell,
+falscher Wert) statt eines rohen Statuscodes.
+
+**CORS:** Der Aufruf kommt von einer HTTPS-Seite an eine lokale Adresse. ComfyUI muss Fremdzugriffe
+erlauben (`--enable-cors-header`, in der Desktop-Anwendung die entsprechende Einstellung). Chrome
+behandelt `127.0.0.1` als vertrauenswürdigen Ursprung, die übliche Mixed-Content-Sperre greift dort
+also nicht; das fertige Bild kommt ohnehin als `data:`-Adresse in die Seite.
 
 ### Einen Gradio-Space anbinden
 
